@@ -645,6 +645,18 @@ pub struct Newsletter {
 pub struct Newsletters {
     pub newsletters: Vec<Newsletter>,
     pub problems: Vec<AccountStatus>,
+    /// The accounts whose Inbox newsletters aren't here yet: the first time
+    /// an account comes online, Postrider moves them.
+    pub setting_aside: Vec<SettingAside>,
+}
+
+/// An account whose newsletters are still being set aside, and why that
+/// failed, when it did.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SettingAside {
+    pub account_id: Uuid,
+    pub problem: Option<String>,
 }
 
 /// A sender in an account's Newsletters.

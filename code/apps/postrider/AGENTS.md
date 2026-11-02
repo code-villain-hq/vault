@@ -244,7 +244,10 @@ Newsletters of the last 90 days by sender: how often each writes
 (`rhythm.ts`) and how much of it you opened, the least read first. It
 leads with the ones you never open and a button for all of them. It reads
 once, not every 15 seconds, since a read fetches every header of those 90
-days.
+days, except while an account's newsletters are still being set aside
+(`setting_aside`): then it says so and reads every 5 seconds until they
+are. When setting them aside failed, it says why (kept in memory,
+`set_aside_failed`); the account tries again when it next connects.
 
 - Unsubscribe (`POST /newsletters/unsubscribe`, U) asks nothing. It
   archives what the sender sent at once, and the request goes 10 seconds

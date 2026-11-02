@@ -12,6 +12,7 @@ import type {
   Newsletter,
   Newsletters,
   SenderProblem,
+  SettingAside,
   UnsubscribeSent,
   Unsubscribed,
 } from "@postrider/types";
@@ -51,7 +52,8 @@ export function NewslettersPage() {
   const base = `/api/w/${workspace.id}/newsletters`;
 
   // Read once, and again after Undo: each read asks every account's server
-  // for 90 days of headers.
+  // for 90 days of headers. The first time an account comes online, its
+  // Inbox newsletters move here: until they have, read every 5 seconds.
   const [data, setData] = useState<Newsletters>();
   const [error, setError] = useState("");
   const load = useCallback(() => {
@@ -64,6 +66,12 @@ export function NewslettersPage() {
     );
   }, [base, place]);
   useEffect(load, [load]);
+  const moving = data?.setting_aside.some((s) => s.problem === null) ?? false;
+  useEffect(() => {
+    if (!moving) return;
+    const timer = setTimeout(load, 5000);
+    return () => clearTimeout(timer);
+  }, [moving, data, load]);
 
   // The senders this page unsubscribed from or kept stay in their place,
   // with what happened, though their mail has left Newsletters.
@@ -263,6 +271,13 @@ export function NewslettersPage() {
           {data && data.problems.length > 0 && (
             <AccountProblems accounts={accounts} statuses={data.problems} />
           )}
+          {data && (
+            <SettingAsideLines
+              accounts={accounts}
+              settingAside={data.setting_aside}
+              showMoving={rows.length > 0}
+            />
+          )}
           {bulk ? (
             <BulkLead id={bulk[0]} batch={bulk[1]} done={done} onUndo={undo} />
           ) : (
@@ -293,11 +308,18 @@ export function NewslettersPage() {
           <ErrorMessage>{problem}</ErrorMessage>
           {!data && !error && <p className="px-3 text-muted">Reading your newsletters…</p>}
           {!data && error && <ErrorMessage>{error}</ErrorMessage>}
-          {data && rows.length === 0 && (
-            <Empty title="No newsletters yet">
-              Mail with a link to unsubscribe comes here, instead of to your Inbox.
-            </Empty>
-          )}
+          {data &&
+            rows.length === 0 &&
+            (moving ? (
+              <Empty title="Moving your newsletters here">
+                The first time, Postrider moves the mail in your Inbox with a link to unsubscribe
+                here. It shows in a moment.
+              </Empty>
+            ) : (
+              <Empty title="No newsletters yet">
+                Mail with a link to unsubscribe comes here, instead of to your Inbox.
+              </Empty>
+            ))}
           {rows.length > 0 && (
             <ol ref={listRef} aria-label="Newsletters">
               {rows.map((row, index) => {
@@ -515,4 +537,40 @@ function newestMail(workspace: string, row: Newsletter) {
 function openPage(url: string) {
   if (isDesktop) void openInBrowser(url);
   else window.open(url, "_blank", "noopener");
+}
+
+/** The accounts whose newsletters aren't here yet: still moving, or why
+ * moving them failed. */
+function SettingAsideLines({
+  accounts,
+  settingAside,
+  showMoving,
+}: {
+  accounts: MailAccount[];
+  settingAside: SettingAside[];
+  showMoving: boolean;
+}) {
+  const lines = accounts.flatMap((account) => {
+    const aside = settingAside.find((s) => s.account_id === account.id);
+    return aside && (aside.problem !== null || showMoving)
+      ? [{ account, problem: aside.problem }]
+      : [];
+  });
+  if (!lines.length) return null;
+  return (
+    <ul className="problems">
+      {lines.map(({ account, problem }) => (
+        <li key={account.id} className={problem ? "text-danger-ink" : ""}>
+          <span className="av sm" style={hue(account.hue)} aria-hidden="true">
+            {account.name.charAt(0).toUpperCase()}
+          </span>
+          <span>
+            {problem
+              ? `${account.name}: its newsletters stay in the Inbox for now. ${problem} Postrider tries again the next time it connects.`
+              : `Moving ${account.name}'s newsletters here from its Inbox…`}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }

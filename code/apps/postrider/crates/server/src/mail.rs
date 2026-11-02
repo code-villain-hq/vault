@@ -75,6 +75,8 @@ pub struct Mail {
     /// What the lists showed of the mail in each account's folders (by
     /// path), under the folder's UIDVALIDITY, so it isn't read again.
     pub(crate) lines: Mutex<KeptLines>,
+    /// Why setting each account's newsletters aside failed, until it works.
+    pub(crate) set_aside_failed: Mutex<HashMap<Uuid, String>>,
 }
 
 impl Mail {
@@ -89,6 +91,7 @@ impl Mail {
             readers: Mutex::default(),
             places: Mutex::default(),
             lines: Mutex::default(),
+            set_aside_failed: Mutex::default(),
         }
     }
 
@@ -552,12 +555,20 @@ impl Mail {
             self.bump();
         }
         self.set(account.id, AccountState::Online, None);
-        if let Err(failure) = self.set_newsletters_aside(account).await {
-            tracing::warn!(
-                address = %account.address,
-                "couldn't set the newsletters aside: {}",
-                failure.message()
-            );
+        let set_aside = self.set_newsletters_aside(account).await;
+        {
+            let mut failed = self.set_aside_failed.lock().expect("never poisoned");
+            match set_aside {
+                Ok(()) => failed.remove(&account.id),
+                Err(failure) => {
+                    tracing::warn!(
+                        address = %account.address,
+                        "couldn't set the newsletters aside: {}",
+                        failure.message()
+                    );
+                    failed.insert(account.id, failure.message())
+                }
+            };
         }
         self.asked(account.id);
         *tries = 0;

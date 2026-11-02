@@ -38,6 +38,7 @@ export type * from "./generated/Role";
 export type * from "./generated/SenderProblem";
 export type * from "./generated/Senders";
 export type * from "./generated/ServerCalendar";
+export type * from "./generated/SettingAside";
 export type * from "./generated/UnsubscribeSent";
 export type * from "./generated/Unsubscribed";
 export type * from "./generated/Unsubscribing";

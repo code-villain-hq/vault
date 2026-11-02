@@ -21,7 +21,7 @@ pub use mail::{
     CalendarCreate, CalendarPatch, Day, Event, Folder, FolderLink, FolderRole, HUES, Inbox,
     KeptInInbox, Listing, MailAccount, MailAccountConnect, MailAccountCreate, MailAccountPatch,
     MailRef, MailSummary, Message, MoveMail, NewMail, Newsletter, NewsletterRef, Newsletters,
-    RenameFolder, Reply, Rewrite, Rewritten, SenderProblem, Senders, ServerCalendar,
+    RenameFolder, Reply, Rewrite, Rewritten, SenderProblem, Senders, ServerCalendar, SettingAside,
     UnsubscribeSent, Unsubscribed, Unsubscribing,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};

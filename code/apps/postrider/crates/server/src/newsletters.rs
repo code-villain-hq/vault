@@ -31,7 +31,7 @@ use lettre::message::header::ContentType;
 use mail_parser::MessageParser;
 use postrider_domain::{
     AccountState, AccountStatus, FolderRole, KeptInInbox, MailAccount, Newsletter, Newsletters,
-    SenderProblem, Senders, UnsubscribeSent, Unsubscribed, Unsubscribing, Validate,
+    SenderProblem, Senders, SettingAside, UnsubscribeSent, Unsubscribed, Unsubscribing, Validate,
 };
 use reqwest::Url;
 use tokio::sync::watch;
@@ -513,11 +513,32 @@ pub async fn list(
             .map(|account| state.mail.newsletters_of(account, now)),
     )
     .await;
+    let set_aside: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT account_id FROM newsletters_set_aside WHERE account_id = ANY($1)",
+    )
+    .bind(accounts.iter().map(|a| a.id).collect::<Vec<_>>())
+    .fetch_all(&state.mail.pool)
+    .await?;
+    let failed = state
+        .mail
+        .set_aside_failed
+        .lock()
+        .expect("never poisoned")
+        .clone();
     let mut newsletters = Vec::new();
     let mut problems = Vec::new();
+    let mut setting_aside = Vec::new();
     for (account, read) in accounts.iter().zip(read) {
         match read {
-            Ok(found) => newsletters.extend(found),
+            Ok(found) => {
+                newsletters.extend(found);
+                if !set_aside.contains(&account.id) {
+                    setting_aside.push(SettingAside {
+                        account_id: account.id,
+                        problem: failed.get(&account.id).cloned(),
+                    });
+                }
+            }
             Err(failure) => problems.push(AccountStatus {
                 account_id: account.id,
                 state: match failure {
@@ -532,6 +553,7 @@ pub async fn list(
     Ok(Json(Newsletters {
         newsletters,
         problems,
+        setting_aside,
     }))
 }
 
