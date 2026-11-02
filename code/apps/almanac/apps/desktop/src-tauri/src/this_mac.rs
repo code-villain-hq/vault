@@ -213,29 +213,31 @@ async fn start_server(
     Ok((server, pool, session))
 }
 
-/// Reminders as they come due, as notifications: the topic's name over
-/// what to do.
+/// Reminders as they come due, as notifications.
 fn notify(app: AppHandle, state: &AppState) {
     let mut due = state.due.subscribe();
     tauri::async_runtime::spawn(async move {
         loop {
             match due.recv().await {
-                Ok(reminder) => {
-                    let shown = app
-                        .notification()
-                        .builder()
-                        .title(&reminder.topic)
-                        .body(&reminder.title)
-                        .show();
-                    if let Err(error) = shown {
-                        tracing::warn!("couldn't show a reminder: {error}");
-                    }
-                }
+                Ok(reminder) => ring(&app, &reminder.topic, &reminder.title),
                 Err(RecvError::Lagged(_)) => {}
                 Err(RecvError::Closed) => break,
             }
         }
     });
+}
+
+/// A reminder's notification: the topic's name over what to do. A server's
+/// reminders ring here too, from the web app (`ringing.tsx`). Outside an
+/// app bundle, in `tauri dev`, the plugin shows it.
+pub fn ring(app: &AppHandle, topic: &str, title: &str) {
+    if code_villain_notify::show(topic, title) {
+        return;
+    }
+    let shown = app.notification().builder().title(topic).body(title).show();
+    if let Err(error) = shown {
+        tracing::warn!("couldn't show a reminder: {error}");
+    }
 }
 
 async fn new_session(pool: &PgPool, person: Uuid) -> Result<String, String> {

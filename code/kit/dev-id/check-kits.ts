@@ -8,7 +8,7 @@ import { $ } from "bun";
 import { type CheckStep, runChecks } from "./check";
 
 const kitRoot = new URL("..", import.meta.url).pathname;
-const kits = ["auth", "claude", "desktop", "dev-id", "scim", "settings", "sync"];
+const kits = ["auth", "claude", "desktop", "dev-id", "notify", "scim", "settings", "sync"];
 
 const devId = `${kitRoot}dev-id`;
 

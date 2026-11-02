@@ -365,7 +365,17 @@ shape.
 `reminders.rs` looks every 30 seconds for reminders that are on, notify,
 and are due (at their time, or at nine), marks them told for that date,
 and sends them on `AppState::due`. The desktop app (`this_mac.rs`) turns
-them into notifications. A server with no Mac listening marks nothing.
+them into notifications, with `code/kit/notify`: the notification plugin's
+never show on macOS. A server with no Mac listening marks nothing.
+
+A server's reminders ring from the desktop app's copy (`ringing.tsx`), offline
+too. The app keeps every server workspace you're signed in to in sync, not
+only the one on screen: a workspace's copy is held (`copies.ts`), one per
+workspace, by the page and the ringer. Every 30 seconds the ringer rings
+what has come due with the `ring` command. Each Mac keeps in localStorage the
+date it rang each reminder for, and the day it began. What was due before
+that day stays quiet. The server isn't told, so every Mac you use rings once,
+for every reminder in the workspace.
 
 ## Layout
 
@@ -387,6 +397,8 @@ them into notifications. A server with no Mac listening marks nothing.
   `set.tsx`, the rules for a collection's picture in `collection.ts`), a section's own (`?section=`, what's
   kept under that theme from every block; with `&row=` a collection's
   row, its fields above, which its name opens in every picture, `Opens`) and its About (`?about`), `talk.tsx` the talk beside it,
+  `copies.ts` each workspace's local copy, shared by whatever holds it,
+  `ringing.tsx` a server's reminders rung on this Mac,
   `asking.tsx` the answers on their way and each topic's open talk (above
   the pages, so they last while you look elsewhere), `calendar.tsx`
   Calendar, `today.tsx` what's due today on the workspace's own page (a ring and chips to tick), `settings.tsx` Settings → Claude and Blocks, every kind drawn
@@ -396,7 +408,7 @@ them into notifications. A server with no Mac listening marks nothing.
   desktop app signed in to.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Almanac on Postgres for
   the workspaces on this Mac, with `code/kit/desktop`, and shows due
-  reminders as notifications.
+  reminders as notifications, a server's too (`ring`).
 - `migrations`: SQL schema, applied by the server on start.
 
 ## Rules

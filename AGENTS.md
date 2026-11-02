@@ -24,7 +24,7 @@ Every app except Caster, the theme and the site is built the same way:
 
 The sync engine lives in `code/kit/sync` (its `AGENTS.md` says how an app uses it). Forge, Glyph, Raven and Almanac use it. Layer uses it for the setup a team shares: its desktop app keeps that in a workspace, and the rest of its state in local files.
 
-Company sign-in lives in `code/kit/auth` (OIDC, sessions, desktop handoff). Shared web chrome and sign-in screens live in `code/kit/web`. Settings parsing is `code/kit/settings`; SCIM is `code/kit/scim`; local Postgres for desktop apps is `code/kit/desktop`; Claude Code on the asker's Mac (Settings → Claude) is `code/kit/claude`; Acme stand-in for `bun run dev` is `code/kit/dev-id`.
+Company sign-in lives in `code/kit/auth` (OIDC, sessions, desktop handoff). Shared web chrome and sign-in screens live in `code/kit/web`. Settings parsing is `code/kit/settings`; SCIM is `code/kit/scim`; local Postgres for desktop apps is `code/kit/desktop`; Claude Code on the asker's Mac (Settings → Claude) is `code/kit/claude`; notifications on the Mac (tauri-plugin-notification's never show) are `code/kit/notify`; Acme stand-in for `bun run dev` is `code/kit/dev-id`.
 
 The desktop app's own server starts with `code/kit/desktop`: Postgres 18 bundled in the app, on loopback, and the app's server beside it. Forge, Glyph, Raven and Almanac have it (`apps/desktop/src-tauri/src/this_mac.rs`), and Layer, one per profile (`src-tauri/src/workspace.rs`).
 

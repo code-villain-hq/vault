@@ -225,7 +225,8 @@ topics.
   Calendar shows the workspace's week from every topic and what's still
   to do from before it; what you tick stays on its day, ticked, until you
   untick it. A bell marks the reminders that notify the Mac, and the
-  desktop app sends those notifications.
+  desktop app sends those notifications, a server's workspace's too, from
+  its copy on the Mac, offline as well.
 
 On this Mac a topic searches the web when a question needs it, and links
 what it read. A company server's doesn't.

@@ -46,6 +46,7 @@ code-villain-desktop = { path = "../../kit/desktop" }
 code-villain-auth = { path = "../../kit/auth" }
 code-villain-scim = { path = "../../kit/scim" }
 code-villain-settings = { path = "../../kit/settings" }
+code-villain-notify = { path = "../../kit/notify" }
 code-villain-sync = { path = "../../kit/sync" }
 almanac-domain = { path = "crates/domain" }
 almanac-server = { path = "crates/server" }

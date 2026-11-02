@@ -75,6 +75,12 @@ fn mac_user_name() -> String {
     this_mac::account_name()
 }
 
+/// A server's reminder come due, rung here as this Mac's own are.
+#[tauri::command]
+fn ring(app: tauri::AppHandle, topic: String, title: String) {
+    this_mac::ring(&app, &topic, &title);
+}
+
 /// Whether Claude Code on this Mac can answer for the server at `origin`.
 #[tauri::command]
 async fn claude_here(here: State<'_, Here>, origin: String) -> Result<ClaudeCodeInfo, String> {
@@ -110,6 +116,8 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // Reminders ring as notifications: macOS asks once whether they may.
+            code_villain_notify::ask();
             let data = app.path().app_data_dir()?;
             app.manage(Here::new(data.join("claude")));
             app.manage(ThisMac::new(data, app.handle().clone()));
@@ -123,6 +131,7 @@ fn main() {
             this_mac,
             start_on_this_mac,
             mac_user_name,
+            ring,
             claude_here,
             answer_here
         ])

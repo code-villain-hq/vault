@@ -11,11 +11,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { followPhotos } from "./sending";
+import { holdCopy } from "./copies";
 import type { Place } from "./server";
-import { loadSession } from "./session";
-import { followSetUps } from "./starting";
-import { createSyncClient, type Schema } from "./sync";
+import type { Schema } from "./sync";
 
 interface WorkspaceContext {
   /** Where the workspace lives: this Mac, or a server. */
@@ -30,7 +28,7 @@ interface WorkspaceContext {
 const Context = createContext<WorkspaceContext | null>(null);
 
 /**
- * Opens the workspace's local copy and keeps it in sync while mounted.
+ * Holds the workspace's local copy, which keeps it in sync, while mounted.
  * Inside, the workspace's `url_key` is its key in the app's addresses,
  * which names its server when another place has the same key.
  */
@@ -59,28 +57,9 @@ export function WorkspaceProvider({
   const opens = `${place.id} ${userId} ${workspaceId}`;
 
   useEffect(() => {
-    const refusals = new EventTarget();
-    const sync = createSyncClient({
-      place,
-      userId,
-      workspaceId,
-      // Ask again: maybe signed out, maybe just removed from this workspace.
-      onSessionEnded: () => void loadSession(),
-      onRefused: (message) =>
-        refusals.dispatchEvent(new CustomEvent("refused", { detail: message })),
-    });
+    const { sync, refusals, release } = holdCopy(place, userId, workspaceId);
     setConnection({ sync, refusals, opened: `${place.id} ${userId} ${workspaceId}` });
-    void sync.start();
-    const stopSetUps = followSetUps(sync, place, workspaceId);
-    const stopPhotos = followPhotos(sync, place, workspaceId);
-    const online = () => sync.retryNow();
-    window.addEventListener("online", online);
-    return () => {
-      window.removeEventListener("online", online);
-      stopSetUps();
-      stopPhotos();
-      sync.stop();
-    };
+    return release;
   }, [place, userId, workspaceId]);
 
   // Until the switched-to workspace opens, nothing shows the last one's.

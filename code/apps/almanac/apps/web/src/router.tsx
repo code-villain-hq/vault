@@ -2,12 +2,23 @@ import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/re
 import { LoginPage, SignedInPage, StartPage } from "./auth";
 import { CalendarPage } from "./calendar";
 import { Home, NotFound, WorkspaceHome, WorkspaceLayout } from "./layout";
+import { Ringing } from "./ringing";
 import { AccountPage, BlocksPage, ClaudePage, MembersPage } from "./settings";
 import { TopicPage, type TopicSearch } from "./topic";
 
 const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
 
-const root = createRootRoute({ component: Outlet, notFoundComponent: NotFound });
+/** Every page, and in the desktop app the reminders that ring from servers. */
+function Root() {
+  return (
+    <>
+      <Ringing />
+      <Outlet />
+    </>
+  );
+}
+
+const root = createRootRoute({ component: Root, notFoundComponent: NotFound });
 
 const index = createRoute({ getParentRoute: () => root, path: "/", component: Home });
 
