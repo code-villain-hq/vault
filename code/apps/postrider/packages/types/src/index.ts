@@ -23,6 +23,8 @@ export type * from "./generated/MailSummary";
 export type * from "./generated/Me";
 export type * from "./generated/Message";
 export type * from "./generated/ModelKind";
+export type * from "./generated/MoveMail";
+export type * from "./generated/RenameFolder";
 export type * from "./generated/Reply";
 export type * from "./generated/Role";
 export type * from "./generated/ServerCalendar";

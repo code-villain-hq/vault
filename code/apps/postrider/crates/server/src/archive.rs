@@ -1,13 +1,14 @@
 //! Filing a mail away: E moves it to its account's Archive, at
 //! `POST /api/w/{workspace}/mails/{account}/{uid}/archive[?folder=<key>]`,
-//! and ⌫ to its Trash, at `…/trash`. An account without the folder gets
-//! one, beside its other folders.
+//! ⌫ to its Trash, at `…/trash`, and V to a folder you pick, at `…/move`.
+//! An account without the folder gets one, beside its other folders.
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use postrider_domain::{FolderRole, MailAccount};
+use postrider_domain::{FolderRole, MailAccount, MoveMail};
 use uuid::Uuid;
 
 use crate::auth::Member;
@@ -18,15 +19,16 @@ use crate::mail::{Mail, OpenParams};
 use crate::state::AppState;
 
 impl Mail {
-    /// Moves a mail from the Inbox, or the folder `key` names, to its
-    /// account's folder for `role`: Archive or Trash. One there already stays.
-    pub async fn file_away(
+    /// Moves a mail from the Inbox, or the folder `key` names, to the folder
+    /// `to` names: the Inbox, a role's like Archive, or one of the account's
+    /// own, made when it has none. One there already stays.
+    pub async fn move_mail(
         self: &Arc<Self>,
         workspace_id: Uuid,
         account_id: Uuid,
         key: Option<&str>,
         uid: i64,
-        role: FolderRole,
+        to: &str,
     ) -> Result<(), AppError> {
         let refused = |failure: Failure| AppError::refused(failure.message());
         let account = self.account(workspace_id, account_id).await?;
@@ -43,10 +45,10 @@ impl Mail {
                     ))
                 })?,
         };
-        if from.role == Some(role) {
+        let to = self.destination(&account, to).await.map_err(refused)?;
+        if from.path == to.path {
             return Ok(());
         }
-        let to = self.folder_for(&account, role).await.map_err(refused)?;
         self.on_server(&account, |session| {
             let (from, to) = (from.path.clone(), to.path.clone());
             Box::pin(async move { imap::move_mail(session, &from, uid, &to).await })
@@ -60,6 +62,17 @@ impl Mail {
             lines.remove(&uid);
         }
         Ok(())
+    }
+
+    /// The account's folder `key` names, made when it has none.
+    async fn destination(&self, account: &MailAccount, key: &str) -> Result<Place, Failure> {
+        if key.eq_ignore_ascii_case("inbox") {
+            return Ok(Place::inbox());
+        }
+        match FolderRole::ALL.into_iter().find(|role| role.key() == key) {
+            Some(role) => self.folder_for(account, role).await,
+            None => Ok(self.folder_named(account, key).await?.0),
+        }
     }
 
     /// The account's folder for `role`, made when it has none.
@@ -96,12 +109,12 @@ pub async fn archive(
 ) -> Result<StatusCode, AppError> {
     state
         .mail
-        .file_away(
+        .move_mail(
             member.actor.workspace_id,
             account_id,
             params.folder.as_deref(),
             uid,
-            FolderRole::Archive,
+            FolderRole::Archive.key(),
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -116,12 +129,38 @@ pub async fn trash(
 ) -> Result<StatusCode, AppError> {
     state
         .mail
-        .file_away(
+        .move_mail(
             member.actor.workspace_id,
             account_id,
             params.folder.as_deref(),
             uid,
-            FolderRole::Trash,
+            FolderRole::Trash.key(),
+        )
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/w/{workspace}/mails/{account}/{uid}/move[?folder=<key>]`: to
+/// the folder `to` names, or a new one by that name.
+pub async fn move_to(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, account_id, uid)): Path<(Uuid, Uuid, i64)>,
+    Query(params): Query<OpenParams>,
+    Json(moving): Json<MoveMail>,
+) -> Result<StatusCode, AppError> {
+    let to = moving.to.trim();
+    if to.is_empty() || to.contains('/') {
+        return Err(AppError::invalid("Pick a folder, or name a new one."));
+    }
+    state
+        .mail
+        .move_mail(
+            member.actor.workspace_id,
+            account_id,
+            params.folder.as_deref(),
+            uid,
+            to,
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)

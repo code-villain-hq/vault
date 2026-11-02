@@ -124,11 +124,14 @@ export function NotFound() {
  */
 export function PageHeader({
   title,
+  crumb,
   parent,
   back,
   children,
 }: {
   title: string;
+  /** In the title's place, when it's more than words: a folder's name, to rename. */
+  crumb?: ReactNode;
   parent?: ReactNode;
   /** A button back to where the page was opened from, in the parent's place. */
   back?: ReactNode;
@@ -150,11 +153,13 @@ export function PageHeader({
               </span>
             </>
           )}
-          <span className="truncate font-medium text-fg" aria-current="page">
-            {title}
-          </span>
+          {crumb ?? (
+            <span className="truncate font-medium text-fg" aria-current="page">
+              {title}
+            </span>
+          )}
         </nav>
-        <div className="ml-auto flex min-w-0 items-center gap-3">{children}</div>
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">{children}</div>
       </header>
       <h1 className="sr-only">{title}</h1>
     </>
@@ -483,6 +488,7 @@ const SECTIONS: ShortcutSection[] = [
       ["R", "Reply"],
       ["E", "Archive, and open the next"],
       ["⌫", "Delete, and open the next"],
+      ["V", "Move to a folder, or a new one"],
       ["Esc", "Close it"],
     ],
   },

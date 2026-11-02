@@ -201,10 +201,14 @@
   background: var(--signal);
 }
 
-/* "Search mail", in the top bar. */
+/* "Search mail", in the list's top bar: as wide as the list leaves it,
+   ending where the list's rows and the field at its foot end. */
+.mail-list .app-topbar {
+  padding-right: 8px;
+}
 .search {
   display: flex;
-  flex: 0 1 240px;
+  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 120px;
@@ -228,6 +232,30 @@
 }
 .search .ui-kbd {
   margin-left: auto;
+}
+
+/* A folder's name in the top bar: clicked, a field to rename it. */
+.crumb-name {
+  min-width: 0;
+  max-width: 100%;
+  margin: -4px -6px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: inherit;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.crumb-name {
+  cursor: text;
+}
+button.crumb-name:hover {
+  background: var(--hover);
+}
+input.crumb-name {
+  margin-block: -5px;
 }
 
 /* An account Postrider can't read right now, above its mail. */
@@ -255,6 +283,16 @@
 }
 .mail-list {
   width: min(var(--list-width), 50%);
+}
+/* The field to ask Postrider is the foot of the list's panel. */
+.mail-list .page-content {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mail-list .ask {
+  background: var(--panel);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
 }
 .mail-reader .reader-back {
   display: none;

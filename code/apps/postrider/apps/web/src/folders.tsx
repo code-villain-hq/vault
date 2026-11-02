@@ -1,5 +1,5 @@
 import { shortcutFree } from "@code-villain/web";
-import type { Listing } from "@postrider/types";
+import type { Folder, FolderLink, Listing, RenameFolder } from "@postrider/types";
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -99,7 +99,8 @@ function useListing(from: From, path: string | undefined, again = 0) {
 /** A folder's newest mail, every account's, in the list column. */
 export function FolderList({ folder, open }: { folder: string; open: string | undefined }) {
   const { folders, minutes } = useFolders();
-  const name = folders.find((f) => f.key.toLowerCase() === folder.toLowerCase())?.name ?? folder;
+  const shown = folders.find((f) => f.key.toLowerCase() === folder.toLowerCase());
+  const name = shown?.name ?? folder;
   const from = useMemo(() => ({ folder }), [folder]);
   // Read again with the sidebar's counts, for mail filed or read elsewhere.
   const { listing, error, waiting } = useListing(
@@ -109,13 +110,114 @@ export function FolderList({ folder, open }: { folder: string; open: string | un
   );
   return (
     <>
-      <PageHeader title={name}>
+      <PageHeader
+        title={name}
+        crumb={shown?.role === null ? <FolderName folder={shown} /> : undefined}
+      >
         <SearchField />
       </PageHeader>
       <PageBody>
         <Mails from={from} open={open} listing={listing} error={error} waiting={waiting} />
       </PageBody>
     </>
+  );
+}
+
+/**
+ * A folder's name in the top bar, which renames it when clicked: in every
+ * account that has it, with its mail and the rules that sort into it, as
+ * the chat does. Enter or leaving the field renames it, Esc doesn't. A
+ * folder inside another keeps its place: only its own name changes.
+ */
+function FolderName({ folder }: { folder: Folder }) {
+  const { workspace, place, refusals } = useWorkspace();
+  const { moved } = useFolders();
+  const navigate = useNavigate();
+  const parts = folder.name.split(" / ");
+  const own = parts.pop() ?? folder.name;
+  const parent = parts.length ? `${parts.join(" / ")} / ` : "";
+  const [text, setText] = useState<string>();
+  const [renaming, setRenaming] = useState(false);
+  // Esc lets go of the field, and leaving it then renames nothing.
+  const dropped = useRef(false);
+
+  const rename = () => {
+    const name = text?.trim();
+    if (renaming || dropped.current) return;
+    if (!name || name === own) {
+      setText(undefined);
+      return;
+    }
+    setRenaming(true);
+    const renamed: RenameFolder = { name };
+    api<FolderLink>(
+      "POST",
+      `/api/w/${workspace.id}/folders/${encodeURIComponent(folder.key)}/rename`,
+      renamed,
+      place,
+    ).then(
+      (to) => {
+        moved();
+        setText(undefined);
+        setRenaming(false);
+        void navigate({
+          to: "/$workspace/folders/$folder",
+          params: { workspace: workspace.url_key, folder: to.key },
+          replace: true,
+        });
+      },
+      (problem: unknown) => {
+        setRenaming(false);
+        refusals.dispatchEvent(new CustomEvent("refused", { detail: messageOf(problem) }));
+      },
+    );
+  };
+
+  if (text === undefined) {
+    return (
+      <button
+        type="button"
+        className="crumb-name"
+        aria-current="page"
+        title="Rename the folder"
+        onClick={() => {
+          dropped.current = false;
+          setText(own);
+        }}
+      >
+        {folder.name}
+      </button>
+    );
+  }
+  return (
+    <span className="flex min-w-0 items-center">
+      {parent && <span className="shrink-0 font-medium text-fg">{parent}</span>}
+      <input
+        autoFocus
+        value={text}
+        readOnly={renaming}
+        onChange={(event) => setText(event.target.value)}
+        onFocus={(event) => event.target.select()}
+        onBlur={rename}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            rename();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            if (renaming) return;
+            dropped.current = true;
+            setText(undefined);
+          }
+        }}
+        aria-label="The folder's name"
+        spellCheck={false}
+        // As wide as the name, a letter to spare.
+        style={{ width: `calc(${Math.max(text.length, 4) + 1}ch + 14px)` }}
+        className={`crumb-name ui-field ${renaming ? "text-muted" : ""}`}
+      />
+    </span>
   );
 }
 

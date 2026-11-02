@@ -15,7 +15,8 @@ use axum::extract::{Path, Query, State};
 use futures::future::join_all;
 use futures::{StreamExt, TryStreamExt, stream};
 use postrider_domain::{
-    AccountState, AccountStatus, Folder, FolderRole, Listing, MailAccount, MailSummary, Message,
+    AccountState, AccountStatus, Folder, FolderLink, FolderRole, Listing, MailAccount, MailSummary,
+    Message, RenameFolder,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -25,6 +26,7 @@ use crate::error::AppError;
 use crate::imap::{self, Failure, Line, Place};
 use crate::mail::{Mail, READERS};
 use crate::message;
+use crate::rules::{Renamed, leaf};
 use crate::state::AppState;
 
 /// How many of a folder's newest mails a list shows, from each account.
@@ -115,6 +117,71 @@ impl Mail {
             .await?
             .into_iter()
             .find(|place| place.is(key)))
+    }
+
+    /// Renames the folder `key` names, in every account that has it. A
+    /// folder for a role, like Sent, keeps its name. One account refusing
+    /// puts back those renamed before it.
+    pub async fn rename(
+        self: &Arc<Self>,
+        workspace_id: Uuid,
+        key: &str,
+        name: &str,
+    ) -> Result<Vec<Renamed>, AppError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(AppError::invalid("Give the folder a name."));
+        }
+        if name.contains('/') || name.eq_ignore_ascii_case("inbox") {
+            return Err(AppError::invalid(format!(
+                "A folder can't be called {name}."
+            )));
+        }
+        let refused = |failure: Failure| AppError::refused(failure.message());
+        let mut renaming = Vec::new();
+        for account in self.accounts(workspace_id).await? {
+            let Some(from) = self.place(&account, key).await.map_err(refused)? else {
+                continue;
+            };
+            if let Some(role) = from.role {
+                return Err(AppError::invalid(format!(
+                    "{} is the same in every mail app: rename your own folders.",
+                    role_name(role)
+                )));
+            }
+            if let Some(there) = self.place(&account, name).await.map_err(refused)?
+                && there.path != from.path
+            {
+                return Err(AppError::invalid(format!(
+                    "{} has a folder called {name} already.",
+                    account.name
+                )));
+            }
+            renaming.push((account, from));
+        }
+        if renaming.is_empty() {
+            return Err(AppError::not_found(format!(
+                "There's no folder called {key}."
+            )));
+        }
+        let mut renamed: Vec<Renamed> = Vec::new();
+        for (account, from) in renaming {
+            match self.rename_folder(&account, &from, name).await {
+                Ok(done) => renamed.push(done),
+                Err(failure) => {
+                    for done in renamed.iter().rev() {
+                        let back = leaf(&done.from.name);
+                        let _ = self.rename_folder(&done.account, &done.to, back).await;
+                    }
+                    return Err(AppError::refused(format!(
+                        "{}: {}",
+                        account.name,
+                        failure.message()
+                    )));
+                }
+            }
+        }
+        Ok(renamed)
     }
 
     /// A folder's newest mail, from every account that has it.
@@ -319,6 +386,25 @@ pub async fn folder(
     Ok(Json(
         state.mail.folder(member.actor.workspace_id, &key).await?,
     ))
+}
+
+/// `POST /api/w/{workspace}/folders/{key}/rename`: the folder renamed in
+/// every account, with its rules; it answers with the folder's new key.
+pub async fn rename(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, key)): Path<(Uuid, String)>,
+    Json(rename): Json<RenameFolder>,
+) -> Result<Json<FolderLink>, AppError> {
+    let renamed = state
+        .mail
+        .rename(member.actor.workspace_id, &key, &rename.name)
+        .await?;
+    let to = &renamed[0].to;
+    Ok(Json(FolderLink {
+        key: to.key(),
+        name: to.name.clone(),
+    }))
 }
 
 #[derive(Deserialize)]

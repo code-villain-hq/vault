@@ -6,8 +6,9 @@ above it. [`storyboards/a-day-with-your-mail.html`](storyboards/a-day-with-your-
 is the approved storyboard; build from it, a step at a time, not beyond it.
 Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
 Trash and the other folders in the sidebar, Search mail (/), Settings →
-Accounts, and on a mail E to archive it, ⌫ to delete it, R to reply and
-its files to open. A mail opens beside its list, in three columns: the
+Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
+R to reply and its files to open. A folder's name in the top bar renames
+it. A mail opens beside its list, in three columns: the
 sidebar, the list, the mail. Esc closes it, J and K move. A narrow window
 shows the list or the mail, with a way back. The desktop app notifies of
 new mail and counts what's unread on the dock. Step 2 is built too: the
@@ -134,6 +135,13 @@ Every change happens on the account's server; the Inbox follows it there.
 - E archives and ⌫ deletes (`archive.rs`): the mail moves to its
   account's Archive or Trash (made when there's none) and the next one
   opens. Mail in Trash stays there; its server empties it.
+- V moves it (`move.tsx`, `POST /mails/{account}/{uid}/move` with `to`):
+  to the Inbox, Archive, Junk or a folder of yours, picked by typing part
+  of its name, or to a new one made with that name.
+- A folder's name in the top bar renames it (`folders.tsx`,
+  `POST /folders/{key}/rename`): in every account that has it, with the
+  rules that sort into it, Sieve's and reading ones. Sent, Archive and the
+  other role folders keep their names.
 - R replies (`reply.rs`, `compose.tsx`): to the mail's Reply-To, else its
   sender, from the account it came to, in its thread, quoting it. It goes
   over SMTP: the IMAP server with `imap.` read as `smtp.`, on 465 with
@@ -156,16 +164,21 @@ The field at the foot of the list (`ask.tsx`) sends what you typed to
 you're signed in to it, through `code/kit/claude`, in an empty folder of
 its own and with Postrider's tools only, reached at `/api/ai/mcp` with a
 token that lasts the one question: `find_senders`, `find_mail`,
-`read_mail`, `sort_into`, `sort_by_reading` and `stop_sorting`. The
-prompt names the accounts, their folders and their rules, so "Dependabot
-too" adds to the rule it means. One question at a time; there's no talk to scroll back.
+`read_mail`, `sort_into`, `sort_by_reading`, `stop_sorting` and
+`rename_folder`. What the field can do, the page can do too: V moves a
+mail, a folder's name renames it. The prompt names the accounts,
+their folders and their rules, so "Dependabot too" adds to the rule it
+means. One question at a time; there's no talk to scroll back.
 Not installed or signed out, the answer says what to do.
 
 Rules live on each account's mail server, in a Sieve script named
 `postrider` (`rules.rs`, over ManageSieve in `sieve.rs`), so the server
 sorts while the Mac is shut and every mail app sees the same folders.
 Each rule is written with a `# rule {…}` comment, which is how Postrider
-reads its rules back; nothing about them is kept on the Mac. When the
+reads its rules back; nothing about them is kept on the Mac. IMAP names a
+folder in modified UTF-7 and Sieve in UTF-8, so `fileinto` gets the
+folder's name decoded (`imap::folder_name`), or mail for "Gebühren"
+lands in the Inbox. When the
 account ran a script of its own, `postrider-and-yours` runs that one,
 then Postrider's. A rule is a folder and what goes there: from a sender,
 to an address, words in the subject, a mailing list. `sort_into` writes

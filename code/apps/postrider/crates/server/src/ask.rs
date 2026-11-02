@@ -30,7 +30,7 @@ use crate::error::AppError;
 use crate::mail::Mail;
 use crate::message;
 use crate::reading::ReadingRule;
-use crate::rules::{self, Moved, Rule, When, same_folder};
+use crate::rules::{self, Moved, Renamed, Rule, When, leaf, same_folder};
 use crate::state::AppState;
 
 pub const POSTRIDER: App = App {
@@ -74,6 +74,8 @@ pub struct Done {
     /// The reading rules it made, and those it took away.
     reading_made: Vec<Uuid>,
     reading_removed: Vec<ReadingRule>,
+    /// The folders it renamed, in order.
+    renamed: Vec<Renamed>,
     chips: Vec<String>,
     folder: Option<FolderLink>,
 }
@@ -85,6 +87,7 @@ impl Done {
             || !self.made.is_empty()
             || !self.reading_made.is_empty()
             || !self.reading_removed.is_empty()
+            || !self.renamed.is_empty()
     }
 }
 
@@ -95,6 +98,7 @@ const TOOLS: &[&str] = &[
     "sort_into",
     "sort_by_reading",
     "stop_sorting",
+    "rename_folder",
 ];
 
 fn definitions() -> Vec<Value> {
@@ -208,6 +212,20 @@ fn definitions() -> Vec<Value> {
                 "required": ["folder"],
             },
         }),
+        json!({
+            "name": "rename_folder",
+            "description": "Renames a folder in every account that has it. What's in it, the \
+                folders inside it and the rules that sort into it go with it. A folder for a \
+                role, like Sent, keeps its name. It answers with what it did.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "folder": { "type": "string" },
+                    "name": { "type": "string" },
+                },
+                "required": ["folder", "name"],
+            },
+        }),
     ]
 }
 
@@ -224,6 +242,7 @@ impl Tools for Asking {
             "sort_into" => self.sort_into(&arguments).await,
             "sort_by_reading" => self.sort_by_reading(&arguments).await,
             "stop_sorting" => self.stop_sorting(&arguments).await,
+            "rename_folder" => self.rename_folder(&arguments).await,
             _ => Err(format!("Postrider has no tool called {name}.")),
         };
         match done {
@@ -419,6 +438,37 @@ impl Asking {
             n => format!("Moved {n} mails there."),
         });
         Ok(format!("Done. Tell them so, in their language: {said}"))
+    }
+
+    async fn rename_folder(&self, arguments: &Value) -> Result<String, String> {
+        let folder = text(arguments, "folder")?;
+        let name = text(arguments, "name")?;
+        let renamed = self
+            .mail
+            .rename(self.workspace_id, folder, name)
+            .await
+            .map_err(|e| e.message)?;
+        let mut done = self.done.lock().await;
+        let mut accounts = Vec::new();
+        let mut said = String::new();
+        for renamed in renamed {
+            if !done.before.iter().any(|(a, _)| a.id == renamed.account.id) {
+                done.before
+                    .push((renamed.account.clone(), renamed.rules.clone()));
+            }
+            accounts.push(renamed.account.name.clone());
+            said = format!("**{}** is **{}** now", renamed.from.name, renamed.to.name);
+            done.folder = Some(FolderLink {
+                key: renamed.to.key(),
+                name: renamed.to.name.clone(),
+            });
+            done.renamed.push(renamed);
+        }
+        Ok(format!(
+            "Done. Tell them so, in their language: {said} {}. Its mail and the rules that \
+             sort into it went with it.",
+            self.in_accounts(&accounts)
+        ))
     }
 
     async fn sort_by_reading(&self, arguments: &Value) -> Result<String, String> {
@@ -923,11 +973,15 @@ async fn prompt(mail: &Arc<Mail>, workspace_id: Uuid, accounts: &[MailAccount]) 
          \n\
          To sort mail into a folder, find its senders first with find_senders: a name like \
          GitHub isn't an address. Then sort_into the folder they named, with the addresses \
-         it found, or a domain for anyone there. To change a rule (\"Dependabot too\"), \
+         it found, or a domain for anyone there. When they name no folder, name it yourself, \
+         for the kind of mail it gathers rather than one sender: \"GitHub and co\" is code \
+         and its tools, so **Dev-Kram** rather than **GitHub**. One or two words in their \
+         language, with a little character. To change a rule (\"Dependabot too\"), \
          sort_into the same folder again with what's new; to take something out, \
-         stop_sorting. When a tool says what it did, say that, in its words; add a sentence \
-         only for what they should know, such as a sender you didn't find. Sort only what \
-         they asked for.\n\
+         stop_sorting. To rename a folder, rename_folder: its mail and rules go with it. \
+         When a tool says what it did, say that, in its words; add a sentence only for what \
+         they should know, such as a sender you didn't find. Sort only what they asked \
+         for.\n\
          \n\
          Sorting that needs reading a mail, like \"anything that looks like an invoice\", \
          can't be a rule on the mail server: sort_by_reading does it, on this Mac while \
@@ -1045,6 +1099,12 @@ pub async fn undo(
 }
 
 async fn put_back(mail: &Mail, done: &Done) -> Result<(), crate::imap::Failure> {
+    // Folders get their names back first: what's below looks for them there.
+    for renamed in done.renamed.iter().rev() {
+        let back = leaf(&renamed.from.name);
+        mail.rename_folder(&renamed.account, &renamed.to, back)
+            .await?;
+    }
     for (account, rules) in &done.before {
         mail.put_rules(account, rules).await?;
     }

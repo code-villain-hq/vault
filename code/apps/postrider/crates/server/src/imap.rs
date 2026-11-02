@@ -8,6 +8,7 @@
 //! meaning (UIDVALIDITY).
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
@@ -407,7 +408,7 @@ pub async fn make_folder(
         rest.starts_with(delimiter)
             .then(|| format!("INBOX{delimiter}"))
     });
-    let path = format!("{}{name}", under_inbox.unwrap_or_default());
+    let path = format!("{}{}", under_inbox.unwrap_or_default(), path_name(name));
     match session.create(&path).await {
         Ok(()) => {}
         Err(async_imap::error::Error::No(answer))
@@ -421,6 +422,64 @@ pub async fn make_folder(
         path,
         name: name.to_string(),
         role,
+    })
+}
+
+/// Renames a folder where it is, among the same folders: "GitHub" to
+/// "Dev-Kram". What it holds goes with it.
+pub async fn rename_folder(
+    session: &mut Session,
+    place: &Place,
+    name: &str,
+) -> Result<Place, Failure> {
+    let listed: Vec<_> = session
+        .list(Some(""), Some(&place.path))
+        .await?
+        .try_collect()
+        .await?;
+    let delimiter = listed
+        .first()
+        .and_then(|listed| listed.delimiter())
+        .unwrap_or_default()
+        .to_string();
+    if !delimiter.is_empty() && name.contains(&delimiter) {
+        return Err(Failure::Refused(format!(
+            "A folder's name can't have “{delimiter}” in it here."
+        )));
+    }
+    let parent = match delimiter.is_empty() {
+        true => "",
+        false => place
+            .path
+            .rfind(&delimiter)
+            .map_or("", |at| &place.path[..at + delimiter.len()]),
+    };
+    let path = format!("{parent}{}", path_name(name));
+    // Dovecot hangs up on a connection whose folder goes from under it.
+    session.select("INBOX").await?;
+    match session.rename(&place.path, &path).await {
+        Ok(()) => {}
+        Err(async_imap::error::Error::No(answer))
+            if answer.to_ascii_lowercase().contains("exists") =>
+        {
+            return Err(Failure::Refused(format!(
+                "There's a folder called {name} already."
+            )));
+        }
+        Err(e) => return Err(e.into()),
+    }
+    let _ = session.unsubscribe(&place.path).await;
+    if let Err(e) = session.subscribe(&path).await {
+        tracing::info!("couldn't subscribe to {path}: {e}");
+    }
+    let shown = match place.name.rsplit_once(" / ") {
+        Some((parent, _)) => format!("{parent} / {name}"),
+        None => name.to_string(),
+    };
+    Ok(Place {
+        path,
+        name: shown,
+        role: place.role,
     })
 }
 
@@ -595,7 +654,7 @@ fn places(listed: Vec<Listed>) -> Vec<Place> {
 
 /// A folder's name as IMAP sends it, in modified UTF-7 (RFC 3501, 5.1.3):
 /// `Entw&APw-rfe` is "Entwürfe".
-fn folder_name(path: &str) -> String {
+pub(crate) fn folder_name(path: &str) -> String {
     let mut name = String::new();
     let mut rest = path;
     while let Some(start) = rest.find('&') {
@@ -625,6 +684,37 @@ fn folder_name(path: &str) -> String {
     }
     name.push_str(rest);
     name
+}
+
+/// A name as a folder's path has it, in modified UTF-7: "Entwürfe" is
+/// `Entw&APw-rfe`.
+fn path_name(name: &str) -> String {
+    fn wide_ones(path: &mut String, wide: &mut Vec<u16>) {
+        if wide.is_empty() {
+            return;
+        }
+        let bytes: Vec<u8> = wide.iter().flat_map(|unit| unit.to_be_bytes()).collect();
+        let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(bytes);
+        let _ = write!(path, "&{}-", encoded.replace('/', ","));
+        wide.clear();
+    }
+    let mut path = String::new();
+    let mut wide = Vec::new();
+    for c in name.chars() {
+        match c {
+            '&' => {
+                wide_ones(&mut path, &mut wide);
+                path.push_str("&-");
+            }
+            ' '..='~' => {
+                wide_ones(&mut path, &mut wide);
+                path.push(c);
+            }
+            _ => wide.extend_from_slice(c.encode_utf16(&mut [0; 2])),
+        }
+    }
+    wide_ones(&mut path, &mut wide);
+    path
 }
 
 /// A mail in a folder, as a list shows it.
@@ -1056,6 +1146,16 @@ mod tests {
         assert_eq!(folder_name("Tom &- Jerry"), "Tom & Jerry");
         assert_eq!(folder_name("&ZeVnLIqe-"), "日本語");
         assert_eq!(folder_name("Plain"), "Plain");
+    }
+
+    #[test]
+    fn new_folder_names_encode_as_they_decode() {
+        assert_eq!(path_name("Entwürfe"), "Entw&APw-rfe");
+        assert_eq!(path_name("Tom & Jerry"), "Tom &- Jerry");
+        assert_eq!(path_name("日本語"), "&ZeVnLIqe-");
+        for name in ["Bücher & Hefte", "Dev-Kram", "Grüße 🦉"] {
+            assert_eq!(folder_name(&path_name(name)), name);
+        }
     }
 
     #[test]

@@ -321,6 +321,14 @@ pub enum FolderRole {
 }
 
 impl FolderRole {
+    pub const ALL: [FolderRole; 5] = [
+        FolderRole::Sent,
+        FolderRole::Archive,
+        FolderRole::Drafts,
+        FolderRole::Trash,
+        FolderRole::Junk,
+    ];
+
     /// Its key in addresses, where it stands for each account's own.
     pub fn key(self) -> &'static str {
         match self {
@@ -507,6 +515,20 @@ pub struct Answer {
 pub struct FolderLink {
     pub key: String,
     pub name: String,
+}
+
+/// A folder's new name.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct RenameFolder {
+    pub name: String,
+}
+
+/// Where a mail goes: a folder's key, or the name of a new one.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MoveMail {
+    pub to: String,
 }
 
 #[cfg(test)]

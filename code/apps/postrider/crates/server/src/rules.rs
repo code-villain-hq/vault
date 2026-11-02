@@ -110,10 +110,11 @@ pub fn script(rules: &[Rule]) -> String {
             .map(When::test)
             .collect::<Vec<_>>()
             .join(", ");
+        // Sieve names a folder in UTF-8, where IMAP has modified UTF-7.
         let _ = write!(
             script,
             "\n# rule {said}\nif anyof ({tests}) {{\n  fileinto {};\n  stop;\n}}\n",
-            sieve_string(&rule.path)
+            sieve_string(&crate::imap::folder_name(&rule.path))
         );
     }
     script
@@ -190,6 +191,16 @@ fn uid_set(uids: &[u32]) -> String {
     set
 }
 
+/// A folder an account renamed: where it was, where it is, and the
+/// account's rules before.
+#[derive(Debug, Clone)]
+pub struct Renamed {
+    pub account: MailAccount,
+    pub from: Place,
+    pub to: Place,
+    pub rules: Vec<Rule>,
+}
+
 /// Mail a rule moved from the Inbox, to move back on Undo: what in `path`
 /// matches `when`, from UID `since` on.
 #[derive(Debug, Clone)]
@@ -261,6 +272,60 @@ impl Mail {
             .or_default()
             .push(made.clone());
         Ok((made, true))
+    }
+
+    /// Renames the account's folder, and with it the rules that sort into
+    /// it or a folder inside it: Postrider's on the server, and those it
+    /// sorts by reading. Its rules as they were come back with it.
+    pub(crate) async fn rename_folder(
+        &self,
+        account: &MailAccount,
+        from: &Place,
+        name: &str,
+    ) -> Result<Renamed, Failure> {
+        let rules = self.rules(account).await?;
+        let rename = |from: Place, name: String| {
+            self.on_server(account, move |session| {
+                let (from, name) = (from.clone(), name.clone());
+                Box::pin(async move { imap::rename_folder(session, &from, &name).await })
+            })
+        };
+        let to = rename(from.clone(), name.to_string()).await?;
+        // Folders inside it moved with it: they're listed again.
+        self.lock_places().remove(&account.id);
+        self.lock_lines()
+            .retain(|(id, path), _| *id != account.id || moved_to(path, from, &to).is_none());
+        let mut changed = rules.clone();
+        for rule in &mut changed {
+            if let Some(path) = moved_to(&rule.path, from, &to) {
+                rule.path = path;
+                rule.folder = renamed(&rule.folder, from, &to);
+            }
+        }
+        if changed != rules
+            && let Err(failure) = self.put_rules(account, &changed).await
+        {
+            // Back where it was, where its rules look for it.
+            let _ = rename(to.clone(), leaf(&from.name).to_string()).await;
+            return Err(failure);
+        }
+        let reading = self.reading_rules(account.id).await?;
+        for rule in reading {
+            if let Some(path) = moved_to(&rule.path, from, &to) {
+                sqlx::query("UPDATE reading_rules SET folder = $2, path = $3 WHERE id = $1")
+                    .bind(rule.id)
+                    .bind(renamed(&rule.folder, from, &to))
+                    .bind(path)
+                    .execute(&self.pool)
+                    .await?;
+            }
+        }
+        Ok(Renamed {
+            account: account.clone(),
+            from: from.clone(),
+            to,
+            rules,
+        })
     }
 
     /// Moves what's in the account's Inbox that matches `when` to `path`.
@@ -508,6 +573,25 @@ pub fn described(rules: &[Rule]) -> String {
 }
 
 /// Whether two folder names are the same folder.
+/// The last part of a folder's name: "Layer" of "Projects / Layer".
+pub fn leaf(name: &str) -> &str {
+    name.rsplit(" / ").next().unwrap_or(name)
+}
+
+/// Where `path` is once `from` is renamed to `to`: it, or a folder inside it.
+fn moved_to(path: &str, from: &Place, to: &Place) -> Option<String> {
+    let rest = path.strip_prefix(from.path.as_str())?;
+    (rest.is_empty() || rest.starts_with(['.', '/'])).then(|| format!("{}{rest}", to.path))
+}
+
+/// A folder's name once `from` is renamed to `to`.
+fn renamed(name: &str, from: &Place, to: &Place) -> String {
+    match name.strip_prefix(from.name.as_str()) {
+        Some(rest) => format!("{}{rest}", to.name),
+        None => to.name.clone(),
+    }
+}
+
 pub fn same_folder(a: &str, b: &str) -> bool {
     a.trim().eq_ignore_ascii_case(b.trim())
 }
@@ -538,6 +622,18 @@ mod tests {
         ));
         assert_eq!(rules_in(&script), vec![code()]);
         assert_eq!(rules_in(HEADER), vec![]);
+    }
+
+    #[test]
+    fn a_rule_files_into_the_folder_by_its_utf8_name() {
+        let fees = Rule {
+            folder: "Gebühren & Rechnungen".into(),
+            path: "Geb&APw-hren &- Rechnungen".into(),
+            when: vec![When::From("netcup.test".into())],
+        };
+        let script = script(std::slice::from_ref(&fees));
+        assert!(script.contains("fileinto \"Gebühren & Rechnungen\";"));
+        assert_eq!(rules_in(&script), vec![fees]);
     }
 
     #[test]

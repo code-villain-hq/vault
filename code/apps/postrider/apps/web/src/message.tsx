@@ -7,9 +7,9 @@ import {
   shortcutFree,
   UNKNOWN_PROBLEM,
 } from "@code-villain/web";
-import type { Attachment, MailSummary, Message } from "@postrider/types";
+import type { Attachment, MailSummary, Message, MoveMail } from "@postrider/types";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Archive, ArrowLeft, Paperclip, Reply, Trash2 } from "lucide-react";
+import { Archive, ArrowLeft, FolderInput, Paperclip, Reply, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
 import { ReplyDialog } from "./compose";
@@ -17,6 +17,7 @@ import { forgetListed, markSeen, useListedMails } from "./folders";
 import { type From, initial, mailKey, openedFrom, rememberOpened } from "./inbox";
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
+import { MoveDialog } from "./move";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
 import { ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -25,7 +26,8 @@ import { useWorkspace } from "./workspace";
  * `/$workspace/mail/$account/$uid`: a mail, opened beside the list it was
  * opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`). Esc
  * closes it; J and K open the next and the previous one in it; E archives
- * it and ⌫ deletes it, and the next opens; R answers it.
+ * it, ⌫ deletes it and V moves it to a folder, and the next opens; R
+ * answers it.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
@@ -42,6 +44,7 @@ export function MailPage() {
   const mails = listed ? listedMails : (inbox?.mails ?? []);
   const index = mails.findIndex((mail) => mailKey(mail) === key);
   const [replying, setReplying] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [opened, setOpened] = useState<{ key: string; message?: Message; error?: string }>();
   const message = opened?.key === key ? opened.message : undefined;
   const error = opened?.key === key ? opened.error : undefined;
@@ -92,20 +95,23 @@ export function MailPage() {
   const deletable = summary !== undefined && kept !== "trash";
 
   /**
-   * Moves it to its account's Archive or Trash and opens the next mail at
-   * once, or closes it after the last. A server that refuses says so in
-   * the frame's status, and the mail comes back to the Inbox.
+   * Moves it to its account's Archive or Trash, or to a folder picked or
+   * made, and opens the next mail at once, or closes it after the last. A
+   * server that refuses says so in the frame's status, and the mail comes
+   * back to the Inbox.
    */
-  const fileAway = (to: "archive" | "trash") => {
-    if (!summary || !(to === "archive" ? archivable : deletable)) return;
+  const fileAway = (to: "archive" | "trash" | MoveMail) => {
+    if (!summary) return;
+    if ((to === "archive" && !archivable) || (to === "trash" && !deletable)) return;
     const fromInbox = (summary.folder ?? "inbox").toLowerCase() === "inbox";
     if (fromInbox) leave(summary.account_id, summary.uid);
     if (listed) forgetListed(from, key);
     const query = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+    const picked = typeof to === "object";
     api(
       "POST",
-      `/api/w/${workspace.id}/mails/${account}/${uid}/${to}${query}`,
-      undefined,
+      `/api/w/${workspace.id}/mails/${account}/${uid}/${picked ? "move" : to}${query}`,
+      picked ? to : undefined,
       place,
     ).then(
       () => refresh(),
@@ -136,6 +142,9 @@ export function MailPage() {
       } else if (key === "Backspace" || key === "Delete") {
         event.preventDefault();
         fileAway("trash");
+      } else if (key === "v" && summary) {
+        event.preventDefault();
+        setMoving(true);
       } else if (key === "r" && summary) {
         event.preventDefault();
         setReplying(true);
@@ -172,6 +181,9 @@ export function MailPage() {
           )}
           {archivable && (
             <ReaderButton icon={Archive} label="Archive (E)" onClick={() => fileAway("archive")} />
+          )}
+          {summary && (
+            <ReaderButton icon={FolderInput} label="Move to… (V)" onClick={() => setMoving(true)} />
           )}
           {deletable && (
             <ReaderButton icon={Trash2} label="Delete (⌫)" onClick={() => fileAway("trash")} />
@@ -234,6 +246,12 @@ export function MailPage() {
           message={message}
         />
       )}
+      <MoveDialog
+        open={moving}
+        onOpenChange={setMoving}
+        from={summary?.folder ?? "inbox"}
+        onMove={(to) => fileAway({ to })}
+      />
     </>
   );
 }

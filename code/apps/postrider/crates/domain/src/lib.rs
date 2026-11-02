@@ -20,7 +20,7 @@ pub use mail::{
     AccountState, AccountStatus, Answer, Asked, Attachment, Calendar, CalendarConnect,
     CalendarCreate, CalendarPatch, Day, Event, Folder, FolderLink, FolderRole, HUES, Inbox,
     Listing, MailAccount, MailAccountConnect, MailAccountCreate, MailAccountPatch, MailSummary,
-    Message, Reply, ServerCalendar,
+    Message, MoveMail, RenameFolder, Reply, ServerCalendar,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{

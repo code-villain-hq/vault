@@ -45,7 +45,7 @@ export function Ask() {
   };
 
   return (
-    <div className="flex max-h-1/2 min-h-0 shrink-0 flex-col gap-2 px-2 pb-2 pt-1">
+    <div className="ask flex max-h-1/2 min-h-0 shrink-0 flex-col gap-2 px-2 pb-2 pt-1">
       {said && <AnswerCard said={said} onClose={() => setSaid(null)} />}
       <form
         className="ui-field flex shrink-0 items-end gap-1 rounded-md py-1 pl-3 pr-1"
@@ -133,20 +133,26 @@ function Answered({ answer }: { answer: Answer }) {
   const undone = undo === "undone";
 
   // Undo takes away a folder the answer made, once it's empty again: shown,
-  // the Inbox shows in its place.
+  // the Inbox shows in its place. Only the folders read right after Undo
+  // tell; one of that name made again later stays open.
   const made = answer.folder?.key;
-  const gone = undone && made !== undefined && !folders.some((f) => f.key === made);
+  const latest = useRef(folders);
+  latest.current = folders;
+  const before = useRef<typeof folders | null>(null);
   useEffect(() => {
-    if (gone && shown === made) {
+    if (!before.current || before.current === folders) return;
+    before.current = null;
+    if (made !== undefined && shown === made && !folders.some((f) => f.key === made)) {
       void navigate({ to: "/$workspace", params: { workspace: workspace.url_key } });
     }
-  }, [gone, shown, made, navigate, workspace.url_key]);
+  }, [folders, shown, made, navigate, workspace.url_key]);
 
   const putBack = (id: string) => {
     setUndo("undoing");
     setProblem("");
     api("POST", `/api/w/${workspace.id}/answers/${id}/undo`, undefined, place).then(
       () => {
+        before.current = latest.current;
         setUndo("undone");
         moved();
       },
