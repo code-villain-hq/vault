@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Herald: a day with your mail</title>
+<link rel="stylesheet" href="../../../../studio/design/tokens/color.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/type.css">
+<link rel="stylesheet" href="../../../../studio/design/tokens/shape.css">
+<link rel="stylesheet" href="../../../../studio/design/components.css">
+<style>
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-next.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("../../layer/src/design/fonts/atkinson-hyperlegible-mono.ttf"); font-weight: 200 800; }
+@font-face { font-family: "Grenze Gotisch"; src: url("../../layer/src/design/fonts/grenze-gotisch.ttf"); font-weight: 100 900; }
+</style>
+<style>
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--surface); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); padding: 40px; }
+  ol, ul { list-style: none; }
+}
+.page { width: 1180px; margin: 0 auto; display: grid; gap: 56px; }
+.page > header h1 { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1.1; }
+.page > header p { color: var(--muted); font-size: var(--type-body-size); line-height: var(--type-body-leading); margin-top: 6px; max-width: 76ch; }
+.step { display: grid; gap: 14px; }
+.step h2 { font-size: var(--type-title-size); font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.step h2 .n { color: var(--faint); font-weight: 400; }
+.step > p { color: var(--muted); max-width: 84ch; }
+.choices { color: var(--muted); max-width: 92ch; display: grid; gap: 2px; }
+.choices b { color: var(--fg); font-weight: 600; }
+.choices li { padding-left: 14px; position: relative; }
+.choices li::before { content: "·"; position: absolute; left: 2px; color: var(--faint); }
+.mode { display: grid; gap: 8px; }
+.mode-label { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* App window: the desktop app, so the traffic lights stand where the wordmark would. */
+.win { display: grid; grid-template-columns: 224px 1fr; grid-template-rows: 48px 1fr; height: 720px; background: var(--bg); color: var(--fg); border-radius: 12px; overflow: hidden; font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); }
+.side { grid-row: 1 / 3; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+.toprow { height: 48px; display: flex; align-items: center; padding-left: 8px; }
+.lights { display: flex; gap: 8px; }
+.lights span { width: 12px; height: 12px; border-radius: 50%; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.tools { margin-left: auto; display: flex; gap: 2px; align-items: center; }
+.picker { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; margin: 2px 0 10px; font-weight: 600; }
+.picker .chev { margin-left: auto; color: var(--muted); }
+.avatar { width: 20px; height: 20px; border-radius: 5px; background: var(--cloak); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.nav { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; }
+.nav svg { color: var(--muted); flex: none; }
+.nav.is-selected { font-weight: 700; }
+.nav.is-selected svg { color: var(--fg); }
+.nav .cnt { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--type-ui-small-size); font-weight: 400; font-variant-numeric: tabular-nums; padding-right: 2px; }
+.group { color: var(--faint); font-size: var(--type-ui-small-size); padding: 14px 8px 4px; }
+.sync { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.sync span { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
+.top { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.top b { color: var(--fg); font-weight: 600; }
+.search { display: flex; align-items: center; gap: 8px; width: 240px; height: 28px; padding: 0 6px 0 10px; background: var(--panel); color: var(--faint); }
+.search .ui-kbd { margin-left: auto; }
+.content { background: var(--panel); border-radius: var(--radius-lg); margin: 0 8px 8px 0; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+.ask { padding: 10px 24px 16px; margin-top: auto; }
+.askbox { display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 6px 0 14px; max-width: 720px; }
+.askbox .ph { color: var(--faint); flex: 1; }
+.askbox > svg { color: var(--muted); }
+
+/* An account, and its calendar, wear one data hue. */
+.av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--hue) 20%, transparent); color: var(--hue); }
+.av.sm { width: 18px; height: 18px; font-size: 10px; }
+.cv { --hue: var(--data-1); }
+.lz { --hue: var(--data-2); }
+
+/* Today, above the Inbox: 8 to 22, an hour at 64px. */
+.today { padding: 16px 24px 6px; }
+.dayhead { display: flex; align-items: baseline; gap: 10px; }
+.dayhead b { font-weight: 700; }
+.dayhead span { color: var(--muted); font-size: var(--type-ui-small-size); }
+.track { position: relative; height: 58px; margin-top: 10px; width: 896px; }
+.ev { position: absolute; top: 0; height: 32px; border-radius: var(--radius-md); padding: 0 8px; display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: color-mix(in srgb, var(--hue) var(--status-tint), transparent); }
+.ev b { font-size: var(--type-ui-small-size); font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev span { font-size: 11px; color: var(--muted); line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hour { position: absolute; bottom: 0; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; transform: translateX(-50%); }
+.hour:first-of-type { transform: none; }
+.now { position: absolute; top: -3px; height: 38px; width: 2px; border-radius: 1px; background: var(--signal); }
+.now::before { content: ""; position: absolute; top: -2px; left: -2px; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); }
+
+/* The Inbox: no dividers; unread reads in weight and the live dot. */
+.mails { padding: 6px 12px 0; display: grid; gap: 1px; }
+.mail { display: grid; grid-template-columns: 8px 26px 150px 1fr auto; gap: 12px; align-items: center; height: 40px; padding: 0 12px 0 8px; }
+.mail .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--faint); }
+.mail .line b { color: var(--fg); font-weight: 400; }
+.mail .when { color: var(--faint); font-size: var(--type-ui-small-size); font-variant-numeric: tabular-nums; }
+.mail.unread .who, .mail.unread .line b { font-weight: 700; }
+.mail.unread .when { color: var(--muted); }
+
+/* What Herald did, above the field you asked in. */
+.answer { margin: 8px 24px 0; max-width: 720px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); display: grid; gap: 10px; }
+.asked { color: var(--faint); font-size: var(--type-ui-small-size); }
+.did { display: flex; gap: 10px; align-items: flex-start; }
+.did > svg { color: var(--muted); margin-top: 2px; }
+.did b { font-weight: 700; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 25px; }
+.chips .ui-chip { padding: 5px 10px; }
+.acts { display: flex; align-items: center; gap: 10px; padding-left: 25px; }
+.acts .ui-link { font-size: var(--type-control-size); }
+
+/* The desk: two composers side by side, before and after. */
+.desk { position: relative; height: 520px; border-radius: 12px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-reading); font-size: var(--type-ui-size); line-height: var(--type-ui-leading); }
+.ghost { position: absolute; inset: 28px 40px -20px; border-radius: 12px; background: color-mix(in srgb, var(--fg) 4%, var(--bg)); padding: 56px 64px; display: grid; align-content: start; gap: 14px; }
+.ghost b { display: block; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.slots { position: absolute; inset: 52px 0 auto; display: flex; justify-content: center; gap: 24px; }
+.slot { display: grid; gap: 8px; width: 520px; }
+.slot .mode-label { padding-left: 4px; }
+.compose { padding: 6px 18px 14px; display: grid; }
+.hdr { display: flex; align-items: center; gap: 10px; height: 38px; }
+.hdr .lbl { color: var(--faint); width: 56px; }
+.hdr .ui-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; color: var(--fg); font-weight: 600; }
+.ctext { padding: 12px 0 16px; font-size: var(--type-ui-size); line-height: 1.6; min-height: 236px; white-space: pre-line; }
+.ctext .caret { display: inline-block; width: 1.5px; height: 1.1em; margin-left: 1px; vertical-align: -0.15em; background: var(--accent); }
+.cfoot { display: flex; align-items: center; gap: 8px; }
+.from { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 8px 0 4px; border-radius: var(--radius-md); color: var(--muted); font-size: var(--type-ui-small-size); }
+.from .chev { color: var(--muted); }
+.cfoot .grow { margin-left: auto; }
+.cfoot .hint { color: var(--faint); font-size: var(--type-ui-small-size); }
+
+/* Newsletters: least read first. */
+.nbody { padding: 22px 16px 0; }
+.lead { display: flex; align-items: center; gap: 16px; padding: 0 12px 16px; max-width: 900px; }
+.lead div b { font-weight: 700; }
+.lead div span { color: var(--muted); }
+.lead .ui-button-primary { margin-left: auto; }
+.nl { display: grid; grid-template-columns: 26px 200px 110px 1fr auto; gap: 12px; align-items: center; height: 44px; padding: 0 12px 0 8px; max-width: 900px; }
+.nl .name { font-weight: 600; }
+.nl .rh, .nl .op { color: var(--muted); font-size: var(--type-ui-small-size); }
+.nl .act { display: flex; align-items: center; gap: 10px; }
+.nl.hovered { background: var(--hover); }
+.nl.gone .name { color: var(--faint); font-weight: 400; }
+.nl.gone .av { opacity: 0.5; }
+.nl .note { color: var(--muted); font-size: var(--type-ui-small-size); }
+.label { color: var(--faint); font-size: var(--type-ui-small-size); padding: 18px 12px 6px; }
+
+/* The week: 8 to 22, an hour at 28px. */
+.wbody { padding: 14px 24px 0; }
+.weekhead { display: flex; align-items: center; gap: 8px; padding: 0 0 8px; }
+.weekhead b { font-weight: 700; }
+.weekhead .tools { margin-left: 4px; gap: 0; }
+.legend { margin-left: auto; display: flex; gap: 14px; color: var(--muted); font-size: var(--type-ui-small-size); }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--hue); }
+.week { display: grid; grid-template-columns: 40px repeat(7, 1fr); gap: 0 4px; }
+.dh { height: 26px; color: var(--faint); font-size: var(--type-ui-small-size); display: flex; gap: 5px; align-items: baseline; padding: 0 4px; }
+.dh b { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dh.today, .dh.today b { color: var(--fg); font-weight: 700; }
+.gut { position: relative; height: 392px; }
+.gut span { position: absolute; right: 6px; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; transform: translateY(-50%); }
+.col { position: relative; height: 392px; border-radius: var(--radius-md); background: repeating-linear-gradient(to bottom, transparent 0 55px, color-mix(in srgb, var(--fg) 4%, transparent) 55px 56px); }
+.col.today { background-color: color-mix(in srgb, var(--fg) var(--highlight-tint), transparent); }
+.col .ev { left: 3px; right: 3px; height: auto; justify-content: flex-start; padding: 4px 7px; top: 0; }
+.col .ev.short { flex-direction: row; gap: 6px; align-items: center; padding-top: 0; padding-bottom: 0; }
+.col .ev.proposed { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--hue) var(--status-tint), transparent) 0 6px, transparent 6px 12px); }
+.col .ev.proposed b { color: var(--muted); }
+.col .ev b { white-space: normal; }
+.col .ev:has(.newdot) { padding-right: 16px; }
+.col .ev .newdot { position: absolute; right: 6px; top: 8px; }
+.col .ev .src { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.col .ev .src svg { color: var(--muted); }
+.col .now { left: -2px; right: 0; top: 18px; width: auto; height: 2px; }
+.col .now::before { top: -2px; left: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Herald: a day with your mail</h1>
+  <p>Mail and calendar in one villain app, for the Lazarski and Code Villain accounts on Uberspace and the calendar on Radicale. Work mail stays in Outlook. Monday, Nov 3. Night and day, with the Nightshade tokens. Herald is a working name, and the content is made up.</p>
+</header>
+
+<section class="step" id="s1">
+  <h2><span class="n">1</span>Your day, then your mail</h2>
+  <p>Monday, 08:40, with coffee. Herald opens on one Inbox for both accounts, with today's calendar above it.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> one Inbox for both accounts. Each account wears one colour on its senders, and its calendar wears the same one.</li>
+    <li><b>My choice:</b> today sits above the Inbox, 8 to 22, with a line for now. The week is in Calendar.</li>
+    <li><b>My choice:</b> a mail opens in the list's place, and Esc goes back. J and K move, E archives, R replies.</li>
+    <li><b>My choice:</b> one field at the foot of every view, to ask Herald something or tell it what to do. Claude Code on this Mac answers, as in Almanac.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="inbox"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="inbox"></div></div>
+</section>
+
+<section class="step" id="s2">
+  <h2><span class="n">2</span>You tell it how to sort</h2>
+  <p>You type “Put GitHub and Forgejo mail in a folder called Code”. Herald makes the rule, moves what's already there, and says what it did.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> the rule lives on the mail server (Sieve, which Uberspace runs), so it sorts while the Mac is shut, and your iPhone sees the same folders.</li>
+    <li><b>My choice:</b> it says what it did in words, with Undo. There's no rule editor: to change a rule, you say so (“Dependabot too”).</li>
+    <li><b>My choice:</b> sorting that needs reading, like “anything that looks like an invoice”, can't be a server rule. Herald does that while it's open on this Mac, and says so when it makes one.</li>
+    <li><b>My choice:</b> a folder with the same name in both accounts shows once.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="sorted"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="sorted"></div></div>
+</section>
+
+<section class="step" id="s3">
+  <h2><span class="n">3</span>You write, then make it more professional</h2>
+  <p>Anna Weber asks whether Layer works for a team. You answer the way you'd text, then press More professional.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> the button sits beside Send. It rewrites in place, in the language you wrote in, and keeps every fact: names, dates, prices, links.</li>
+    <li><b>My choice:</b> Back to yours (or ⌘Z) puts your words back. One button, not a menu of tones.</li>
+    <li><b>My choice:</b> a reply goes from the account the mail came to. The chip beside the buttons changes it.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="compose"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="compose"></div></div>
+</section>
+
+<section class="step" id="s4">
+  <h2><span class="n">4</span>Newsletters, one click each</h2>
+  <p>Newsletters have a page of their own, the ones you read least at the top. You've just unsubscribed from Spotify.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> a newsletter is any sender whose mail carries an unsubscribe header. They skip the Inbox and land here. This is the biggest call on the page: say if you'd rather keep them in the Inbox.</li>
+    <li><b>My choice:</b> Unsubscribe asks nothing. The request waits 10 seconds before it goes, so Undo really undoes it, and it archives what the sender sent. A sender without one-click unsubscribe opens its page in the browser.</li>
+    <li><b>My choice:</b> the view leads with the one thing worth doing: the ones you never open.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="newsletters"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="newsletters"></div></div>
+</section>
+
+<section class="step" id="s5">
+  <h2><span class="n">5</span>Your week, and what your mail adds to it</h2>
+  <p>Kristina's mail asked about dinner on Saturday at 18:00. It offered the event at its top, and one click added it. Then you ask for two evenings for Layer.</p>
+  <ul class="choices">
+    <li><b>My choice:</b> Calendar is Radicale's, over CalDAV: both calendars in one week, each in its account's colour.</li>
+    <li><b>My choice:</b> a mail that names a time offers the event above its text. The event remembers its mail and opens it.</li>
+    <li><b>My choice:</b> asked to find time, Herald draws what it proposes into the week first, striped. It's made when you pick.</li>
+    <li><b>Mind:</b> Herald doesn't see your DIB calendar, which stays in Outlook. So it plans evenings and weekends unless you tell it otherwise.</li>
+  </ul>
+  <div class="mode"><div class="mode-label">Night</div><div data-theme="night" data-use="week"></div></div>
+  <div class="mode"><div class="mode-label">Day</div><div data-theme="day" data-use="week"></div></div>
+</section>
+
+</div>
+
+<!-- The sidebar every view shares; data-inbox and data-code fill its counts. -->
+<template id="side">
+  <aside class="side">
+    <div class="toprow">
+      <div class="lights"><span></span><span></span><span></span></div>
+      <div class="tools">
+        <button class="ui-button ui-icon-button" aria-label="Search"><i data-i="search"></i></button>
+        <button class="ui-button ui-icon-button" aria-label="New mail"><i data-i="compose"></i></button>
+      </div>
+    </div>
+    <div class="picker"><span class="avatar">M</span>Michael<i class="chev" data-i="chevron"></i></div>
+    <div class="nav ui-row" data-nav="inbox"><i data-i="inbox"></i>Inbox<span class="cnt"><span class="ui-live-dot"></span><span data-count="inbox"></span></span></div>
+    <div class="nav ui-row" data-nav="calendar"><i data-i="calendar"></i>Calendar</div>
+    <div class="nav ui-row" data-nav="newsletters"><i data-i="newspaper"></i>Newsletters</div>
+    <div class="nav ui-row"><i data-i="sent"></i>Sent</div>
+    <div class="nav ui-row"><i data-i="archive"></i>Archive</div>
+    <div class="group">Folders</div>
+    <div class="nav ui-row" data-folder="code"><i data-i="code"></i>Code<span class="cnt"><span class="ui-live-dot"></span>3</span></div>
+    <div class="nav ui-row"><i data-i="receipt"></i>Rechnungen</div>
+    <div class="nav ui-row"><i data-i="heart"></i>Familie</div>
+    <div class="nav ui-row"><i data-i="plane"></i>Reisen</div>
+    <div class="sync"><span></span>Synced</div>
+  </aside>
+</template>
+
+<template id="today">
+  <div class="today">
+    <div class="dayhead"><b>Monday, Nov 3</b><span>Zahnarzt in 1 h 20 min</span></div>
+    <div class="track">
+      <div class="ev lz" style="left: 128px; width: 96px"><b>Zahnarzt</b><span>10:00</span></div>
+      <div class="ev lz" style="left: 288px; width: 96px"><b>Mittag</b><span>12:30</span></div>
+      <div class="ev lz" style="left: 672px; width: 96px"><b>Bouldern</b><span>18:30</span></div>
+      <div class="ev cv" style="left: 784px; width: 80px"><b>Call: Layer</b><span>20:15</span></div>
+      <div class="now" style="left: 43px"></div>
+      <span class="hour" style="left: 0">8</span>
+      <span class="hour" style="left: 128px">10</span>
+      <span class="hour" style="left: 256px">12</span>
+      <span class="hour" style="left: 384px">14</span>
+      <span class="hour" style="left: 512px">16</span>
+      <span class="hour" style="left: 640px">18</span>
+      <span class="hour" style="left: 768px">20</span>
+    </div>
+  </div>
+</template>
+
+<template id="askbox">
+  <div class="ask">
+    <div class="askbox ui-field"><i data-i="sparkles"></i><span class="ph">Ask Herald, or tell it what to do</span><button class="ui-button ui-icon-button" aria-label="Send"><i data-i="up"></i></button></div>
+  </div>
+</template>
+
+<template id="inbox">
+  <div class="win" data-inbox="5" data-current="inbox">
+    <div data-use="side"></div>
+    <div class="top"><b>Inbox</b>
+      <div class="tools"><div class="search ui-field"><i data-i="search"></i><span>Search mail</span><span class="ui-kbd">/</span></div></div>
+    </div>
+    <main class="content">
+      <div data-use="today"></div>
+      <ol class="mails">
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av cv">A</span><span class="who">Anna Weber</span><span class="line"><b>Layer for our team?</b> — Hi Michael, we tried Layer on three Macs last week and wondered whether it…</span><span class="when">08:12</span></li>
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av lz">K</span><span class="who">Kristina</span><span class="line"><b>Samstag</b> — Hast du Samstag Zeit? Mama fragt, ob wir um 18 Uhr zum Essen kommen.</span><span class="when">07:58</span></li>
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av lz">G</span><span class="who">GitHub</span><span class="line"><b>[code-villain-hq/vault] Bump vite from 7.3 to 7.4</b> — Dependabot opened a pull request…</span><span class="when">07:41</span></li>
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av cv">C</span><span class="who">Code Villain Git</span><span class="line"><b>[code-villain/vault] CI passed on main</b> — Run #812 for b13c00a finished in 6 minutes.</span><span class="when">07:40</span></li>
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av lz">G</span><span class="who">GitHub</span><span class="line"><b>[villain-layer] Pane loses focus after ⌘K (#212)</b> — A new issue was opened by…</span><span class="when">06:55</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">N</span><span class="who">Netcup</span><span class="line"><b>codevillain.eu wurde verlängert</b> — Ihre Domain wurde um ein Jahr verlängert.</span><span class="when">Yesterday</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">D</span><span class="who">DB Fernverkehr</span><span class="line"><b>Ihre Fahrkarte: Berlin → Hamburg, Fr 14. Nov</b> — Vielen Dank für Ihre Buchung.</span><span class="when">Yesterday</span></li>
+        <li class="mail ui-row"><span></span><span class="av cv">P</span><span class="who">Pocket ID</span><span class="line"><b>New sign-in to your account</b> — A new sign-in from Safari on macOS.</span><span class="when">Sat</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">M</span><span class="who">Mama</span><span class="line"><b>Fotos vom Wochenende</b> — Hier die Bilder, die ich versprochen hatte.</span><span class="when">Sat</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">U</span><span class="who">Uberspace</span><span class="line"><b>Wartung am 12. November</b> — Am Mittwoch, 12. November, zwischen 6 und 7 Uhr…</span><span class="when">Fri</span></li>
+      </ol>
+      <div data-use="askbox"></div>
+    </main>
+  </div>
+</template>
+
+<template id="sorted">
+  <div class="win" data-inbox="2" data-current="inbox" data-code>
+    <div data-use="side"></div>
+    <div class="top"><b>Inbox</b>
+      <div class="tools"><div class="search ui-field"><i data-i="search"></i><span>Search mail</span><span class="ui-kbd">/</span></div></div>
+    </div>
+    <main class="content">
+      <div data-use="today"></div>
+      <ol class="mails">
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av cv">A</span><span class="who">Anna Weber</span><span class="line"><b>Layer for our team?</b> — Hi Michael, we tried Layer on three Macs last week and wondered whether it…</span><span class="when">08:12</span></li>
+        <li class="mail ui-row unread"><span class="ui-live-dot"></span><span class="av lz">K</span><span class="who">Kristina</span><span class="line"><b>Samstag</b> — Hast du Samstag Zeit? Mama fragt, ob wir um 18 Uhr zum Essen kommen.</span><span class="when">07:58</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">N</span><span class="who">Netcup</span><span class="line"><b>codevillain.eu wurde verlängert</b> — Ihre Domain wurde um ein Jahr verlängert.</span><span class="when">Yesterday</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">D</span><span class="who">DB Fernverkehr</span><span class="line"><b>Ihre Fahrkarte: Berlin → Hamburg, Fr 14. Nov</b> — Vielen Dank für Ihre Buchung.</span><span class="when">Yesterday</span></li>
+        <li class="mail ui-row"><span></span><span class="av cv">P</span><span class="who">Pocket ID</span><span class="line"><b>New sign-in to your account</b> — A new sign-in from Safari on macOS.</span><span class="when">Sat</span></li>
+        <li class="mail ui-row"><span></span><span class="av lz">M</span><span class="who">Mama</span><span class="line"><b>Fotos vom Wochenende</b> — Hier die Bilder, die ich versprochen hatte.</span><span class="when">Sat</span></li>
+      </ol>
+      <div class="answer">
+        <div class="asked">Put GitHub and Forgejo mail in a folder called Code</div>
+        <div class="did"><i data-i="code"></i><span>Made a rule in both accounts: mail from <b>GitHub</b> and <b>Code Villain Git</b> goes to <b>Code</b>. Moved 214 mails there.</span></div>
+        <div class="chips"><span class="ui-chip">From notifications@github.com</span><span class="ui-chip">From villain@codevillain.eu</span></div>
+        <div class="acts"><button class="ui-button"><i data-i="undo"></i>Undo</button><a class="ui-link" href="#">Open Code</a></div>
+      </div>
+      <div data-use="askbox"></div>
+    </main>
+  </div>
+</template>
+
+<template id="compose">
+  <div class="desk">
+    <div class="ghost"></div>
+    <div class="slots">
+      <div class="slot">
+        <div class="mode-label">As you wrote it</div>
+        <div class="compose ui-dialog">
+          <div class="hdr"><span class="lbl">To</span><span class="ui-chip"><span class="av sm cv">A</span>Anna Weber</span></div>
+          <div class="hdr"><span class="lbl">Subject</span><span>Re: Layer for our team?</span></div>
+          <div class="ctext">hey anna, yes layer works for teams. you just install it with brew on each mac and share the setup via a workspace. its free for now btw. ping me if smth breaks<span class="caret"></span></div>
+          <div class="cfoot">
+            <span class="from"><span class="av sm cv">C</span>contact@codevillain.eu<i class="chev" data-i="chevron"></i></span>
+            <button class="ui-button grow"><i data-i="sparkles"></i>More professional</button>
+            <button class="ui-button ui-button-primary">Send</button>
+          </div>
+        </div>
+      </div>
+      <div class="slot">
+        <div class="mode-label">After More professional</div>
+        <div class="compose ui-dialog">
+          <div class="hdr"><span class="lbl">To</span><span class="ui-chip"><span class="av sm cv">A</span>Anna Weber</span></div>
+          <div class="hdr"><span class="lbl">Subject</span><span>Re: Layer for our team?</span></div>
+          <div class="ctext">Hi Anna,
+
+Thanks for trying Layer. Yes, it works for teams: install it with Homebrew on each Mac, then share your setup through a workspace.
+
+Layer is free for now. If anything breaks, just let me know.
+
+Best,
+Michael</div>
+          <div class="cfoot">
+            <span class="from"><span class="av sm cv">C</span>contact@codevillain.eu<i class="chev" data-i="chevron"></i></span>
+            <button class="ui-button grow"><i data-i="undo"></i>Back to yours</button>
+            <button class="ui-button ui-button-primary">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="newsletters">
+  <div class="win" data-inbox="2" data-current="newsletters" data-code>
+    <div data-use="side"></div>
+    <div class="top"><b>Newsletters</b>
+      <div class="tools"><div class="search ui-field"><i data-i="search"></i><span>Search mail</span><span class="ui-kbd">/</span></div></div>
+    </div>
+    <main class="content">
+      <div class="nbody">
+        <div class="lead">
+          <div><b>You never open 4 of these.</b> <span>They sent you 38 mails in October.</span></div>
+          <button class="ui-button ui-button-primary">Unsubscribe from those 4</button>
+        </div>
+        <ol>
+          <li class="nl ui-row hovered"><span class="av lz">Z</span><span class="name">Zalando</span><span class="rh">Daily</span><span class="op">Never opened</span><span class="act"><button class="ui-button">Unsubscribe</button></span></li>
+          <li class="nl ui-row"><span class="av lz">L</span><span class="name">LinkedIn</span><span class="rh">Daily</span><span class="op">Never opened</span><span class="act"></span></li>
+          <li class="nl ui-row"><span class="av lz">M</span><span class="name">MediaMarkt</span><span class="rh">3 a week</span><span class="op">Never opened</span><span class="act"></span></li>
+          <li class="nl ui-row"><span class="av lz">B</span><span class="name">BahnBonus</span><span class="rh">Weekly</span><span class="op">Never opened</span><span class="act"></span></li>
+          <li class="nl ui-row gone"><span class="av lz">S</span><span class="name">Spotify</span><span class="rh">Weekly</span><span class="op note">Unsubscribed. Archived 23 mails.</span><span class="act"><button class="ui-button"><i data-i="undo"></i>Undo</button></span></li>
+          <li class="nl ui-row"><span class="av lz">H</span><span class="name">heise online</span><span class="rh">Daily</span><span class="op">Opened 3 of 22</span><span class="act"></span></li>
+          <li class="nl ui-row"><span class="av lz">B</span><span class="name">Babylon Kino</span><span class="rh">Weekly</span><span class="op">Opened 2 of 4</span><span class="act"></span></li>
+          <li class="nl ui-row"><span class="av cv">P</span><span class="name">The Pragmatic Engineer</span><span class="rh">Weekly</span><span class="op">Opened 4 of 4</span><span class="act"></span></li>
+          <li class="nl ui-row"><span class="av cv">T</span><span class="name">This Week in Rust</span><span class="rh">Weekly</span><span class="op">Opened 4 of 4</span><span class="act"></span></li>
+        </ol>
+      </div>
+    </main>
+  </div>
+</template>
+
+<template id="week">
+  <div class="win" data-inbox="2" data-current="calendar" data-code>
+    <div data-use="side"></div>
+    <div class="top"><b>Calendar</b>
+      <div class="tools"><div class="search ui-field"><i data-i="search"></i><span>Search mail</span><span class="ui-kbd">/</span></div></div>
+    </div>
+    <main class="content">
+      <div class="wbody">
+        <div class="weekhead">
+          <b>Nov 3 – 9</b>
+          <div class="tools">
+            <button class="ui-button ui-icon-button" aria-label="Last week"><i data-i="left"></i></button>
+            <button class="ui-button ui-icon-button" aria-label="Next week"><i data-i="right"></i></button>
+          </div>
+          <div class="legend"><span class="lz"><i></i>Privat</span><span class="cv"><i></i>Code Villain</span></div>
+        </div>
+        <div class="week">
+          <div></div>
+          <div class="dh today">Mon <b>3</b></div>
+          <div class="dh">Tue <b>4</b></div>
+          <div class="dh">Wed <b>5</b></div>
+          <div class="dh">Thu <b>6</b></div>
+          <div class="dh">Fri <b>7</b></div>
+          <div class="dh">Sat <b>8</b></div>
+          <div class="dh">Sun <b>9</b></div>
+          <div class="gut"><span style="top: 0">8</span><span style="top: 56px">10</span><span style="top: 112px">12</span><span style="top: 168px">14</span><span style="top: 224px">16</span><span style="top: 280px">18</span><span style="top: 336px">20</span></div>
+          <div class="col today">
+            <div class="now"></div>
+            <div class="ev lz" style="top: 56px; height: 42px"><b>Zahnarzt</b><span>10:00</span></div>
+            <div class="ev lz" style="top: 126px; height: 42px"><b>Mittag</b><span>12:30</span></div>
+            <div class="ev lz" style="top: 294px; height: 42px"><b>Bouldern</b><span>18:30</span></div>
+            <div class="ev cv short" style="top: 343px; height: 35px"><b>Call: Layer</b></div>
+          </div>
+          <div class="col">
+            <div class="ev cv proposed" style="top: 308px; height: 70px"><b>Layer</b><span>19:00–21:30</span></div>
+          </div>
+          <div class="col">
+            <div class="ev lz" style="top: 294px; height: 42px"><b>Bouldern</b><span>18:30</span></div>
+          </div>
+          <div class="col">
+            <div class="ev lz" style="top: 322px; height: 70px"><b>Kino mit Kristina</b><span>19:30</span></div>
+          </div>
+          <div class="col">
+            <div class="ev cv proposed" style="top: 308px; height: 70px"><b>Layer</b><span>19:00–21:30</span></div>
+          </div>
+          <div class="col">
+            <div class="ev lz" style="top: 280px; height: 84px"><span class="ui-live-dot newdot" aria-label="New"></span><b>Essen bei Mama</b><span>18:00</span><span class="src"><i data-i="mail" data-s="11"></i>Kristina</span></div>
+          </div>
+          <div class="col">
+            <div class="ev lz" style="top: 84px; height: 56px"><b>Brunch</b><span>11:00</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="answer">
+        <div class="asked">Find two evenings for Layer this week</div>
+        <div class="did"><i data-i="calendar"></i><span>Tuesday and Friday are free after 19:00. I drew <b>19:00–21:30</b> on both, in Code Villain.</span></div>
+        <div class="acts"><button class="ui-button ui-button-primary">Block both</button><button class="ui-button">Only Tuesday</button></div>
+      </div>
+      <div data-use="askbox"></div>
+    </main>
+  </div>
+</template>
+
+<script>
+// Lucide icons, stroke 1.75.
+const icons = {
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  compose: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  newspaper: '<path d="M15 18h-5"/><path d="M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/>',
+  sent: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  receipt: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  plane: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
+  up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  left: '<path d="m15 18-6-6 6-6"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+};
+// #s3 shows only step 3, for screenshots.
+const only = location.hash.slice(1);
+if (only) for (const el of document.querySelectorAll(".page > *")) if (el.id !== only) el.remove();
+
+// Fill the slots in document order: a theme slot keeps its element, a nested one gives way to its template.
+let slot;
+while ((slot = document.querySelector("[data-use]"))) {
+  const content = document.getElementById(slot.dataset.use).content.cloneNode(true);
+  if (slot.dataset.theme) {
+    slot.removeAttribute("data-use");
+    slot.append(content);
+  } else {
+    slot.replaceWith(content);
+  }
+}
+
+// Each window's Inbox count, current view, and whether the Code folder exists yet.
+for (const win of document.querySelectorAll(".win")) {
+  win.querySelector('[data-count="inbox"]').textContent = win.dataset.inbox;
+  win.querySelector(`[data-nav="${win.dataset.current}"]`).classList.add("is-selected");
+  if (!("code" in win.dataset)) win.querySelector('[data-folder="code"]').remove();
+}
+
+for (const el of document.querySelectorAll("i[data-i]")) {
+  const s = el.dataset.s || 15;
+  el.outerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="${el.className}">${icons[el.dataset.i]}</svg>`;
+}
+</script>
+</body>
+</html>
