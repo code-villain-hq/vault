@@ -15,13 +15,15 @@
 use std::collections::{BTreeMap, HashSet};
 
 use almanac_domain::{
-    BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation, PICTURE_CELL,
-    PageLayout, PointWas, Proposal, ProposedReminder, SET_KINDS, STICKS_TO_MAX, TopicChange,
-    TopicPatch,
+    Actor, BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation,
+    PICTURE_CELL, PageLayout, PointWas, Proposal, ProposedReminder, SET_KINDS, STICKS_TO_MAX,
+    TopicChange, TopicPatch,
 };
+use almanac_sync::SyncError;
 use chrono::{Days, Local, NaiveDate, NaiveTime};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use sqlx::PgConnection;
 use sqlx::types::Json;
 use uuid::Uuid;
 
@@ -1091,8 +1093,11 @@ impl Kept {
             if point.look != was.look {
                 data.insert("look".into(), json!(point.look));
             }
-            if point.cells != was.cells {
-                data.insert("cells".into(), json!(point.cells.0));
+            // Only the cells it changed, merged into the row as it is when
+            // the answer is written: a tick made meanwhile stays.
+            let changed = cells_changed(&was.cells.0, &point.cells.0);
+            if !changed.is_empty() {
+                data.insert("changed_cells".into(), Value::Object(changed));
             }
             let reworded = !data.is_empty();
             let into_rows = point.block_id != was.block_id
@@ -1137,8 +1142,9 @@ impl Kept {
                 if let Some(check) = block.and_then(check_of) {
                     let mut cells = point.cells.0.clone();
                     cells.insert(check.to_string(), Cell::Check(*done));
-                    if cells != was.cells.0 {
-                        data.insert("cells".into(), json!(cells));
+                    let changed = cells_changed(&was.cells.0, &cells);
+                    if !changed.is_empty() {
+                        data.insert("changed_cells".into(), Value::Object(changed));
                     }
                 }
             }
@@ -1314,6 +1320,23 @@ impl Kept {
             message.insert("changes".into(), json!(changes));
         }
         (message, operations)
+    }
+
+    /// Where the page's blocks and points were when the question was
+    /// asked, for those the answer didn't move on purpose, its sub-topics'
+    /// pages' too: they're only renumbered along with what it moved or
+    /// added, so [`fit`] leaves them where someone moved them since.
+    pub fn along(&self) -> Vec<(Uuid, i32)> {
+        let blocks = self.refs.blocks.iter().map(|b| (b.id, b.position));
+        let points = self.refs.points.iter().map(|p| (p.id, p.position));
+        let mut along: Vec<(Uuid, i32)> = blocks
+            .chain(points)
+            .filter(|(id, _)| !self.moved.contains(id))
+            .collect();
+        for sub in &self.sub_pages {
+            along.extend(sub.kept.along());
+        }
+        along
     }
 
     // The copy of the page.
@@ -1603,6 +1626,110 @@ impl Kept {
             self.points[p].position = position as i32;
         }
     }
+}
+
+/// What a row's cells change from `was` to `now`, as `changed_cells` takes
+/// them: what's new or different, and null for what went.
+fn cells_changed(was: &BTreeMap<String, Cell>, now: &BTreeMap<String, Cell>) -> Map<String, Value> {
+    let mut changed: Map<String, Value> = now
+        .iter()
+        .filter(|(name, cell)| was.get(*name) != Some(*cell))
+        .map(|(name, cell)| (name.clone(), json!(cell)))
+        .collect();
+    for name in was.keys().filter(|name| !now.contains_key(*name)) {
+        changed.insert(name.clone(), Value::Null);
+    }
+    changed
+}
+
+/// What refers to another record in a write that makes one, and that
+/// record's model: what the made one can't be without.
+const NEEDS: [(&str, ModelKind); 3] = [
+    ("block_id", ModelKind::Block),
+    ("row_id", ModelKind::Point),
+    ("point_id", ModelKind::Point),
+];
+
+/// An answer's writes fitted to the workspace as it is now, read in the
+/// transaction that writes them, after its lock: an answer takes minutes,
+/// and meanwhile people tick, reorder and remove. A change to what's gone
+/// since is left out, as is what's made in or moved into what's gone,
+/// rather than failing the answer; a block or point the answer only
+/// renumbered along (`along`, [`Kept::along`]) keeps the place someone
+/// moved it to since. Cells are already only the ones it changed.
+pub async fn fit(
+    db: &mut PgConnection,
+    actor: Actor,
+    operations: Vec<Operation>,
+    along: &[(Uuid, i32)],
+) -> Result<Vec<Operation>, SyncError> {
+    let mut made: HashSet<Uuid> = HashSet::new();
+    let mut fitted = Vec::new();
+    for operation in operations {
+        match operation {
+            Operation::Create { model, id, data } => {
+                if !is_there(db, actor, &made, &data, &NEEDS).await? {
+                    continue;
+                }
+                made.insert(id);
+                fitted.push(Operation::Create { model, id, data });
+            }
+            Operation::Update {
+                model,
+                id,
+                mut data,
+            } => {
+                if made.contains(&id) {
+                    fitted.push(Operation::Update { model, id, data });
+                    continue;
+                }
+                let Some(now) = code_villain_sync::current(db, actor, model, id).await? else {
+                    continue;
+                };
+                if !is_there(db, actor, &made, &data, &NEEDS[..1]).await? {
+                    continue;
+                }
+                let at = now.get("position").and_then(Value::as_i64);
+                let moved_since = along
+                    .iter()
+                    .any(|(a, was)| *a == id && at != Some(i64::from(*was)));
+                if moved_since && data.remove("position").is_some() && data.is_empty() {
+                    continue;
+                }
+                fitted.push(Operation::Update { model, id, data });
+            }
+            delete => fitted.push(delete),
+        }
+    }
+    Ok(fitted)
+}
+
+/// Whether the records `data` names by `needs` are there: made earlier in
+/// the same writes, or in the workspace now.
+async fn is_there(
+    db: &mut PgConnection,
+    actor: Actor,
+    made: &HashSet<Uuid>,
+    data: &Map<String, Value>,
+    needs: &[(&str, ModelKind)],
+) -> Result<bool, SyncError> {
+    for (field, model) in needs {
+        let Some(id) = data
+            .get(*field)
+            .and_then(Value::as_str)
+            .and_then(|id| id.parse::<Uuid>().ok())
+        else {
+            continue;
+        };
+        if !made.contains(&id)
+            && code_villain_sync::current(db, actor, *model, id)
+                .await?
+                .is_none()
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// A text's bold lead and what follows it: "**Zwei Sichten**: Für …".
@@ -2665,7 +2792,7 @@ mod tests {
                 [Operation::Update { id, data, .. }]
                     if *id == fact.id && data["block_id"] == json!(weight.id)
                         && data["text"] == json!("Lisa")
-                        && data["cells"] == json!({"Gewicht": 3.4})
+                        && data["changed_cells"] == json!({"Gewicht": 3.4})
             ),
             "{operations:?}"
         );
@@ -2708,6 +2835,42 @@ mod tests {
     }
 
     #[test]
+    fn an_answer_writes_only_the_cells_it_changed() {
+        let was = BTreeMap::from([
+            ("Tag".to_string(), Cell::Text("2026-10-20".into())),
+            ("Gewicht".to_string(), Cell::Number(3.5)),
+            ("Notiz".to_string(), Cell::Text("satt".into())),
+        ]);
+        let mut now = was.clone();
+        now.insert("Gewicht".into(), Cell::Number(3.4));
+        now.remove("Notiz");
+        assert_eq!(
+            Value::Object(cells_changed(&was, &now)),
+            json!({"Gewicht": 3.4, "Notiz": null})
+        );
+        assert!(cells_changed(&was, &was).is_empty());
+    }
+
+    #[test]
+    fn what_an_answer_only_renumbered_along_is_named() {
+        let list = block("collection", "Pflanzen", 0);
+        let other = block("paragraph", "Notizen", 1);
+        let (a, b) = (
+            point(&list, "", "Monstera", 0),
+            point(&list, "", "Calathea", 1),
+        );
+        let mut kept = Kept::on(Refs {
+            blocks: vec![list.clone(), other.clone()],
+            points: vec![a.clone(), b.clone()],
+            ..Refs::default()
+        });
+        kept.move_block("b2", "").unwrap();
+        let along = kept.along();
+        assert!(!along.iter().any(|(id, _)| *id == other.id));
+        assert!(along.contains(&(list.id, 0)) && along.contains(&(b.id, 1)));
+    }
+
+    #[test]
     fn a_ticked_item_ticks_its_reminder() {
         let list = checklist("Routine", 0);
         let (wash, bin) = (
@@ -2737,7 +2900,7 @@ mod tests {
                 [
                     Operation::Update { id: item, data: done, .. },
                     Operation::Update { model: ModelKind::Reminder, id, data },
-                ] if *item == bin.id && done["cells"] == json!({"Done": true})
+                ] if *item == bin.id && done["changed_cells"] == json!({"Done": true})
                     && *id == reminder.id
                     && data["due_on"] == json!("2026-11-03")
                     && data["last_done_on"] == json!("2026-10-30")

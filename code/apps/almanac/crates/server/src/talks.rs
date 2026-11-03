@@ -32,7 +32,9 @@ use crate::auth::Member;
 use crate::claude::{Problem, Turn};
 use crate::error::AppError;
 use crate::handed;
-use crate::kept::{Answering, FieldArg, ItemArg, Kept, PointChange, RowArg, fields, reminder};
+use crate::kept::{
+    self, Answering, FieldArg, ItemArg, Kept, PointChange, RowArg, fields, reminder,
+};
 use crate::keys::WEB;
 use crate::mcp::{Asking, Mode};
 use crate::page::{Page, Workspace};
@@ -612,7 +614,7 @@ async fn answer(
                     data: message,
                 },
             );
-            match write(state, actor, operations).await {
+            match write_kept(state, actor, operations, &kept.along()).await {
                 Ok(()) => Ok(()),
                 // What it kept doesn't fit: the answer still stands.
                 Err(error) => {
@@ -1156,7 +1158,29 @@ async fn keep(
             },
         );
     }
-    write(state, actor, operations).await
+    write_kept(state, actor, operations, &kept.along()).await
+}
+
+/// What an answer kept, written as [`kept::fit`] fits it to the page as it
+/// is by now, in the same transaction.
+pub async fn write_kept(
+    state: &AppState,
+    actor: Actor,
+    operations: Vec<Operation>,
+    along: &[(Uuid, i32)],
+) -> Result<(), AppError> {
+    let mut db = state.pool.begin().await?;
+    almanac_sync::lock_workspace(&mut db, actor.workspace_id).await?;
+    let operations = kept::fit(&mut db, actor, operations, along).await?;
+    if !operations.is_empty() {
+        let transaction = Transaction {
+            id: Uuid::now_v7(),
+            operations,
+        };
+        almanac_sync::apply_in(&mut db, actor, &transaction, almanac_sync::Origin::Server).await?;
+    }
+    db.commit().await?;
+    Ok(())
 }
 
 fn today() -> String {
