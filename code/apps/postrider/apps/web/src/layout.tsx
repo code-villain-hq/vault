@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { NewMailProvider, useNewMail } from "./compose";
+import { FolderMenu, useCountHidden } from "./folder-menu";
 import { InboxProvider, useFolders, useInbox, useUnread } from "./mail";
 import { isDesktop } from "./platform";
 import { setCurrentPlace } from "./server";
@@ -290,20 +291,27 @@ function MailNav() {
   const unread = useUnread();
   const { newsletters, sent, archive, drafts, junk, trash, others } = useShownFolders();
   const list = useOpenList();
+  const inbox = useMemo(
+    () => ({ key: "inbox", name: "Inbox", role: null, unread, total: unread }),
+    [unread],
+  );
+  const inboxMarked = useCountHidden("inbox");
   return (
     <nav aria-label="Mail" className="flex flex-col gap-4">
       <div className="flex flex-col gap-0.5">
-        <Link
-          to="/$workspace"
-          params={{ workspace: workspace.url_key }}
-          activeOptions={{ exact: true }}
-          className={`${navLink} ${list === "" ? "active" : ""}`}
-          title="Inbox (G then I)"
-        >
-          <NavIcon icon={Inbox} />
-          Inbox
-          <Unread count={unread} />
-        </Link>
+        <FolderMenu folder={inbox}>
+          <Link
+            to="/$workspace"
+            params={{ workspace: workspace.url_key }}
+            activeOptions={{ exact: true }}
+            className={`${navLink} ${list === "" ? "active" : ""}`}
+            title="Inbox (G then I)"
+          >
+            <NavIcon icon={Inbox} />
+            Inbox
+            {!inboxMarked && <Unread count={unread} />}
+          </Link>
+        </FolderMenu>
         <Link
           to="/$workspace/newsletters"
           params={{ workspace: workspace.url_key }}
@@ -378,17 +386,20 @@ function FolderLink({
   quiet?: boolean;
 }) {
   const { workspace } = useWorkspace();
+  const marked = useCountHidden(folder.key);
   return (
-    <Link
-      to="/$workspace/folders/$folder"
-      params={{ workspace: workspace.url_key, folder: folder.key }}
-      className={`${navLink} ${open === folder.key.toLowerCase() ? "active" : ""}`}
-      title={title}
-    >
-      <NavIcon icon={icon} />
-      <span className="truncate">{folder.name}</span>
-      {!quiet && <Unread count={folder.unread} />}
-    </Link>
+    <FolderMenu folder={folder} own={folder.role === null} counted={!quiet}>
+      <Link
+        to="/$workspace/folders/$folder"
+        params={{ workspace: workspace.url_key, folder: folder.key }}
+        className={`${navLink} ${open === folder.key.toLowerCase() ? "active" : ""}`}
+        title={title}
+      >
+        <NavIcon icon={icon} />
+        <span className="truncate">{folder.name}</span>
+        {!quiet && !marked && <Unread count={folder.unread} />}
+      </Link>
+    </FolderMenu>
   );
 }
 
@@ -525,6 +536,10 @@ const SECTIONS: ShortcutSection[] = [
       ["I", "Keep it in the Inbox"],
       ["/", "Find a sender"],
     ],
+  },
+  {
+    title: "The sidebar",
+    keys: [["⇧F10", "The focused folder's menu: mark all as read, rename, delete, empty"]],
   },
   {
     title: "A sender's mail",

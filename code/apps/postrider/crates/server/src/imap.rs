@@ -26,6 +26,8 @@ use tokio_rustls::TlsConnector;
 use tokio_rustls::client::TlsStream;
 use uuid::Uuid;
 
+use crate::rules::uid_set;
+
 /// How many of an Inbox's newest mails Postrider keeps a copy of.
 pub const KEEP: u32 = 200;
 
@@ -389,6 +391,82 @@ pub async fn mark_read(session: &mut Session, folder: &str, uid: i64) -> Result<
         .try_collect::<Vec<_>>()
         .await?;
     Ok(())
+}
+
+/// How many UIDs one STORE names at most, so its line stays short enough
+/// for any server however scattered they are.
+const STORED: usize = 5000;
+
+/// Marks every unread mail in a folder read, in one STORE: the folder's
+/// UIDVALIDITY, and the mails it marked, for Undo.
+pub async fn mark_all_read(
+    session: &mut Session,
+    folder: &str,
+) -> Result<(u32, Vec<u32>), Failure> {
+    let mailbox = session.select(folder).await?;
+    let mut uids: Vec<u32> = session.uid_search("UNSEEN").await?.into_iter().collect();
+    uids.sort_unstable();
+    for some in uids.chunks(STORED) {
+        session
+            .uid_store(uid_set(some), "+FLAGS.SILENT (\\Seen)")
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
+    }
+    Ok((mailbox.uid_validity.unwrap_or(0), uids))
+}
+
+/// Marks the mails [`mark_all_read`] marked unread again, unless the
+/// folder's UIDs were numbered anew since.
+pub async fn mark_unread(
+    session: &mut Session,
+    folder: &str,
+    validity: u32,
+    uids: &[u32],
+) -> Result<(), Failure> {
+    let mailbox = session.select(folder).await?;
+    if mailbox.uid_validity.unwrap_or(0) != validity {
+        return Err(Failure::Refused(
+            "The folder changed on its server since: its mail stays read.".into(),
+        ));
+    }
+    for some in uids.chunks(STORED) {
+        session
+            .uid_store(uid_set(some), "-FLAGS.SILENT (\\Seen)")
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
+    }
+    Ok(())
+}
+
+/// Deletes everything in a folder for good, as emptying the Trash does:
+/// how many mails it held.
+pub async fn empty(session: &mut Session, folder: &str) -> Result<u32, Failure> {
+    let mailbox = session.select(folder).await?;
+    if mailbox.exists > 0 {
+        session
+            .uid_store("1:*", "+FLAGS.SILENT (\\Deleted)")
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
+        session.expunge().await?.try_collect::<Vec<_>>().await?;
+    }
+    Ok(mailbox.exists)
+}
+
+/// Deletes a folder, its mail moved to `trash` first: how many mails it
+/// held.
+pub async fn delete_folder(session: &mut Session, path: &str, trash: &str) -> Result<u32, Failure> {
+    let mailbox = session.select(path).await?;
+    if mailbox.exists > 0 {
+        session.uid_mv("1:*", trash).await?;
+    }
+    // Dovecot hangs up on a connection whose folder is deleted under it.
+    session.select("INBOX").await?;
+    let _ = session.unsubscribe(path).await;
+    session.delete(path).await?;
+    Ok(mailbox.exists)
 }
 
 /// Moves a mail to another folder (MOVE, RFC 6851).

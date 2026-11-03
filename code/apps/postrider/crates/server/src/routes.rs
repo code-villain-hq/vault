@@ -47,8 +47,14 @@ pub fn router(state: AppState) -> Router {
         .route("/mails/{account_id}/{uid}/reply", post(reply::reply))
         .route("/mails/{account_id}/{uid}/files/{index}", get(files::file))
         .route("/folders", get(folders::folders))
-        .route("/folders/{key}", get(folders::folder))
+        .route(
+            "/folders/{key}",
+            get(folders::folder).delete(folders::delete),
+        )
         .route("/folders/{key}/rename", post(folders::rename))
+        .route("/folders/{key}/read", post(folders::mark_all_read))
+        .route("/folders/{key}/empty", post(folders::empty))
+        .route("/marked/{id}/undo", post(folders::undo_read))
         .route("/search", get(folders::search))
         .route("/newsletters", get(newsletters::list))
         .route("/newsletters/sender", get(newsletters::sender))

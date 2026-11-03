@@ -20,9 +20,9 @@ pub use mail::{
     AccountState, AccountStatus, Answer, Asked, Attachment, Calendar, CalendarConnect,
     CalendarCreate, CalendarPatch, Conversation, Day, Event, Folder, FolderLink, FolderRole, HUES,
     Inbox, KeptInInbox, Listing, MailAccount, MailAccountConnect, MailAccountCreate,
-    MailAccountPatch, MailRef, MailSummary, Message, MoveMail, NewMail, Newsletter, NewsletterRef,
-    Newsletters, RenameFolder, Reply, Rewrite, Rewritten, SenderProblem, Senders, ServerCalendar,
-    SettingAside, UnsubscribeSent, Unsubscribed, Unsubscribing,
+    MailAccountPatch, MailRef, MailSummary, MarkedRead, Message, MoveMail, NewMail, Newsletter,
+    NewsletterRef, Newsletters, RenameFolder, Reply, Rewrite, Rewritten, SenderProblem, Senders,
+    ServerCalendar, SettingAside, UnsubscribeSent, Unsubscribed, Unsubscribing,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{

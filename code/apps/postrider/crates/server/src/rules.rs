@@ -8,7 +8,7 @@
 
 use std::fmt::Write as _;
 
-use postrider_domain::MailAccount;
+use postrider_domain::{FolderRole, MailAccount};
 use serde::{Deserialize, Serialize};
 
 use crate::imap::{self, Failure, Place};
@@ -417,6 +417,58 @@ impl Mail {
             to,
             rules,
         })
+    }
+
+    /// Deletes the account's folder, its mail moved to the Trash first, and
+    /// the rules that sort into it: Postrider's on the server, and those it
+    /// sorts by reading. Its rules come back when the folder stays.
+    pub(crate) async fn delete_folder(
+        &self,
+        account: &MailAccount,
+        place: &Place,
+    ) -> Result<(), Failure> {
+        let rules = self.rules(account).await?;
+        let kept: Vec<Rule> = rules
+            .iter()
+            .filter(|rule| rule.path != place.path)
+            .cloned()
+            .collect();
+        if kept != rules {
+            self.put_rules(account, &kept).await?;
+        }
+        let deleted = async {
+            let (trash, _) = self.destination(account, FolderRole::Trash.key()).await?;
+            let held = self
+                .on_server(account, |session| {
+                    let (path, trash) = (place.path.clone(), trash.path.clone());
+                    Box::pin(async move { imap::delete_folder(session, &path, &trash).await })
+                })
+                .await?;
+            Ok::<_, Failure>((trash, held))
+        }
+        .await;
+        let (trash, held) = match deleted {
+            Ok(deleted) => deleted,
+            Err(failure) => {
+                if kept != rules {
+                    let _ = self.put_rules(account, &rules).await;
+                }
+                return Err(failure);
+            }
+        };
+        tracing::info!(address = %account.address, "deleted a folder, {held} mails to the Trash");
+        if let Some(places) = self.lock_places().get_mut(&account.id) {
+            places.retain(|other| other.path != place.path);
+        }
+        self.lock_lines().retain(|(id, path), _| {
+            *id != account.id || (*path != place.path && *path != trash.path)
+        });
+        sqlx::query("DELETE FROM reading_rules WHERE account_id = $1 AND path = $2")
+            .bind(account.id)
+            .bind(&place.path)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     /// Moves what's in the account's Inbox that matches `when` to `path`.

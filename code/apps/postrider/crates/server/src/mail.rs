@@ -24,6 +24,7 @@ use uuid::Uuid;
 use crate::auth::Member;
 use crate::conversations::{self, Joins};
 use crate::error::AppError;
+use crate::folders::Marked;
 use crate::imap::{self, Failure, KeptHeaders, Login, Place, Session, Summary};
 use crate::message;
 use crate::secrets::Secrets;
@@ -85,6 +86,9 @@ pub struct Mail {
     /// What the Newsletters page read of each account's Newsletters (by
     /// path), so it reads only what came since.
     pub(crate) newsletter_headers: Mutex<HashMap<(Uuid, String), KeptHeaders>>,
+    /// What marking a folder read marked, for Undo, by the id the page got.
+    /// It lasts until the server stops.
+    pub(crate) marked: Mutex<HashMap<Uuid, Marked>>,
 }
 
 impl Mail {
@@ -101,6 +105,7 @@ impl Mail {
             lines: Mutex::default(),
             set_aside_failed: Mutex::default(),
             newsletter_headers: Mutex::default(),
+            marked: Mutex::default(),
         }
     }
 
@@ -694,6 +699,10 @@ impl Mail {
 
     pub(crate) fn lock_lines(&self) -> std::sync::MutexGuard<'_, KeptLines> {
         self.lines.lock().expect("never poisoned")
+    }
+
+    pub(crate) fn lock_marked(&self) -> std::sync::MutexGuard<'_, HashMap<Uuid, Marked>> {
+        self.marked.lock().expect("never poisoned")
     }
 }
 

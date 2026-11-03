@@ -67,6 +67,33 @@ export function markSeen(from: From, key: string) {
   );
 }
 
+/** Every mail a folder's list shows, read: as when it was marked read at once. */
+export function markAllSeen(folder: string) {
+  const key = listKey({ folder });
+  const listing = listings.get(key);
+  if (!listing) return;
+  keep(
+    key,
+    { ...listing, mails: listing.mails.map((mail) => ({ ...mail, seen: true })) },
+    partial.has(key),
+  );
+}
+
+/** The folder whose name its menu asked to rename, until its top bar takes it. */
+let renameAsked: string | undefined;
+const renameWatchers = new Set<() => void>();
+
+/** Opens the field that renames the folder `key` names, once its page shows. */
+export function askRename(key: string | undefined) {
+  renameAsked = key;
+  for (const watcher of renameWatchers) watcher();
+}
+
+function watchRename(watcher: () => void) {
+  renameWatchers.add(watcher);
+  return () => void renameWatchers.delete(watcher);
+}
+
 /** A mail that left the list it was opened from, as when it's archived. */
 export function forgetListed(from: From, key: string) {
   const listing = listings.get(listKey(from));
@@ -248,6 +275,14 @@ function FolderName({ folder }: { folder: Folder }) {
   const [renaming, setRenaming] = useState(false);
   // Esc lets go of the field, and leaving it then renames nothing.
   const dropped = useRef(false);
+  // Rename… in the sidebar's menu opens the field.
+  const asked = useSyncExternalStore(watchRename, () => renameAsked);
+  useEffect(() => {
+    if (asked?.toLowerCase() !== folder.key.toLowerCase()) return;
+    askRename(undefined);
+    dropped.current = false;
+    setText(own);
+  }, [asked, folder.key, own]);
 
   const rename = () => {
     const name = text?.trim();

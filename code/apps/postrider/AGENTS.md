@@ -8,7 +8,8 @@ Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
 Trash and the other folders in the sidebar, Search mail (/), Settings →
 Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
 R to reply and its files to open. A folder's name in the top bar renames
-it. A mail opens beside its list, in three columns: the
+it; a right click on a sidebar item, or ⇧F10 on it, marks it all read,
+renames or deletes it, or empties Trash and Junk. A mail opens beside its list, in three columns: the
 sidebar, the list, the mail. Esc closes it, J and K or ↓ and ↑ move. A narrow window
 shows the list or the mail, with a way back. The desktop app notifies of
 new mail and counts what's unread on the dock. Step 2 is built too: the
@@ -174,7 +175,7 @@ Every change happens on the account's server; the Inbox follows it there.
   account's Archive or Trash (made when there's none), and the list comes
   back on the next one, unopened; from the Inbox, all of a conversation's
   Inbox mail goes. Mail in
-  Trash stays there; its server empties it.
+  Trash stays there, until its server or Empty Trash… empties it.
 - V moves it (`move.tsx`, `POST /mails/{account}/{uid}/move` with `to`):
   to the Inbox, Archive, Junk or a folder of yours, picked by typing part
   of its name, or to a new one made with that name.
@@ -182,6 +183,20 @@ Every change happens on the account's server; the Inbox follows it there.
   `POST /folders/{key}/rename`): in every account that has it, with the
   rules that sort into it, Sieve's and reading ones. Sent, Archive and the
   other role folders keep their names.
+- A sidebar item's menu (`folder-menu.tsx`; a right click, or ⇧F10 or the
+  menu key on the focused item) holds what that item can do, and nothing
+  where it can do nothing (Sent, Drafts, Newsletters). Mark all as read,
+  where the sidebar counts unread mail (`POST /folders/{key}/read`), sets
+  \Seen with one `UID STORE` per account (in chunks of 5,000), and the
+  Inbox's copy with it; Undo, where the count was for 30 seconds,
+  (`POST /marked/{id}/undo`) unsets it on the same UIDs, unless the
+  folder's UIDVALIDITY changed. Newsletters is never marked read at once:
+  its page goes by what you opened. Rename… opens the top bar's field.
+  Delete folder… (`DELETE /folders/{key}`, your own folders, none with
+  folders in it) moves its mail to the Trash, then deletes it in every
+  account with the rules that sort into it. Empty Trash… and Empty Junk…
+  (`POST /folders/{key}/empty`) delete their mail for good. Both ask
+  first, Cancel focused.
 - R replies (`reply.rs`, `compose.tsx`): to the mail's Reply-To, else its
   sender, from the account it came to, in its thread, quoting it. It goes
   over SMTP: the IMAP server with `imap.` read as `smtp.`, on 465 with

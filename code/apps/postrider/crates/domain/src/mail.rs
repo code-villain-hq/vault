@@ -371,6 +371,9 @@ pub struct Folder {
     /// those that came since you last looked there.
     #[ts(type = "number")]
     pub unread: i64,
+    /// How many mails it holds, in every account.
+    #[ts(type = "number")]
+    pub total: i64,
 }
 
 /// Mail read live from the servers: a folder's newest, or what a search
@@ -611,6 +614,15 @@ pub struct Answer {
 pub struct FolderLink {
     pub key: String,
     pub name: String,
+}
+
+/// A folder's unread mail, marked read: how many, and the id Undo takes.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MarkedRead {
+    pub id: Uuid,
+    #[ts(type = "number")]
+    pub count: i64,
 }
 
 /// A folder's new name.

@@ -2,7 +2,10 @@
 //! folders, each once by its name or role, at `GET /api/w/{workspace}/folders`;
 //! a folder's newest mail at `/folders/{key}`; what a search finds in all
 //! of them at `/search?q=`; and a mail opened from either at
-//! `/mails/{account}/{uid}?folder=<key>`.
+//! `/mails/{account}/{uid}?folder=<key>`. A folder's menu marks its mail
+//! read (`POST /folders/{key}/read`, undone at `/marked/{id}/undo`),
+//! renames it, deletes it (`DELETE /folders/{key}`), and empties the Trash
+//! and Junk (`POST /folders/{key}/empty`).
 //!
 //! Only the Inbox is followed and kept in Postgres. The rest is asked for
 //! when it's shown; what the lists showed is kept in memory, so a folder
@@ -15,12 +18,13 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use futures::{StreamExt, TryStreamExt, stream};
 use postrider_domain::{
     AccountState, AccountStatus, Folder, FolderLink, FolderRole, Listing, MailAccount, MailSummary,
-    Message, RenameFolder,
+    MarkedRead, Message, RenameFolder,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -49,14 +53,18 @@ impl Mail {
         let accounts = self.accounts(workspace_id).await?;
         let listed = join_all(accounts.iter().map(|account| self.count_folders(account))).await;
         let mut folders: Vec<Folder> = Vec::new();
-        for (place, unseen) in listed.into_iter().flatten() {
+        for (place, (unseen, all)) in listed.into_iter().flatten() {
             match folders.iter_mut().find(|folder| place.is(&folder.key)) {
-                Some(folder) => folder.unread += i64::from(unseen),
+                Some(folder) => {
+                    folder.unread += i64::from(unseen);
+                    folder.total += i64::from(all);
+                }
                 None => folders.push(Folder {
                     key: place.key(),
                     name: place.role.map_or_else(|| place.name.clone(), role_name),
                     role: place.role,
                     unread: i64::from(unseen),
+                    total: i64::from(all),
                 }),
             }
         }
@@ -64,9 +72,10 @@ impl Mail {
         Ok(folders)
     }
 
-    /// An account's folders with what's unread in each, as its server says
-    /// now. Offline, the folders it had, with nothing counted.
-    async fn count_folders(&self, account: &MailAccount) -> Vec<(Place, u32)> {
+    /// An account's folders with what's unread in each, and all it holds,
+    /// as its server says now. Offline, the folders it had, with nothing
+    /// counted.
+    async fn count_folders(&self, account: &MailAccount) -> Vec<(Place, (u32, u32))> {
         let counted = self
             .on_server(account, |session| {
                 Box::pin(async move {
@@ -85,15 +94,12 @@ impl Mail {
                 let places = counted.iter().map(|(place, _)| place.clone()).collect();
                 self.lock_places().insert(account.id, places);
                 counted
-                    .into_iter()
-                    .map(|(place, (unseen, _))| (place, unseen))
-                    .collect()
             }
             Err(failure) => {
                 tracing::info!(address = %account.address, "couldn't list folders: {}", failure.message());
                 self.lock_places()
                     .get(&account.id)
-                    .map(|places| places.iter().map(|place| (place.clone(), 0)).collect())
+                    .map(|places| places.iter().map(|place| (place.clone(), (0, 0))).collect())
                     .unwrap_or_default()
             }
         }
@@ -190,6 +196,219 @@ impl Mail {
             }
         }
         Ok(renamed)
+    }
+
+    /// Marks every unread mail in the folder `key` names read, in every
+    /// account that has it, each in one STORE, and in the Inbox's copy.
+    /// One account refusing puts back those marked before it. What it
+    /// marked waits for Undo, by the id it answers with.
+    pub async fn mark_all_read(
+        self: &Arc<Self>,
+        workspace_id: Uuid,
+        key: &str,
+    ) -> Result<MarkedRead, AppError> {
+        let mut marked: Vec<Read> = Vec::new();
+        for account in self.accounts(workspace_id).await? {
+            let read = async {
+                let Some(place) = self.place(&account, key).await? else {
+                    return Ok(None);
+                };
+                let (validity, uids) = self
+                    .on_server(&account, |session| {
+                        let path = place.path.clone();
+                        Box::pin(async move { imap::mark_all_read(session, &path).await })
+                    })
+                    .await?;
+                self.seen_here(&account, &place, &uids, true).await?;
+                Ok::<_, Failure>(Some(Read {
+                    account: account.clone(),
+                    place,
+                    validity,
+                    uids,
+                }))
+            }
+            .await;
+            match read {
+                Ok(read) => marked.extend(read),
+                Err(failure) => {
+                    let _ = self.mark_unread(&marked).await;
+                    return Err(AppError::refused(format!(
+                        "{}: {}",
+                        account.name,
+                        failure.message()
+                    )));
+                }
+            }
+        }
+        let count = marked.iter().map(|read| read.uids.len()).sum::<usize>();
+        let id = Uuid::now_v7();
+        self.lock_marked().insert(
+            id,
+            Marked {
+                workspace_id,
+                marked,
+            },
+        );
+        Ok(MarkedRead {
+            id,
+            count: i64::try_from(count).unwrap_or(i64::MAX),
+        })
+    }
+
+    /// Puts back what marking a folder read marked. What couldn't be put
+    /// back waits for another try.
+    pub async fn undo_read(&self, workspace_id: Uuid, id: Uuid) -> Result<(), AppError> {
+        let marked = {
+            let mut all = self.lock_marked();
+            match all.get(&id) {
+                Some(marked) if marked.workspace_id == workspace_id => all.remove(&id),
+                _ => None,
+            }
+        }
+        .ok_or_else(|| AppError::not_found("There's nothing to undo here any more."))?;
+        if let Err(problem) = self.mark_unread(&marked.marked).await {
+            self.lock_marked().insert(id, marked);
+            return Err(AppError::refused(problem));
+        }
+        Ok(())
+    }
+
+    /// Marks unread again what marking read marked, in every account that
+    /// can be reached; why one couldn't, if one couldn't.
+    async fn mark_unread(&self, marked: &[Read]) -> Result<(), String> {
+        let mut failed = None;
+        for read in marked.iter().filter(|read| !read.uids.is_empty()) {
+            let done = async {
+                self.on_server(&read.account, |session| {
+                    let (path, uids) = (read.place.path.clone(), read.uids.clone());
+                    let validity = read.validity;
+                    Box::pin(
+                        async move { imap::mark_unread(session, &path, validity, &uids).await },
+                    )
+                })
+                .await?;
+                self.seen_here(&read.account, &read.place, &read.uids, false)
+                    .await?;
+                Ok::<_, Failure>(())
+            }
+            .await;
+            if let Err(failure) = done {
+                failed = Some(format!("{}: {}", read.account.name, failure.message()));
+            }
+        }
+        failed.map_or(Ok(()), Err)
+    }
+
+    /// The Inbox's copy of these mails, read or unread as their server has
+    /// them now; any other folder's lines are read from its server.
+    async fn seen_here(
+        &self,
+        account: &MailAccount,
+        place: &Place,
+        uids: &[u32],
+        seen: bool,
+    ) -> Result<(), sqlx::Error> {
+        if place.path != Place::inbox().path || uids.is_empty() {
+            return Ok(());
+        }
+        let uids: Vec<i64> = uids.iter().map(|uid| i64::from(*uid)).collect();
+        let updated =
+            sqlx::query("UPDATE inbox_mails SET seen = $3 WHERE account_id = $1 AND uid = ANY($2)")
+                .bind(account.id)
+                .bind(&uids)
+                .bind(seen)
+                .execute(&self.pool)
+                .await?;
+        if updated.rows_affected() > 0 {
+            self.bump();
+        }
+        Ok(())
+    }
+
+    /// Deletes the folder `key` names, in every account that has it: its
+    /// mail goes to the account's Trash, and the rules that sort into it
+    /// go too. The Inbox, a folder for a role, and one with folders in it
+    /// stay.
+    pub async fn delete(self: &Arc<Self>, workspace_id: Uuid, key: &str) -> Result<(), AppError> {
+        if key.eq_ignore_ascii_case("inbox") {
+            return Err(AppError::invalid("The Inbox stays."));
+        }
+        let refused = |failure: Failure| AppError::refused(failure.message());
+        let mut deleting = Vec::new();
+        for account in self.accounts(workspace_id).await? {
+            let Some(place) = self.place(&account, key).await.map_err(refused)? else {
+                continue;
+            };
+            if let Some(role) = place.role {
+                return Err(AppError::invalid(format!(
+                    "{} is the same in every mail app: delete your own folders.",
+                    role_name(role)
+                )));
+            }
+            let inside = format!("{} / ", place.name);
+            if self
+                .places(&account)
+                .await
+                .map_err(refused)?
+                .iter()
+                .any(|other| other.name.starts_with(&inside))
+            {
+                return Err(AppError::invalid(format!(
+                    "{} has folders in it: delete those first.",
+                    place.name
+                )));
+            }
+            deleting.push((account, place));
+        }
+        if deleting.is_empty() {
+            return Err(AppError::not_found(format!(
+                "There's no folder called {key}."
+            )));
+        }
+        for (account, place) in deleting {
+            self.delete_folder(&account, &place)
+                .await
+                .map_err(|failure| {
+                    AppError::refused(format!("{}: {}", account.name, failure.message()))
+                })?;
+        }
+        Ok(())
+    }
+
+    /// Empties the Trash or Junk, in every account: what's in it is gone
+    /// for good. An account that can't be reached keeps its own, and says
+    /// so.
+    pub async fn empty(self: &Arc<Self>, workspace_id: Uuid, key: &str) -> Result<(), AppError> {
+        let role = [FolderRole::Trash, FolderRole::Junk]
+            .into_iter()
+            .find(|role| role.key().eq_ignore_ascii_case(key))
+            .ok_or_else(|| AppError::invalid("Only the Trash and Junk are emptied."))?;
+        let mut failed = None;
+        for account in self.accounts(workspace_id).await? {
+            let emptied = async {
+                let Some(place) = self.place(&account, role.key()).await? else {
+                    return Ok(0);
+                };
+                let gone = self
+                    .on_server(&account, |session| {
+                        let path = place.path.clone();
+                        Box::pin(async move { imap::empty(session, &path).await })
+                    })
+                    .await?;
+                self.lock_lines().remove(&(account.id, place.path));
+                Ok::<_, Failure>(gone)
+            }
+            .await;
+            match emptied {
+                Ok(gone) => {
+                    tracing::info!(address = %account.address, "emptied {gone} from {}", role_name(role));
+                }
+                Err(failure) => {
+                    failed = Some(format!("{}: {}", account.name, failure.message()));
+                }
+            }
+        }
+        failed.map_or(Ok(()), |problem| Err(AppError::refused(problem)))
     }
 
     /// A folder's newest mail, from every account that has it.
@@ -415,6 +634,21 @@ impl Mail {
     }
 }
 
+/// What marking a folder read marked, for Undo.
+pub(crate) struct Marked {
+    workspace_id: Uuid,
+    marked: Vec<Read>,
+}
+
+/// An account's folder marked read: under which UIDVALIDITY, and which
+/// of its mails.
+struct Read {
+    account: MailAccount,
+    place: Place,
+    validity: u32,
+    uids: Vec<u32>,
+}
+
 /// What the sidebar calls a folder for its role, whatever its server does.
 /// "Archive 0 of 812, Newsletters 3 of 940, own 2 of 61 in 4": an
 /// account's counts, for the log, without its folders' own names.
@@ -563,6 +797,54 @@ pub async fn rename(
         key: to.key(),
         name: to.name.clone(),
     }))
+}
+
+/// `POST /api/w/{workspace}/folders/{key}/read`: the folder's unread mail
+/// marked read in every account; it answers with how many, and the id
+/// Undo takes.
+pub async fn mark_all_read(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, key)): Path<(Uuid, String)>,
+) -> Result<Json<MarkedRead>, AppError> {
+    Ok(Json(
+        state
+            .mail
+            .mark_all_read(member.actor.workspace_id, &key)
+            .await?,
+    ))
+}
+
+/// `POST /api/w/{workspace}/marked/{id}/undo`: that mail unread again.
+pub async fn undo_read(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, AppError> {
+    state.mail.undo_read(member.actor.workspace_id, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `DELETE /api/w/{workspace}/folders/{key}`: the folder gone from every
+/// account, its mail in the Trash.
+pub async fn delete(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, key)): Path<(Uuid, String)>,
+) -> Result<StatusCode, AppError> {
+    state.mail.delete(member.actor.workspace_id, &key).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/w/{workspace}/folders/{key}/empty`: the Trash or Junk
+/// emptied, in every account.
+pub async fn empty(
+    State(state): State<AppState>,
+    member: Member,
+    Path((_, key)): Path<(Uuid, String)>,
+) -> Result<StatusCode, AppError> {
+    state.mail.empty(member.actor.workspace_id, &key).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize)]

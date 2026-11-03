@@ -18,4 +18,8 @@ name: string, role: FolderRole | null,
  * How many of its mails are unread, in every account; in Newsletters,
  * those that came since you last looked there.
  */
-unread: number, };
+unread: number, 
+/**
+ * How many mails it holds, in every account.
+ */
+total: number, };
