@@ -211,7 +211,7 @@ export interface PaneInfo {
 
 /** What a terminal coming on screen missed. See `pty_attach`. */
 export interface Catchup {
-  /** Base64 output after the point asked from. */
+  /** Base64 output after the point asked from. The live feed after it is raw (`lib/paneFeed.ts`). */
   data: string;
   /** Where `data` ends in the pane's output; ask from here next time. */
   end: number;

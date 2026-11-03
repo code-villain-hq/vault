@@ -150,7 +150,7 @@ mod tests {
         assert!(!String::from_utf8_lossy(&next.data).contains("one"), "only what came after");
 
         // The window was never attached, so all of it still waits for it.
-        let catchup = ptys.attach(&id, None).unwrap();
+        let catchup = ptys.attach(&id, None, tauri::ipc::Channel::new(|_| Ok(()))).unwrap();
         assert!(catchup.end >= next.end);
 
         // Asked from before what is held, it starts again.

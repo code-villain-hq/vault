@@ -149,7 +149,7 @@ outbox meanwhile.
 | main | plain `#[tauri::command] fn`, the event loop, AppKit | Nothing that waits. While it waits, no event reaches the webview. |
 | tokio workers | `async fn` commands, HTTP clients, the MCP server | Nothing that blocks. The MCP server shares these. |
 | blocking pool | `commands::blocking(app, \|state\| …)`, `commands::off_runtime(\|\| …)` | git, file walks, child processes, the keychain |
-| per pane | a reader, a writer and a waiter thread, plus flush timers | owned by `pty.rs` |
+| per pane | a reader, a writer, a waiter and a flush thread | owned by `pty.rs` |
 | browser | a reader and a writer thread on Chrome's pipe | owned by `browser/cdp.rs`; events are handled on the reader, which never waits on Chrome |
 | background | `attention` (5s), `news` (3 min while away), restore and login-shell warm-up at startup | started in `lib.rs` |
 | a loop | one async task per agent on a loop (`loops.rs`), waiting on its pane's turns; the loop's git, its checks and what it types go to the blocking pool | at most two loops' checks at once (`AT_ONCE`) |
@@ -221,7 +221,6 @@ for, and the reverse, and that each is in this table.
 
 | Event | Payload | Emitted when | Listened in |
 |---|---|---|---|
-| `pty:output` | `{ pane_id, data: base64, end }` | a watched pane printed (batched, ~33ms) | `lib/ptyOutput.ts`, one listener for all panes |
 | `pty:activity` | pane id | a pane's state changed: a hook report, a keystroke, a notice cleared, a pane shown, a Slack thread's idle chat stopped (BOT-14) | `Watchers.tsx` → `refreshPanes` |
 | `pty:notice` | `{ pane_id, notice }` | a usage-limit or trust prompt appeared | `Watchers.tsx` → refresh and toast |
 | `pty:exit` | `{ pane_id, code }` | a pane's process ended | `Watchers.tsx` → refresh, toast, Slack |
@@ -257,12 +256,16 @@ in front, and slower once nobody has touched it for 45 seconds
   marker, with a timeout), then `VILLAIN_PANE`. The pane cap is checked
   under the map lock, counting spawns in flight.
 - **Output.** Each pane keeps 256KB of scrollback with a running byte
-  position. It travels base64-encoded, so a multi-byte character split
-  across two chunks is never mangled. A pane that nothing shows is not
-  sent anything. When it comes on screen, `pty_attach(since)` hands over
-  exactly what came after `since`, or says `reset` when that is gone.
-  While watched, output is batched to ~33ms. A keystroke's echo goes out
-  within 4ms.
+  position. A pane that nothing shows is not sent anything. When it comes
+  on screen, `pty_attach(since, output)` hands over exactly what came after
+  `since` (base64, once per showing), or says `reset` when that is gone,
+  and from then on the pane's flush thread (`pty/flush.rs`, one per pane
+  for its life) sends live output to that terminal's `output` channel as
+  raw bytes: the position it ends at (8 bytes, big-endian), then the bytes
+  (`lib/paneFeed.ts`). Each attach brings a new channel and ends the last.
+  xterm joins a multi-byte character split across two batches. While
+  watched, output is batched to ~33ms. A keystroke's echo goes out within
+  4ms.
 - **The frontend's side** (`Terminal.tsx`): one xterm per pane, created
   once and moved into whichever view shows it. Unmounting parks it and
   hiding detaches it. It is disposed when the pane leaves the store's

@@ -174,8 +174,9 @@ export const api = {
   ptyWrite: (paneId: string, data: string) => invoke<void>("pty_write", { paneId, data }),
   ptyResize: (paneId: string, rows: number, cols: number) =>
     invoke<void>("pty_resize", { paneId, rows, cols }),
-  ptyAttach: (paneId: string, since: number | null) =>
-    invoke<Catchup>("pty_attach", { paneId, since }),
+  /** What a terminal missed since `since`; its live output then goes to `output`, raw. */
+  ptyAttach: (paneId: string, since: number | null, output: Channel<ArrayBuffer>) =>
+    invoke<Catchup>("pty_attach", { paneId, since, output }),
   ptyDetach: (paneId: string) => invoke<void>("pty_detach", { paneId }),
   closePane: (paneId: string) => invoke<void>("close_pane", { paneId }),
   killPane: (paneId: string) => invoke<void>("kill_pane", { paneId }),

@@ -98,6 +98,7 @@ __mock.calls.filter((c) => c.cmd === "spawn_agent")
 __mock.on("github_open_prs", () => [{ checkout_id: "c-login-api", repo: "api", ok: false, detail: "rejected" }])
 __mock.world.panes[0].activity = "done"; __mock.emit("pty:activity", "pane-claude")
 __mock.emit("system-notify-click", "pane:t-login:pane-shell")   // a banner clicked (NOTE-4)
+__mock.print("pane-shell", "hello\r\n")    // a pane prints, live over its terminal's channel
 ```
 
 - **The data** is in `src/__mock__/world.ts`, typed against `src/lib/types.ts`.

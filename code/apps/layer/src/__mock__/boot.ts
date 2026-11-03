@@ -25,6 +25,7 @@ import { emit } from "@tauri-apps/api/event";
  *   __mock.calls                     every command invoked, with its arguments
  *   __mock.on("cmd", (args) => …)    answer a command differently from now on
  *   __mock.emit("pty:activity", id)  deliver a backend event
+ *   __mock.print(id, "text\r\n")     a pane prints, live to its terminal if shown
  *   __mock.world                     the data being served; edit it, then emit
  *
  * A command with no answer here logs "[mock] unanswered" and returns null.
@@ -112,9 +113,40 @@ function placeElsewhere(id: string, path: string): Project {
   return p;
 }
 
-function encode(text: string): { data: string; end: number } {
-  const bytes = new TextEncoder().encode(text);
-  return { data: btoa(String.fromCharCode(...bytes)), end: bytes.length };
+/** Deliver a message on a channel the UI handed to a command. */
+function toChannel(id: number, message: { index: number } & Record<string, unknown>) {
+  const internals = (
+    window as unknown as {
+      __TAURI_INTERNALS__: { runCallback: (id: number, data: unknown) => void };
+    }
+  ).__TAURI_INTERNALS__;
+  internals.runCallback(id, message);
+}
+
+/** Each terminal on screen: the channel from its last `pty_attach`, and its next index. */
+const feeds = new Map<string, { id: number; next: number }>();
+
+/** Stop a pane's live feed, ending the channel as the backend does when it drops it. */
+function endFeed(paneId: string) {
+  const feed = feeds.get(paneId);
+  if (!feed) return;
+  feeds.delete(paneId);
+  toChannel(feed.id, { index: feed.next, end: true });
+}
+
+/** A pane prints `text`: kept for the next catch-up, and sent live if it is on screen. */
+function print(paneId: string, text: string) {
+  const enc = new TextEncoder();
+  const before = world.output[paneId] ?? "";
+  world.output[paneId] = before + text;
+  const feed = feeds.get(paneId);
+  if (!feed) return;
+  // As the backend frames a batch: where it ends (8 bytes, big-endian), then its bytes.
+  const bytes = enc.encode(text);
+  const frame = new Uint8Array(8 + bytes.length);
+  new DataView(frame.buffer).setBigUint64(0, BigInt(enc.encode(before).length + bytes.length));
+  frame.set(bytes, 8);
+  toChannel(feed.id, { index: feed.next++, message: frame.buffer });
 }
 
 function newPane(args: Args, kind: PaneInfo["kind"], task: string): PaneInfo {
@@ -495,12 +527,22 @@ const answer: Record<string, Answer> = {
 
   // Terminals.
   pty_attach: (a): Catchup => {
-    return { ...encode(world.output[a.paneId as string] ?? ""), reset: false };
+    const id = a.paneId as string;
+    endFeed(id);
+    feeds.set(id, { id: (a.output as { id: number }).id, next: 0 });
+    const all = new TextEncoder().encode(world.output[id] ?? "");
+    const since = (a.since as number | null) ?? 0;
+    const reset = since > all.length;
+    const missed = all.subarray(reset ? 0 : since);
+    return { data: btoa(String.fromCharCode(...missed)), end: all.length, reset };
   },
   // Keys, sizes and visibility: nothing to answer, and too frequent to log.
   pty_write: () => null,
   pty_resize: () => null,
-  pty_detach: () => null,
+  pty_detach: (a) => {
+    endFeed(a.paneId as string);
+    return null;
+  },
   ...acpAnswers,
   ...loopAnswers(world.projects),
   resumable_agents: () => [],
@@ -952,12 +994,7 @@ const answer: Record<string, Answer> = {
     const b = tabOf(a.taskId as string);
     const frames = a.frames as { id: number };
     const jpeg = await frameOf(b, a.width as number, a.height as number, a.scale as number);
-    const internals = (
-      window as unknown as {
-        __TAURI_INTERNALS__: { runCallback: (id: number, data: unknown) => void };
-      }
-    ).__TAURI_INTERNALS__;
-    internals.runCallback(frames.id, { index: 0, message: jpeg });
+    toChannel(frames.id, { index: 0, message: jpeg });
     return null;
   },
   browser_unwatch: () => null,
@@ -1098,6 +1135,7 @@ mockIPC(
   /** Each task's browser tab; edit one, then emit "browser:changed" with its task. */
   browsers,
   emit: (event: string, payload?: unknown) => emit(event, payload),
+  print,
 };
 
 // The store reads its layout from here on boot (lib/persist.ts).

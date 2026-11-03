@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::agents;
@@ -713,15 +714,17 @@ pub fn pty_resize(state: State<AppState>, pane_id: String, rows: u16, cols: u16)
 }
 
 /// A terminal has come on screen: what it missed since `since`, and a live
-/// feed from then on. `since` is null for a terminal that has drawn nothing.
+/// feed from then on over `output`, raw. `since` is null for a terminal that
+/// has drawn nothing.
 #[tauri::command]
 pub fn pty_attach(
     state: State<AppState>,
     pane_id: String,
     since: Option<u64>,
+    output: Channel<InvokeResponseBody>,
     app: AppHandle,
 ) -> Result<crate::pty::Catchup> {
-    let catchup = state.ptys.attach(&pane_id, since)?;
+    let catchup = state.ptys.attach(&pane_id, since, output)?;
     if catchup.seen {
         let _ = app.emit("pty:activity", &pane_id);
     }

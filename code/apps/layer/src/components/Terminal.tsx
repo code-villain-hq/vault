@@ -1,3 +1,4 @@
+import { Channel } from "@tauri-apps/api/core";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
@@ -5,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { api } from "../lib/api";
 import { whenBehind } from "../lib/catchUp";
 import { afterDrag, isDragging } from "../lib/drag";
-import { onPtyOutput } from "../lib/ptyOutput";
+import { unframe } from "../lib/paneFeed";
 import { decode, TERMINAL_FONT, terminalTheme } from "../lib/terminal";
 import { currentTheme, type Theme } from "../lib/theme";
 import type { PaneInfo } from "../lib/types";
@@ -102,7 +103,6 @@ class PaneTerminal {
   private opened = false;
   private disposed = false;
   private readonly subs: { dispose(): void }[] = [];
-  private readonly stopOutput: () => void;
   private readonly ro: ResizeObserver;
 
   constructor(private readonly id: string) {
@@ -143,7 +143,6 @@ class PaneTerminal {
         void api.ptyResize(id, rows, cols).catch(() => {});
       }),
     );
-    this.stopOutput = onPtyOutput(id, (data, end) => this.receive(data, end));
     this.ro = new ResizeObserver(() => {
       // A grip being dragged resizes this every frame, and each fit is a
       // resize the agent redraws its whole screen for: wait for the drop.
@@ -203,7 +202,6 @@ class PaneTerminal {
     if (this.disposed) return;
     this.disposed = true;
     this.ro.disconnect();
-    this.stopOutput();
     for (const s of this.subs) s.dispose();
     this.dropGpu();
     this.term.dispose();
@@ -234,11 +232,10 @@ class PaneTerminal {
     void api.ptyResize(this.id, this.term.rows, this.term.cols).catch(() => {});
   }
 
-  private receive(data: string, end: number) {
+  private receive(bytes: Uint8Array, end: number) {
     // Off screen, the backend has been told to stop sending; a chunk already
     // on its way is covered by the catch-up when this is shown again.
     if (this.disposed || !this.shown) return;
-    const bytes = decode(data);
     if (this.syncing || this.have === null) {
       this.held.push([bytes, end]);
       return;
@@ -271,7 +268,10 @@ class PaneTerminal {
     try {
       do {
         this.again = false;
-        const c = await api.ptyAttach(this.id, this.have);
+        // A channel per attach: the backend ends the one before. A batch
+        // still on its way over that one is placed by position like any other.
+        const output = new Channel<ArrayBuffer>((frame) => this.receive(...unframe(frame)));
+        const c = await api.ptyAttach(this.id, this.have, output);
         if (this.disposed) return;
         // Too far behind to catch up: the scrollback has moved on past the
         // last byte drawn, so start again from what it still holds.

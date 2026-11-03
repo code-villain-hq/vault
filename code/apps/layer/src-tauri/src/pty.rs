@@ -1,6 +1,8 @@
 //! PTY-backed panes. Each pane is a real terminal: an agent CLI or a shell,
-//! rooted in a workspace's worktree. Output is streamed to the frontend as
-//! base64 so multi-byte sequences never get split by a chunk boundary.
+//! rooted in a workspace's worktree. Output is streamed to the terminal as
+//! raw bytes over its Tauri channel (`flush.rs`), each batch with its
+//! position, so a multi-byte sequence split by a chunk boundary is joined
+//! again by xterm rather than mangled on the way.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -20,6 +22,7 @@ use crate::shellenv;
 
 pub mod acp;
 pub mod feed;
+mod flush;
 mod output;
 mod screen;
 mod text;
@@ -336,22 +339,17 @@ struct Pane {
     pid: Option<u32>,
     io: Io,
     output: Mutex<Output>,
-    flush_scheduled: AtomicBool,
-    /// When the last event went out, so a burst is coalesced and a lone key
+    /// What the reader has told the pane's one flush thread (`flush.rs`).
+    flush: Mutex<flush::Flush>,
+    wake: parking_lot::Condvar,
+    /// When the last batch went out, so a burst is coalesced and a lone key
     /// is not.
     last_flush: Mutex<Instant>,
     /// When a key was last sent that has not had its echo shipped yet.
     typed: Mutex<Option<Instant>>,
-    /// Set when output arrives in answer to a key, to cut the flush thread's
-    /// wait short.
-    ///
-    /// The first event after a quiet spell already went out after
-    /// `OUTPUT_GATHER`, but a key pressed while the pane was busy — an agent's
-    /// spinner going, a watcher printing — waited out the rest of the frame
-    /// behind it: 20ms typical, 35ms often, on every key, in exactly the panes
-    /// people type into most. Measured by the `echo_latency` test.
-    urgent: Mutex<bool>,
-    wake: parking_lot::Condvar,
+    /// The channel of the terminal on screen, from its last `attach`; none
+    /// while nobody is looking.
+    feed: Mutex<Option<flush::Feed>>,
     /// Whether a terminal is on screen for this pane.
     ///
     /// Output for panes nobody can see used to cross the bridge anyway, at
@@ -369,7 +367,7 @@ struct Pane {
 /// from, and whether it has to clear the screen first.
 #[derive(Debug, Clone, Serialize)]
 pub struct Catchup {
-    /// Base64, like the live feed.
+    /// Base64: once per showing, unlike the live feed, which is raw.
     pub data: String,
     /// The position `data` runs up to, to ask from next time.
     pub end: u64,
@@ -464,15 +462,6 @@ impl Drop for Reserved<'_> {
 }
 
 #[derive(Serialize, Clone)]
-struct OutputEvent<'a> {
-    pane_id: &'a str,
-    data: String,
-    /// The position just past `data`, so the webview can tell a repeat from
-    /// a gap.
-    end: u64,
-}
-
-#[derive(Serialize, Clone)]
 struct NoticeEvent<'a> {
     pane_id: &'a str,
     notice: Option<&'a str>,
@@ -485,99 +474,6 @@ struct ExitEvent<'a> {
 }
 
 impl PtyManager {
-    fn emit_output<R: Runtime>(app: &AppHandle<R>, id: &str, bytes: &[u8], end: u64) {
-        let data = base64::engine::general_purpose::STANDARD.encode(bytes);
-        let _ = app.emit("pty:output", OutputEvent { pane_id: id, data, end });
-    }
-
-    /// Queue a UI flush if one is not already waiting.
-    ///
-    /// The reader keeps appending to the output; this just starts the timer
-    /// that will ship it. Doing that on a short sleep means a burst of TUI
-    /// redraws becomes one event instead of one per read.
-    fn schedule_flush<R: Runtime>(app: &AppHandle<R>, pane: &Arc<Pane>, id: &str, keyed: bool) {
-        if !pane.watched.load(Ordering::Acquire) {
-            return;
-        }
-        if pane.flush_scheduled.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
-            return;
-        }
-        let quiet = pane.last_flush.lock().elapsed();
-        let mut wait = if keyed || quiet >= OUTPUT_COALESCE { OUTPUT_GATHER } else { OUTPUT_COALESCE - quiet };
-        let app = app.clone();
-        let pane = pane.clone();
-        let id = id.to_string();
-        std::thread::spawn(move || {
-            loop {
-                // Interruptible: an echo arriving meanwhile cuts it short,
-                // then waits `OUTPUT_GATHER` for the rest of its frame.
-                {
-                    let mut urgent = pane.urgent.lock();
-                    if !*urgent {
-                        let _ = pane.wake.wait_for(&mut urgent, wait);
-                    }
-                    if *urgent {
-                        *urgent = false;
-                        drop(urgent);
-                        std::thread::sleep(OUTPUT_GATHER);
-                    }
-                }
-                wait = OUTPUT_COALESCE;
-                // Hidden since this was scheduled: what is waiting stays in
-                // scrollback, and showing the pane again collects it.
-                if !pane.watched.load(Ordering::Acquire) {
-                    pane.flush_scheduled.store(false, Ordering::Release);
-                    // Unless it was shown again in between, and a read that
-                    // landed then found this flag still up and left it to us.
-                    let more = pane.watched.load(Ordering::Acquire) && {
-                        let out = pane.output.lock();
-                        out.sent < out.total
-                    };
-                    if more
-                        && pane
-                            .flush_scheduled
-                            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-                            .is_ok()
-                    {
-                        continue;
-                    }
-                    break;
-                }
-                let batch = pane.output.lock().take_unsent();
-                let Some((bytes, end)) = batch else {
-                    pane.flush_scheduled.store(false, Ordering::Release);
-                    // A write may have landed between the take and the clear.
-                    // Re-arm rather than drop those bytes until the next read.
-                    let more = {
-                        let out = pane.output.lock();
-                        out.sent < out.total
-                    };
-                    if more
-                        && pane
-                            .flush_scheduled
-                            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-                            .is_ok()
-                    {
-                        continue;
-                    }
-                    break;
-                };
-                Self::emit_output(&app, &id, &bytes, end);
-                *pane.last_flush.lock() = Instant::now();
-            }
-        });
-    }
-
-    fn flush_pending<R: Runtime>(app: &AppHandle<R>, pane: &Pane, id: &str) {
-        if !pane.watched.load(Ordering::Acquire) {
-            return;
-        }
-        let batch = pane.output.lock().take_unsent();
-        if let Some((bytes, end)) = batch {
-            Self::emit_output(app, id, &bytes, end);
-        }
-    }
-
     /// A place under `MAX_PANES` for a pane about to start, in a folder that
     /// exists.
     fn reserve(&self, cwd: &str) -> Result<Reserved<'_>> {
@@ -650,11 +546,11 @@ impl PtyManager {
             pid,
             io,
             output: Mutex::new(Output { scrollback: Vec::new(), total: 0, sent: 0 }),
-            flush_scheduled: AtomicBool::new(false),
+            flush: Mutex::new(flush::Flush::default()),
+            wake: parking_lot::Condvar::new(),
             last_flush: Mutex::new(Instant::now()),
             typed: Mutex::new(None),
-            urgent: Mutex::new(false),
-            wake: parking_lot::Condvar::new(),
+            feed: Mutex::new(None),
             // Nothing is on screen until the webview attaches, and attaching
             // collects whatever was printed before it did.
             watched: AtomicBool::new(false),
@@ -843,19 +739,18 @@ impl PtyManager {
                                 *typed = None;
                                 fresh
                             };
-                            if keyed {
-                                *pane.urgent.lock() = true;
-                                pane.wake.notify_one();
-                            }
-                            // Scrollback always records. The webview only gets
-                            // a feed while the pane is on screen.
-                            Self::schedule_flush(&app, &pane, &id, keyed);
+                            pane.schedule_flush(keyed);
                         }
                     }
                 }
-                // Drain anything still held so the last paint is not lost.
-                Self::flush_pending(&app, &pane, &id);
+                pane.end_flushing();
             });
+        }
+
+        // Flusher: one per pane, for its life, shipping what the reader read.
+        {
+            let pane = pane.clone();
+            std::thread::spawn(move || flush::run(pane));
         }
 
         // Waiter: record the exit status and tell the UI.
@@ -960,9 +855,18 @@ impl PtyManager {
     /// Marked watched under the same lock that reads the catch-up, so every
     /// byte is in one or the other — at worst in both, which the webview
     /// discards by position.
-    pub fn attach(&self, id: &str, since: Option<u64>) -> Result<Catchup> {
+    ///
+    /// `feed` is where its output goes from now on, in place of the channel
+    /// of any earlier attach.
+    pub fn attach(
+        &self,
+        id: &str,
+        since: Option<u64>,
+        feed: tauri::ipc::Channel<tauri::ipc::InvokeResponseBody>,
+    ) -> Result<Catchup> {
         let pane = self.get(id)?;
         let mut out = pane.output.lock();
+        *pane.feed.lock() = Some(feed);
         let was_watched = pane.watched.swap(true, Ordering::AcqRel);
         let seen = {
             let mut meta = pane.meta.lock();
@@ -981,6 +885,8 @@ impl PtyManager {
     pub fn detach(&self, id: &str) {
         if let Ok(pane) = self.get(id) {
             pane.watched.store(false, Ordering::Release);
+            // Dropping the channel tells the terminal's side it is done.
+            pane.feed.lock().take();
             pane.meta.lock().seen_at = Utc::now();
         }
     }
@@ -1509,17 +1415,17 @@ mod tests {
     #[test]
     #[ignore]
     fn echo_latency() {
-        use tauri::Listener;
         for (label, script) in
             [("quiet", "exec cat"), ("beside a 20ms printer", "(while :; do printf .; sleep 0.02; done) & exec cat")]
         {
             let app = tauri::test::mock_app();
             let ptys = PtyManager::default();
             let (tx, rx) = std::sync::mpsc::channel::<(Instant, String)>();
-            app.listen_any("pty:output", move |e| {
-                let v: serde_json::Value = serde_json::from_str(e.payload()).unwrap();
-                let bytes = base64::engine::general_purpose::STANDARD.decode(v["data"].as_str().unwrap()).unwrap();
-                let _ = tx.send((Instant::now(), String::from_utf8_lossy(&bytes).to_string()));
+            let feed = tauri::ipc::Channel::new(move |body| {
+                if let tauri::ipc::InvokeResponseBody::Raw(frame) = body {
+                    let _ = tx.send((Instant::now(), String::from_utf8_lossy(&frame[8..]).to_string()));
+                }
+                Ok(())
             });
             let pane = ptys
                 .spawn(
@@ -1543,7 +1449,7 @@ mod tests {
                     },
                 )
                 .unwrap();
-            ptys.attach(&pane.id, None).unwrap();
+            ptys.attach(&pane.id, None, feed).unwrap();
             std::thread::sleep(Duration::from_millis(300));
             let mut took = Vec::new();
             for i in 0..40u8 {
@@ -1610,7 +1516,7 @@ mod tests {
         let wait_for = |id: &str, since: Option<u64>, want: &str| -> Catchup {
             let deadline = Instant::now() + Duration::from_secs(10);
             loop {
-                let c = ptys.attach(id, since).unwrap();
+                let c = ptys.attach(id, since, tauri::ipc::Channel::new(|_| Ok(()))).unwrap();
                 if text(&c).contains(want) || Instant::now() > deadline {
                     return c;
                 }
@@ -1632,6 +1538,39 @@ mod tests {
         assert!(!rest.reset);
         assert!(rest.end > first.end);
         ptys.close(&pane.id).unwrap();
+
+        // Live output leaves in order on the terminal's channel, each batch
+        // starting where the last ended, and nothing falls between the
+        // catch-up and the feed.
+        let frames = Arc::new(Mutex::new(Vec::<(u64, Vec<u8>)>::new()));
+        let feed = {
+            let frames = frames.clone();
+            tauri::ipc::Channel::new(move |body| {
+                if let tauri::ipc::InvokeResponseBody::Raw(frame) = body {
+                    let end = u64::from_be_bytes(frame[..8].try_into().unwrap());
+                    frames.lock().push((end, frame[8..].to_vec()));
+                }
+                Ok(())
+            })
+        };
+        let printer = spawn("/bin/sh", &["-c", "sleep 0.1; seq 1 20000; sleep 5"]);
+        let caught = ptys.attach(&printer.id, None, feed).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !frames.lock().iter().any(|(_, b)| String::from_utf8_lossy(b).contains("20000\r\n"))
+            && Instant::now() < deadline
+        {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let mut got = base64::engine::general_purpose::STANDARD.decode(&caught.data).unwrap();
+        let mut at = caught.end;
+        for (end, bytes) in frames.lock().iter() {
+            assert_eq!(*end, at + bytes.len() as u64, "a batch out of order, or a gap before it");
+            at = *end;
+            got.extend_from_slice(bytes);
+        }
+        let want: String = (1..=20000).map(|n| format!("{n}\r\n")).collect();
+        assert!(String::from_utf8_lossy(&got).contains(&want), "output lost or reordered on the way");
+        ptys.close(&printer.id).unwrap();
 
         // An interactive shell ignores SIGTERM; closing one used to take the
         // whole five-second grace and end in SIGKILL.
