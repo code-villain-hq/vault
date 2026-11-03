@@ -46,6 +46,10 @@ const ANSWER: Duration = Duration::from_secs(20);
 /// How long a sync waits for every account to ask its server.
 const SYNC: Duration = Duration::from_secs(30);
 
+/// How long a kept connection may take to answer NOOP before it's taken as
+/// gone, and another used.
+const STILL_THERE: Duration = Duration::from_secs(10);
+
 /// Waits between tries while a server can't be reached: doubling, up to
 /// the last.
 const RETRY: [u64; 5] = [5, 15, 30, 60, 300];
@@ -502,23 +506,28 @@ impl Mail {
         }
     }
 
-    /// Does `work` over one of the account's connections for reading,
-    /// opened when none is free. One the server has closed since is opened
-    /// again.
+    /// Does `work` once, over one of the account's connections for reading
+    /// that still answers, opened when none is free. One the server has
+    /// closed since is passed over before the work begins, never after.
     pub(crate) async fn on_server<T>(
         &self,
         account: &MailAccount,
         work: impl for<'s> Fn(&'s mut Session) -> BoxFuture<'s, Result<T, Failure>>,
     ) -> Result<T, Failure> {
-        let kept = self.lock_readers().get_mut(&account.id).and_then(Vec::pop);
-        if let Some(mut session) = kept
-            && let Ok(done) = work(&mut session).await
-        {
-            self.keep_reader(account.id, session);
-            return Ok(done);
-        }
-        let mut session = self.sign_in(account).await?;
-        let done = work(&mut session).await?;
+        let (done, session) = once_ready(
+            || self.lock_readers().get_mut(&account.id).and_then(Vec::pop),
+            |session: &mut Session| {
+                Box::pin(async move {
+                    matches!(
+                        tokio::time::timeout(STILL_THERE, session.noop()).await,
+                        Ok(Ok(()))
+                    )
+                })
+            },
+            || self.sign_in(account),
+            work,
+        )
+        .await?;
         self.keep_reader(account.id, session);
         Ok(done)
     }
@@ -720,6 +729,37 @@ async fn wait_idle(session: Session, wake: &Notify) -> Result<Session, Failure> 
     Ok(done?)
 }
 
+/// Does `work` once, over the first of the `kept` sessions that is still
+/// `ready`, else one it `open`s, and gives the session back with what the
+/// work did. Only a session that fails before the work begins is passed
+/// over: work that failed may have been done all the same (an APPEND to
+/// Sent before the connection dropped, a MOVE before a later STATUS), and
+/// doing it again would do it twice, or find nothing left to do. A session
+/// whose work failed isn't kept.
+async fn once_ready<S, T, Opened>(
+    mut kept: impl FnMut() -> Option<S>,
+    ready: impl for<'s> Fn(&'s mut S) -> BoxFuture<'s, bool>,
+    open: impl FnOnce() -> Opened,
+    work: impl for<'s> Fn(&'s mut S) -> BoxFuture<'s, Result<T, Failure>>,
+) -> Result<(T, S), Failure>
+where
+    Opened: Future<Output = Result<S, Failure>>,
+{
+    let mut answering = None;
+    while let Some(mut session) = kept() {
+        if ready(&mut session).await {
+            answering = Some(session);
+            break;
+        }
+    }
+    let mut session = match answering {
+        Some(session) => session,
+        None => open().await?,
+    };
+    let done = work(&mut session).await?;
+    Ok((done, session))
+}
+
 #[derive(Deserialize)]
 pub struct InboxParams {
     after: Option<i64>,
@@ -768,4 +808,82 @@ pub async fn open(
         }
         None => state.mail.open(workspace_id, account_id, uid).await?,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::*;
+
+    /// A connection: whether it still answers, and the work done over it.
+    struct Fake {
+        answers: bool,
+        done: Arc<AtomicUsize>,
+    }
+
+    async fn run(
+        kept: Vec<bool>,
+        fails: bool,
+        done: &Arc<AtomicUsize>,
+    ) -> (Result<bool, Failure>, usize) {
+        let mut kept: Vec<Fake> = kept
+            .into_iter()
+            .map(|answers| Fake {
+                answers,
+                done: done.clone(),
+            })
+            .collect();
+        let opened = AtomicUsize::new(0);
+        let result = once_ready(
+            || kept.pop(),
+            |fake: &mut Fake| Box::pin(async move { fake.answers }),
+            || async {
+                opened.fetch_add(1, Ordering::SeqCst);
+                Ok(Fake {
+                    answers: true,
+                    done: done.clone(),
+                })
+            },
+            |fake: &mut Fake| {
+                Box::pin(async move {
+                    // Done on the server, whatever is answered after.
+                    fake.done.fetch_add(1, Ordering::SeqCst);
+                    if fails {
+                        Err(Failure::Offline("the connection broke".into()))
+                    } else {
+                        Ok(fake.answers)
+                    }
+                })
+            },
+        )
+        .await
+        .map(|(done, _)| done);
+        (result, opened.load(Ordering::SeqCst))
+    }
+
+    #[tokio::test]
+    async fn work_that_failed_is_never_done_again() {
+        let done = Arc::new(AtomicUsize::new(0));
+        let (result, opened) = run(vec![true], true, &done).await;
+        assert!(result.is_err());
+        assert_eq!((done.load(Ordering::SeqCst), opened), (1, 0));
+        let done = Arc::new(AtomicUsize::new(0));
+        let (result, opened) = run(Vec::new(), true, &done).await;
+        assert!(result.is_err());
+        assert_eq!((done.load(Ordering::SeqCst), opened), (1, 1));
+    }
+
+    #[tokio::test]
+    async fn a_kept_connection_that_stopped_answering_is_passed_over_first() {
+        let done = Arc::new(AtomicUsize::new(0));
+        // Popped from the end: the gone one first, then one that answers.
+        let (result, opened) = run(vec![true, false], false, &done).await;
+        assert!(result.is_ok_and(|kept| kept));
+        assert_eq!((done.load(Ordering::SeqCst), opened), (1, 0));
+        let done = Arc::new(AtomicUsize::new(0));
+        let (result, opened) = run(vec![false, false], false, &done).await;
+        assert!(result.is_ok());
+        assert_eq!((done.load(Ordering::SeqCst), opened), (1, 1));
+    }
 }
