@@ -19,9 +19,11 @@
 //! sends notices. Mail that offers to unsubscribe and says neither stays in
 //! the Inbox, and Claude Code reads it ([`crate::judging`]): a sender it
 //! finds writing only to many is named in the rule ([`Rule::senders`]), so
-//! its mail skips the Inbox from then on, with the Mac off too. Keep in
-//! Inbox is there for the senders this still gets wrong, and takes one off
-//! the rule.
+//! its mail skips the Inbox from then on, with the Mac off too. Big senders
+//! put `List-Id` or `Precedence: bulk` on notices about your account too,
+//! so the header alone sorts but doesn't decide: Claude Code reads what it
+//! sorted as well, and a notice goes back. Keep in Inbox is there for the
+//! senders this still gets wrong, and takes one off the rule.
 //!
 //! `GET /api/w/{workspace}/newsletters` reads all of each account's
 //! Newsletters, by sender: how often each writes, when it last did, and how
@@ -64,6 +66,7 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::folders::listing;
 use crate::imap::{self, Failure, Headed, Place};
+use crate::judging;
 use crate::mail::Mail;
 use crate::reply::{is_this_mac, send};
 use crate::rules::{self, Moved, Rule, When};
@@ -262,7 +265,7 @@ impl Mail {
         if sets_aside {
             self.put_rules(account, &rules).await?;
         }
-        let mut unsure = 0;
+        let mut to_read = 0;
         if let Some(place) = self.newsletters_folder(account).await? {
             let there = self
                 .told_in(
@@ -273,7 +276,8 @@ impl Mail {
                 )
                 .await?;
             let notices = of(&there, Said::Notice);
-            unsure = of(&there, Said::Unsure).len();
+            let unsure = of(&there, Said::Unsure).len();
+            to_read = there.len() - notices.len();
             let back = self
                 .move_out(account, &place.path, &notices, &[], "INBOX")
                 .await?;
@@ -285,11 +289,12 @@ impl Mail {
             tracing::info!(
                 address = %account.address,
                 "sorted again: of the {} in Newsletters, {} a machine sent by itself, \
-                 {} went back, and {unsure} say neither, for Claude Code to read; \
-                 {aside} newsletters aside",
+                 {} went back; {} say they went to many and {unsure} neither, for \
+                 Claude Code to read; {aside} newsletters aside",
                 there.len(),
                 notices.len(),
-                back.count
+                back.count,
+                to_read - unsure
             );
         } else {
             tracing::info!(address = %account.address, "sorted again: no Newsletters");
@@ -301,14 +306,15 @@ impl Mail {
         )
         .bind(account.id)
         .bind(by)
-        .bind(unsure > 0)
+        .bind(to_read > 0)
         .execute(&self.pool)
         .await?;
         Ok(())
     }
 
     /// Moves the Inbox's mail that the newsletters' rule would have to
-    /// Newsletters, but what a rule of yours keeps there: how much.
+    /// Newsletters, but what a rule of yours keeps there, and what Claude
+    /// Code read already: it's where that, or you, put it. How much.
     async fn set_aside(
         &self,
         account: &MailAccount,
@@ -319,8 +325,14 @@ impl Mail {
         let told = self
             .told_in(account, "INBOX", &query, &named(rules))
             .await?;
+        let read = judging::read_already(&self.pool, account, &told).await?;
+        let many: Vec<u32> = told
+            .iter()
+            .filter(|mail| mail.said == Said::Many && !read.contains(&mail.message_id))
+            .map(|mail| mail.uid)
+            .collect();
         let moved = self
-            .move_out(account, "INBOX", &of(&told, Said::Many), &[], &place.path)
+            .move_out(account, "INBOX", &many, &[], &place.path)
             .await?;
         Ok(moved.count)
     }
@@ -606,6 +618,9 @@ pub(crate) struct Told {
     /// As the Inbox's copy keeps it: without its brackets.
     pub message_id: String,
     pub said: Said,
+    /// What says it went to many: its header's field ("List-Id",
+    /// "Precedence"…), or "named" for a sender the rule names.
+    pub by: Option<&'static str>,
     /// The fields that say how it was sent, for Claude Code:
     /// "List-Unsubscribe", "Precedence: bulk".
     pub fields: Vec<String>,
@@ -641,12 +656,21 @@ pub(crate) fn told(headed: &Headed, senders: &[String]) -> Option<Told> {
         raw(field).is_some_and(|said| values.iter().any(|v| said.eq_ignore_ascii_case(v)))
     };
     let bulk = is("Precedence", BULK);
-    let many = raw("List-Id").is_some()
-        || bulk
-        || raw("X-PM-Message-Stream")
-            .is_some_and(|stream| stream.to_lowercase().contains("broadcast"))
-        || (raw("X-MC-User").is_some() && raw("X-Mandrill-User").is_none())
-        || senders.contains(&address);
+    let by = if raw("List-Id").is_some() {
+        Some("List-Id")
+    } else if bulk {
+        Some("Precedence")
+    } else if raw("X-PM-Message-Stream")
+        .is_some_and(|stream| stream.to_lowercase().contains("broadcast"))
+    {
+        Some("X-PM-Message-Stream")
+    } else if raw("X-MC-User").is_some() && raw("X-Mandrill-User").is_none() {
+        Some("X-MC-User")
+    } else if senders.contains(&address) {
+        Some("named")
+    } else {
+        None
+    };
     let machine = raw("Auto-Submitted").is_some()
         && !is("Auto-Submitted", &["no"])
         && raw("List-Unsubscribe-Post").is_none()
@@ -671,11 +695,12 @@ pub(crate) fn told(headed: &Headed, senders: &[String]) -> Option<Told> {
         message_id: message.message_id().unwrap_or_default().to_string(),
         said: if machine {
             Said::Notice
-        } else if many {
+        } else if by.is_some() {
             Said::Many
         } else {
             Said::Unsure
         },
+        by: by.filter(|_| !machine),
         fields,
     })
 }
@@ -721,7 +746,7 @@ pub(crate) fn test(bodies: bool, senders: &[String]) -> String {
 
 /// How the passes sort, besides what the newsletters' rule says: counted up
 /// when they change, so each account's mail is sorted again by them.
-const PASSES: u32 = 3;
+const PASSES: u32 = 4;
 
 /// What makes a newsletter or a notice, as the newsletters' rule says it in
 /// Sieve, and how the passes sort ([`PASSES`]): when it changes, each
@@ -1391,6 +1416,36 @@ mod tests {
         // A way to unsubscribe alone says neither: Claude Code reads it.
         assert_eq!(said(""), Said::Unsure);
         assert_eq!(said("Precedence: first-class"), Said::Unsure);
+    }
+
+    #[test]
+    fn the_log_names_what_said_it_went_to_many() {
+        let by = |lines: &str, senders: &[String]| {
+            let header = format!(
+                "From: noreply-accounts@google.test\nSubject: You shared some data\n\
+                 Message-ID: <1@x>\nList-Unsubscribe: <https://x/u>\n{lines}\n"
+            )
+            .replace('\n', "\r\n");
+            let headed = crate::imap::Headed {
+                uid: 1,
+                arrived: None,
+                seen: false,
+                header: header.into_bytes(),
+            };
+            told(&headed, senders).unwrap().by
+        };
+        assert_eq!(by("List-Id: <x>\nPrecedence: bulk", &[]), Some("List-Id"));
+        assert_eq!(by("Precedence: bulk", &[]), Some("Precedence"));
+        assert_eq!(
+            by("", &["noreply-accounts@google.test".into()]),
+            Some("named")
+        );
+        assert_eq!(by("", &[]), None);
+        // A notice says nothing went to many.
+        assert_eq!(
+            by("Auto-Submitted: auto-generated\nList-Id: <x>", &[]),
+            None
+        );
     }
 
     #[test]

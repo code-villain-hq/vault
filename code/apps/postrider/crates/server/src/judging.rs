@@ -13,22 +13,33 @@
 //! something of yours, is named in the newsletters' rule
 //! ([`Rule::senders`]): its mail skips the Inbox from then on, with the Mac
 //! off too. One that writes both stays with Claude Code, and Keep in Inbox
-//! wins, as everywhere. After an account's mail is sorted again
-//! ([`Mail::sort_again`](crate::mail::Mail)), what in Newsletters says
-//! neither is read the same way, once, and the notices go back.
+//! wins, as everywhere.
+//!
+//! A header that says the mail went to many sorts it, but doesn't decide:
+//! big senders put `List-Id` or `Precedence: bulk` on notices about your
+//! account too (Google's "You shared some Google Account data"). So Claude
+//! Code reads that mail as well. In the Inbox it goes unless it's yours;
+//! what the server's rule sorted into Newsletters is read there, what came
+//! in the last week every [`NEWSLETTERS_EVERY`], and the notices go back.
+//! After an account's mail is sorted again
+//! ([`Mail::sort_again`](crate::mail::Mail)), all of Newsletters is read
+//! the same way, once.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use chrono::{TimeDelta, Utc};
 
 use code_villain_claude::{Adapter, Question};
-use postrider_domain::MailAccount;
+use postrider_domain::{AccountState, MailAccount};
+use sqlx::PgPool;
 
 use crate::ask::as_read;
 use crate::imap::{Failure, Place};
 use crate::mail::Mail;
-use crate::newsletters::{Said, Told, but_yours, named, of};
+use crate::newsletters::{Said, Told, but_yours, named};
 use crate::rules::{self, Rule, When};
 
 /// How many mails one question reads.
@@ -53,12 +64,20 @@ const AFTER_TROUBLE: Duration = Duration::from_secs(300);
 /// How long an answer may take.
 const TIMEOUT: Duration = Duration::from_secs(180);
 
+/// How often Newsletters is read for what its rule sorted there by its
+/// header alone.
+const NEWSLETTERS_EVERY: Duration = Duration::from_secs(300);
+
+/// How far back, in days, each of those reads looks.
+const NEWSLETTERS_SINCE: i64 = 7;
+
 /// Judges new mail for as long as Postrider runs: whenever an Inbox
 /// changes, and every so often besides.
 pub async fn judge(mail: Arc<Mail>, claude_code: Adapter) {
+    let mut looked = HashMap::new();
     loop {
         let version = mail.version();
-        match judge_new(&mail, &claude_code).await {
+        match judge_new(&mail, &claude_code, &mut looked).await {
             Ok(()) => {
                 mail.changed_since(version).await;
                 tokio::time::sleep(SETTLE).await;
@@ -71,9 +90,15 @@ pub async fn judge(mail: Arc<Mail>, claude_code: Adapter) {
     }
 }
 
-/// Judges each account whose newsletters are set aside: Newsletters once
-/// after its mail was sorted again, and what came to its Inbox.
-async fn judge_new(mail: &Mail, claude_code: &Adapter) -> Result<(), String> {
+/// Judges each account whose newsletters are set aside: what came to its
+/// Inbox, and Newsletters: all of it once after its mail was sorted again,
+/// else what came lately, when it was `looked` at longer ago than
+/// [`NEWSLETTERS_EVERY`].
+async fn judge_new(
+    mail: &Mail,
+    claude_code: &Adapter,
+    looked: &mut HashMap<uuid::Uuid, Instant>,
+) -> Result<(), String> {
     let accounts: Vec<(serde_json::Value, bool)> = sqlx::query_as(
         "SELECT to_jsonb(a.*), n.judge_again FROM mail_accounts a \
          JOIN newsletters_set_aside n ON n.account_id = a.id \
@@ -85,7 +110,14 @@ async fn judge_new(mail: &Mail, claude_code: &Adapter) -> Result<(), String> {
     let mut problems = Vec::new();
     for (account, again) in accounts {
         let account: MailAccount = serde_json::from_value(account).map_err(|e| e.to_string())?;
-        if let Err(problem) = judge_account(mail, claude_code, &account, again).await {
+        let due = mail.state_of(account.id) == Some(AccountState::Online)
+            && looked
+                .get(&account.id)
+                .is_none_or(|at| at.elapsed() >= NEWSLETTERS_EVERY);
+        if due {
+            looked.insert(account.id, Instant::now());
+        }
+        if let Err(problem) = judge_account(mail, claude_code, &account, again, due).await {
             problems.push(format!("{}: {problem}", account.name));
         }
     }
@@ -100,11 +132,12 @@ async fn judge_account(
     claude_code: &Adapter,
     account: &MailAccount,
     again: bool,
+    due: bool,
 ) -> Result<(), String> {
     let failed = |failure: Failure| failure.message();
     let mut skipped: Vec<i64> = Vec::new();
     let mut rows = unjudged(mail, account, &skipped).await?;
-    if rows.is_empty() && !again {
+    if rows.is_empty() && !again && !due {
         return Ok(());
     }
     let rules = mail.rules(account).await.map_err(failed)?;
@@ -127,7 +160,12 @@ async fn judge_account(
         senders: &newsletters.senders,
     };
     if again {
-        judge.newsletters(&place).await?;
+        judge.newsletters(&place, None).await?;
+    } else if due {
+        let since = Utc::now() - TimeDelta::days(NEWSLETTERS_SINCE);
+        judge
+            .newsletters(&place, Some(since.format("%d-%b-%Y").to_string()))
+            .await?;
     }
     while !rows.is_empty() {
         judge.inbox(&rows, &newsletters.path, &mut skipped).await?;
@@ -161,6 +199,29 @@ async fn unjudged(
     .map_err(|e| e.to_string())
 }
 
+/// Of these mails, the Message-IDs Claude Code read already: where it, or
+/// you, put them is where they stay.
+pub(crate) async fn read_already(
+    pool: &PgPool,
+    account: &MailAccount,
+    told: &[Told],
+) -> Result<HashSet<String>, sqlx::Error> {
+    let ids: Vec<&str> = told
+        .iter()
+        .map(|mail| mail.message_id.as_str())
+        .filter(|id| !id.is_empty())
+        .collect();
+    let read: Vec<String> = sqlx::query_scalar(
+        "SELECT message_id FROM newsletter_judged \
+         WHERE account_id = $1 AND message_id = ANY($2)",
+    )
+    .bind(account.id)
+    .bind(&ids)
+    .fetch_all(pool)
+    .await?;
+    Ok(read.into_iter().collect())
+}
+
 /// Notes these mails as judged.
 async fn judged(mail: &Mail, account: &MailAccount, keys: &[String]) -> Result<(), String> {
     sqlx::query(
@@ -187,8 +248,10 @@ struct Judge<'a> {
 
 impl Judge<'_> {
     /// Judges these Inbox mails: what offers to unsubscribe, but what a
-    /// rule of yours keeps there, by its header, else by what Claude Code
-    /// made of its kind, else by asking. What went to many goes to `to`.
+    /// rule of yours keeps there, by what Claude Code made of its kind,
+    /// else by asking. What went to many goes to `to`: what its header says
+    /// went to many unless Claude Code finds it's yours, what says neither
+    /// when it finds it went to many.
     async fn inbox(
         &self,
         rows: &[(i64, String)],
@@ -209,13 +272,17 @@ impl Judge<'_> {
             .told_in(self.account, "INBOX", &query, self.senders)
             .await
             .map_err(|f| f.message())?;
-        let mut many = of(&told, Said::Many);
-        let (found, unread) = self.verdicts(&told, None).await?;
-        many.extend(
-            told.iter()
-                .filter(|mail| found.get(&mail.uid) == Some(&true))
-                .map(|mail| mail.uid),
-        );
+        let reading: Vec<&Told> = told.iter().filter(|m| m.said != Said::Notice).collect();
+        let (found, unread) = self.verdicts(&reading, None).await?;
+        let many: Vec<u32> = reading
+            .iter()
+            .filter(|mail| match (mail.said, found.get(&mail.uid)) {
+                (Said::Many, None) => !unread.contains(&mail.uid),
+                (_, Some(many)) => *many,
+                _ => false,
+            })
+            .map(|mail| mail.uid)
+            .collect();
         skipped.extend(unread.iter().map(|uid| i64::from(*uid)));
         let moved = self
             .mail
@@ -237,65 +304,95 @@ impl Judge<'_> {
         judged(self.mail, self.account, &keys).await
     }
 
-    /// Reads Newsletters' mail that its header can't tell, once after the
-    /// account's mail was sorted again: the notices go back to the Inbox.
-    async fn newsletters(&self, place: &Place) -> Result<(), String> {
-        let query = but_yours(self.rules, &place.path, "ALL");
+    /// Reads Newsletters' mail that Claude Code hasn't read yet: what came
+    /// `since` (an IMAP date) that its rule sorted there, or, with none,
+    /// once after the account's mail was sorted again, all of it. The
+    /// notices go back to the Inbox, and the log says by which header
+    /// they'd come, by the sender's domain.
+    async fn newsletters(&self, place: &Place, since: Option<String>) -> Result<(), String> {
+        let lately = since.is_some();
+        let what = since.map_or_else(|| "ALL".to_string(), |date| format!("SINCE {date}"));
+        let query = but_yours(self.rules, &place.path, &what);
         let there = self
             .mail
             .told_in(self.account, &place.path, &query, self.senders)
             .await
             .map_err(|f| f.message())?;
-        let unsure: Vec<Told> = there
-            .into_iter()
-            .filter(|mail| mail.said == Said::Unsure)
-            .collect();
-        let (found, _) = self.verdicts(&unsure, Some(place)).await?;
-        let notices: Vec<u32> = unsure
+        let read = read_already(&self.mail.pool, self.account, &there)
+            .await
+            .map_err(|e| e.to_string())?;
+        // What came lately and says neither, you or the ask field put there.
+        let reading: Vec<&Told> = there
             .iter()
-            .filter(|mail| found.get(&mail.uid) == Some(&false))
-            .map(|mail| mail.uid)
+            .filter(|mail| match mail.said {
+                Said::Notice => false,
+                Said::Many => !lately || !mail.message_id.is_empty(),
+                Said::Unsure => !lately,
+            })
+            .filter(|mail| !read.contains(&mail.message_id))
             .collect();
+        if reading.is_empty() && lately {
+            return Ok(());
+        }
+        let (found, unread) = self.verdicts(&reading, Some(place)).await?;
+        let notices: Vec<&Told> = reading
+            .iter()
+            .copied()
+            .filter(|mail| found.get(&mail.uid) == Some(&false))
+            .collect();
+        let uids: Vec<u32> = notices.iter().map(|mail| mail.uid).collect();
         let back = self
             .mail
-            .move_out(self.account, &place.path, &notices, &[], "INBOX")
+            .move_out(self.account, &place.path, &uids, &[], "INBOX")
             .await
             .map_err(|f| f.message())?;
         // Back in the Inbox, they aren't judged again.
-        let keys: Vec<String> = unsure
+        let keys: Vec<String> = reading
             .iter()
-            .filter(|mail| !mail.message_id.is_empty())
+            .filter(|mail| !mail.message_id.is_empty() && !unread.contains(&mail.uid))
             .map(|mail| mail.message_id.clone())
             .collect();
         judged(self.mail, self.account, &keys).await?;
-        sqlx::query("UPDATE newsletters_set_aside SET judge_again = false WHERE account_id = $1")
+        if !lately {
+            sqlx::query(
+                "UPDATE newsletters_set_aside SET judge_again = false WHERE account_id = $1",
+            )
             .bind(self.account.id)
             .execute(&self.mail.pool)
             .await
             .map_err(|e| e.to_string())?;
+        }
+        if lately && notices.is_empty() {
+            return Ok(());
+        }
         tracing::info!(
             account = %self.account.name,
-            "read the {} in Newsletters that say neither: {} are about something of yours, \
-             {} went back to the Inbox",
-            unsure.len(),
+            "read {} in Newsletters ({}): {} are about something of yours, {} went back \
+             to the Inbox: {}",
+            reading.len(),
+            counted(reading.iter().map(|mail| mail.by.unwrap_or("neither").to_string())),
             notices.len(),
-            back.count
+            back.count,
+            counted(notices.iter().map(|mail| {
+                let domain = mail.address.rsplit_once('@').map_or("", |(_, d)| d);
+                format!("{domain} by {}", mail.by.unwrap_or("neither"))
+            }))
         );
         Ok(())
     }
 
-    /// Whether each mail its header can't tell went to many, by UID: as
-    /// Claude Code found that sender's kind of mail before, else as it says
-    /// now, of one of each kind. A mail it isn't sure of has none. And the
-    /// mails that couldn't be read now, to try again.
+    /// Whether each of these mails went to many, by UID: as Claude Code
+    /// found that sender's kind of mail before, else as it says now, of one
+    /// of each kind. A sender the rule names was found writing to many
+    /// before, so its new kinds aren't asked. A mail it isn't sure of has
+    /// none. And the mails that couldn't be read now, to try again.
     async fn verdicts(
         &self,
-        told: &[Told],
+        told: &[&Told],
         place: Option<&Place>,
     ) -> Result<(HashMap<u32, bool>, Vec<u32>), String> {
-        let unsure: Vec<&Told> = told.iter().filter(|m| m.said == Said::Unsure).collect();
         let mut by_kind: HashMap<(String, String), Vec<u32>> = HashMap::new();
-        for mail in &unsure {
+        for mail in told {
             by_kind
                 .entry((mail.address.clone(), kind(&mail.subject)))
                 .or_default()
@@ -314,6 +411,11 @@ impl Judge<'_> {
             .into_iter()
             .map(|(address, kind, many)| ((address, kind), many))
             .collect();
+        for key in by_kind.keys() {
+            if self.senders.contains(&key.0) && !found.contains_key(key) {
+                found.insert(key.clone(), true);
+            }
+        }
         let mut asks: Vec<(&(String, String), u32)> = by_kind
             .iter()
             .filter(|(key, _)| !found.contains_key(*key))
@@ -460,6 +562,23 @@ fn kept_in_inbox(rules: &[Rule], address: &str) -> bool {
         })
 }
 
+/// How often each of these says the same, for the log: "List-Id 3,
+/// neither 1".
+fn counted(said: impl Iterator<Item = String>) -> String {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for one in said {
+        *counts.entry(one).or_default() += 1;
+    }
+    if counts.is_empty() {
+        return "none".into();
+    }
+    counts
+        .iter()
+        .map(|(one, n)| format!("{one} {n}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// The kind of mail a subject says it is, for a verdict to be kept by: in
 /// lower case, its numbers left out, so "Your code is 4821" and "Your code
 /// is 1937" are one.
@@ -481,8 +600,9 @@ pub(crate) fn kind(subject: &str) -> String {
 }
 
 const SYSTEM: &str = "You tell newsletters from notices for Postrider, the mail app on this \
-Mac. Each mail below offers a way to unsubscribe, but its header doesn't say whether it went to \
-many. Say for each whether it's the reader's own: about something of theirs, such as an order, \
+Mac. Each mail below offers a way to unsubscribe, or says in its header that it went to many \
+(List-Id, Precedence: bulk). That doesn't decide it: big senders put those on notices about the \
+reader's account too, so judge each by who sent it and what it says. Say for each whether it's the reader's own: about something of theirs, such as an order, \
 a delivery, a booking, a code or a sign-in, their account, a payment or a bill, or a message a \
 person wrote them; or sent to many: the same mail to many readers, such as a newsletter, an \
 offer, news, tips or an announcement. A line for each mail, with its number and \"own\" or \
@@ -556,6 +676,19 @@ mod tests {
             "netcup sicherheitstoken #-#"
         );
         assert_ne!(kind("Order 12 shipped"), kind("Order 12 delivered"));
+    }
+
+    #[test]
+    fn the_log_counts_what_says_the_same() {
+        let said = [
+            "google.test by List-Id",
+            "max.test by neither",
+            "google.test by List-Id",
+        ];
+        assert_eq!(
+            counted(said.iter().map(|s| (*s).to_string())),
+            "google.test by List-Id 2, max.test by neither 1"
+        );
     }
 
     #[test]

@@ -289,9 +289,18 @@ or `Precedence: bulk`, as newsletters do to keep auto-replies away. The
 rule's Sieve (`newsletters::test`) and the Rust that reads a header
 (`told`: `Said::Many`, `Notice` or `Unsure`) say the same.
 
+The header sorts, but doesn't decide: big senders put `List-Id` or
+`Precedence: bulk` on notices about your account too (Google's "You
+shared some Google Account data with …"). So Claude Code reads that mail
+too, as below. In the Inbox, what its header says went to many goes
+unless Claude Code finds it's yours. In Newsletters, what came in the
+last week that the rule sorted there by its header is read every 5
+minutes (`NEWSLETTERS_EVERY`), and the notices go back to the Inbox; the
+log says how many, and by which header and sender's domain they'd come.
+
 What offers to unsubscribe but says neither stays in the Inbox, and
-Claude Code on this Mac reads it (`judging.rs`, started by `serve.rs`
-beside the sorter): the sender, how it was sent, the subject and its
+Claude Code on this Mac reads it, and what the header sorted
+(`judging.rs`, started by `serve.rs` beside the sorter): the sender, how it was sent, the subject and its
 first lines, twenty at a time, with no tools. Is it about something of
 yours (an order, a delivery, a booking, a code, a sign-in, your account, a
 payment, a person writing you) or sent to many? Lines like `3: many` say;
@@ -303,8 +312,8 @@ Message-ID), so one you move back stays where you put it. A sender found
 writing to many in two kinds of mail, and never about something of
 yours, is named in the newsletters' rule (`Rule::senders`, `address :is
 "from"` beside the header test): from then on the server sorts its mail
-at once, with the Mac off. One found writing about something of yours
-comes off it again, and a sender that writes both stays with Claude Code.
+at once, with the Mac off, and its new kinds of mail aren't asked. One
+found writing about something of yours comes off it again, and a sender that writes both stays with Claude Code.
 Keep in Inbox wins: it takes the sender off the rule and forgets its
 verdicts. Without Claude Code, such mail stays in the Inbox.
 
@@ -318,9 +327,10 @@ Sieve, after `PASSES`, counted up when the passes change). When that
 changes, the account's mail is sorted again by it, once (`sort_again`):
 its rule is written again, the notices in Newsletters go back to the
 Inbox, and the Inbox's newsletters go to Newsletters, but those from
-senders kept in the Inbox. What in Newsletters says neither is marked
-(`judge_again`) for Claude Code to read once: the notices among it go
-back too. It reads all of Newsletters, but what a rule of yours sorts
+senders kept in the Inbox, or Claude Code read already (it's where that,
+or you, put it). What in Newsletters isn't a notice is marked
+(`judge_again`) for Claude Code to read once, but what it read already:
+the notices among it go back too. It reads all of Newsletters, but what a rule of yours sorts
 there, so a notice comes back however it got there and whatever the
 server's SEARCH finds; the log says how many it read, found and moved.
 Change the test, and every account follows on its next start; there's
