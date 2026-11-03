@@ -30,6 +30,7 @@ COPY kit/desktop /code/kit/desktop
 COPY kit/auth /code/kit/auth
 COPY kit/scim /code/kit/scim
 COPY kit/settings /code/kit/settings
+COPY kit/net /code/kit/net
 # Cargo needs every workspace member's manifest, even when not building it.
 COPY apps/raven/apps/desktop/src-tauri apps/desktop/src-tauri
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

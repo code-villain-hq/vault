@@ -80,7 +80,9 @@ health address is the server's own listener.
 - Other apps send OpenTelemetry over HTTP as JSON (`otlp.rs`), with a
   Bearer key; Raven stores only its hash.
 - `health::watch` checks every app with a health address, in every
-  workspace, every 30 seconds. Beside it, `health::clear_out` clears
+  workspace, every 30 seconds. Apps on this Mac and private networks are
+  checked on purpose; a link-local or cloud-metadata address never, even
+  when a name resolves there (`code/kit/net`, `Reach::OwnNetworks`). Beside it, `health::clear_out` clears
   records older than 30 days every hour, a few thousand rows at a time.
 
 ## The desktop app

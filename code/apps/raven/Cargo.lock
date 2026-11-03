@@ -695,6 +695,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-villain-net"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "code-villain-scim"
 version = "0.1.0"
 dependencies = [
@@ -3759,6 +3768,7 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "code-villain-auth",
+ "code-villain-net",
  "code-villain-scim",
  "code-villain-settings",
  "code-villain-sync",

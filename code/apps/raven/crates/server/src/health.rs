@@ -8,6 +8,7 @@
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
+use code_villain_net::Reach;
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -27,7 +28,10 @@ const CLEAR_BATCH: i64 = 5_000;
 /// Checks every app with a health URL, now and every half minute. Raven
 /// itself answers at `self_url`.
 pub async fn watch(pool: PgPool, self_url: String) {
-    let client = reqwest::Client::builder()
+    // Apps on this Mac and the company's network are watched on purpose,
+    // so private addresses stay allowed; a link-local or cloud-metadata
+    // one never, even when a name resolves there (`code/kit/net`).
+    let client = code_villain_net::client(Reach::OwnNetworks)
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
         .user_agent("raven")
@@ -140,6 +144,15 @@ struct Check {
 }
 
 async fn check(client: &reqwest::Client, url: &str) -> Check {
+    // An address in the URL never reaches the resolver: check it here.
+    if !reqwest::Url::parse(url).is_ok_and(|url| Reach::OwnNetworks.allows_url(&url)) {
+        return Check {
+            ok: false,
+            status_code: None,
+            duration_ms: 0.0,
+            error: Some("not checked: a link-local or metadata address".into()),
+        };
+    }
     let clock = Instant::now();
     let result = client.get(url).send().await;
     let duration_ms = clock.elapsed().as_secs_f64() * 1000.0;
@@ -338,6 +351,24 @@ impl ActionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn metadata_addresses_are_never_called() {
+        let client = code_villain_net::client(Reach::OwnNetworks)
+            .timeout(TIMEOUT)
+            .build()
+            .unwrap();
+        for url in [
+            "http://169.254.169.254/latest/meta-data",
+            "http://2852039166/",
+            "http://[::ffff:169.254.169.254]/",
+            "http://metadata.google.internal/",
+        ] {
+            let check = check(&client, url).await;
+            assert!(!check.ok, "{url}");
+            assert_eq!(check.status_code, None, "{url}");
+        }
+    }
 
     /// Forge, in a workspace of its own, with `old` calls, logs and checks
     /// from 31 days ago and `new` ones from now.
