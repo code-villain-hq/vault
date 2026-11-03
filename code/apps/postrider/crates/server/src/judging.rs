@@ -147,7 +147,7 @@ async fn judge_account(
         // A rule you took away stays away: there's nothing to judge for.
         while !rows.is_empty() {
             let keys: Vec<String> = rows.into_iter().map(|(_, key)| key).collect();
-            judged(mail, account, &keys).await?;
+            judged(mail, account, &keys, false).await?;
             rows = unjudged(mail, account, &skipped).await?;
         }
         return Ok(());
@@ -199,37 +199,49 @@ async fn unjudged(
     .map_err(|e| e.to_string())
 }
 
-/// Of these mails, the Message-IDs Claude Code read already: where it, or
-/// you, put them is where they stay.
-pub(crate) async fn read_already(
+/// Of these mails, the Message-IDs judged already: where the judging, or
+/// you, put them is where they stay. With `read`, only those Claude Code
+/// read: a header used to send mail to Newsletters judged, but unread.
+pub(crate) async fn judged_already(
     pool: &PgPool,
     account: &MailAccount,
     told: &[Told],
+    read: bool,
 ) -> Result<HashSet<String>, sqlx::Error> {
     let ids: Vec<&str> = told
         .iter()
         .map(|mail| mail.message_id.as_str())
         .filter(|id| !id.is_empty())
         .collect();
-    let read: Vec<String> = sqlx::query_scalar(
+    let judged: Vec<String> = sqlx::query_scalar(
         "SELECT message_id FROM newsletter_judged \
-         WHERE account_id = $1 AND message_id = ANY($2)",
+         WHERE account_id = $1 AND message_id = ANY($2) AND (read OR NOT $3)",
     )
     .bind(account.id)
     .bind(&ids)
+    .bind(read)
     .fetch_all(pool)
     .await?;
-    Ok(read.into_iter().collect())
+    Ok(judged.into_iter().collect())
 }
 
-/// Notes these mails as judged.
-async fn judged(mail: &Mail, account: &MailAccount, keys: &[String]) -> Result<(), String> {
+/// Notes these mails as judged, and whether Claude Code `read` them. Two
+/// mails can have one Message-ID.
+async fn judged(
+    mail: &Mail,
+    account: &MailAccount,
+    keys: &[String],
+    read: bool,
+) -> Result<(), String> {
     sqlx::query(
-        "INSERT INTO newsletter_judged (account_id, message_id) \
-         SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING",
+        "INSERT INTO newsletter_judged (account_id, message_id, read) \
+         SELECT $1, key, $3 FROM (SELECT DISTINCT unnest($2::text[]) AS key) keys \
+         ON CONFLICT (account_id, message_id) \
+         DO UPDATE SET read = newsletter_judged.read OR excluded.read",
     )
     .bind(account.id)
     .bind(keys)
+    .bind(read)
     .execute(&mail.pool)
     .await
     .map_err(|e| e.to_string())?;
@@ -301,7 +313,13 @@ impl Judge<'_> {
             .filter(|(uid, _)| !skipped.contains(uid))
             .map(|(_, key)| key.clone())
             .collect();
-        judged(self.mail, self.account, &keys).await
+        judged(self.mail, self.account, &keys, false).await?;
+        let read: Vec<String> = reading
+            .iter()
+            .filter(|mail| !mail.message_id.is_empty() && !unread.contains(&mail.uid))
+            .map(|mail| mail.message_id.clone())
+            .collect();
+        judged(self.mail, self.account, &read, true).await
     }
 
     /// Reads Newsletters' mail that Claude Code hasn't read yet: what came
@@ -318,7 +336,7 @@ impl Judge<'_> {
             .told_in(self.account, &place.path, &query, self.senders)
             .await
             .map_err(|f| f.message())?;
-        let read = read_already(&self.mail.pool, self.account, &there)
+        let read = judged_already(&self.mail.pool, self.account, &there, true)
             .await
             .map_err(|e| e.to_string())?;
         // What came lately and says neither, you or the ask field put there.
@@ -352,7 +370,7 @@ impl Judge<'_> {
             .filter(|mail| !mail.message_id.is_empty() && !unread.contains(&mail.uid))
             .map(|mail| mail.message_id.clone())
             .collect();
-        judged(self.mail, self.account, &keys).await?;
+        judged(self.mail, self.account, &keys, true).await?;
         if !lately {
             sqlx::query(
                 "UPDATE newsletters_set_aside SET judge_again = false WHERE account_id = $1",

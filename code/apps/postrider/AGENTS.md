@@ -307,8 +307,11 @@ payment, a person writing you) or sent to many? Lines like `3: many` say;
 what it isn't sure of stays. Mail sent to many moves to Newsletters. The
 verdict is kept by sender and kind of mail (`newsletter_verdicts`; the
 kind is the subject in lower case, numbers left out), so the same isn't
-asked twice, and each mail is read once (`newsletter_judged`, by
-Message-ID), so one you move back stays where you put it. A sender found
+asked twice, and each mail is judged once (`newsletter_judged`, by
+Message-ID), so one you move back stays where you put it. Whether Claude
+Code read it, not only looked at it, is `read`: in Newsletters only what
+it read is left alone, since a header used to send mail there judged but
+unread (Google's notices). A sender found
 writing to many in two kinds of mail, and never about something of
 yours, is named in the newsletters' rule (`Rule::senders`, `address :is
 "from"` beside the header test): from then on the server sorts its mail
@@ -327,8 +330,8 @@ Sieve, after `PASSES`, counted up when the passes change). When that
 changes, the account's mail is sorted again by it, once (`sort_again`):
 its rule is written again, the notices in Newsletters go back to the
 Inbox, and the Inbox's newsletters go to Newsletters, but those from
-senders kept in the Inbox, or Claude Code read already (it's where that,
-or you, put it). What in Newsletters isn't a notice is marked
+senders kept in the Inbox, or judged already (it's where that, or you,
+put it). What in Newsletters isn't a notice is marked
 (`judge_again`) for Claude Code to read once, but what it read already:
 the notices among it go back too. It reads all of Newsletters, but what a rule of yours sorts
 there, so a notice comes back however it got there and whatever the

@@ -313,8 +313,8 @@ impl Mail {
     }
 
     /// Moves the Inbox's mail that the newsletters' rule would have to
-    /// Newsletters, but what a rule of yours keeps there, and what Claude
-    /// Code read already: it's where that, or you, put it. How much.
+    /// Newsletters, but what a rule of yours keeps there, and what was
+    /// judged already: it's where that, or you, put it. How much.
     async fn set_aside(
         &self,
         account: &MailAccount,
@@ -325,10 +325,10 @@ impl Mail {
         let told = self
             .told_in(account, "INBOX", &query, &named(rules))
             .await?;
-        let read = judging::read_already(&self.pool, account, &told).await?;
+        let judged = judging::judged_already(&self.pool, account, &told, false).await?;
         let many: Vec<u32> = told
             .iter()
-            .filter(|mail| mail.said == Said::Many && !read.contains(&mail.message_id))
+            .filter(|mail| mail.said == Said::Many && !judged.contains(&mail.message_id))
             .map(|mail| mail.uid)
             .collect();
         let moved = self
