@@ -748,10 +748,65 @@ pub async fn folders(session: &mut Session) -> Result<Vec<Place>, Failure> {
     Ok(places(listed))
 }
 
-/// How many of a folder's mails are unread, and how many it holds.
-pub async fn unseen(session: &mut Session, folder: &str) -> Result<(u32, u32), Failure> {
-    let status = session.status(folder, "(MESSAGES UNSEEN)").await?;
-    Ok((status.unseen.unwrap_or(0), status.exists))
+/// How many of each folder's mails are unread, and how many it holds, by
+/// path. Every STATUS goes in one write and the answers are read as they
+/// come, so the folders cost the server one round trip, not one each (IMAP
+/// lets a client send commands without waiting, RFC 3501 5.5). A folder
+/// the server says no to is left out.
+pub async fn unseen(
+    session: &mut Session,
+    folders: &[String],
+) -> Result<HashMap<String, (u32, u32)>, Failure> {
+    use async_imap::imap_proto::{MailboxDatum, Response, Status, StatusAttribute};
+
+    let mut counted = HashMap::new();
+    if folders.is_empty() {
+        return Ok(counted);
+    }
+    // Tags of our own, apart from the session's (A0001…), which waits on none.
+    let mut waiting: HashMap<String, &str> = HashMap::new();
+    let mut commands = Vec::new();
+    for (n, folder) in folders.iter().enumerate() {
+        let tag = format!("S{n}");
+        commands.push(format!(
+            "{tag} STATUS {} (MESSAGES UNSEEN)",
+            quoted(folder)?
+        ));
+        waiting.insert(tag, folder);
+    }
+    session.run_command_untagged(commands.join("\r\n")).await?;
+    while !waiting.is_empty() {
+        let Some(answer) = session
+            .read_response()
+            .await
+            .map_err(|e| Failure::Offline(e.to_string()))?
+        else {
+            return Err(Failure::Offline("the server hung up.".into()));
+        };
+        match answer.parsed() {
+            Response::MailboxData(MailboxDatum::Status { mailbox, status }) => {
+                let (mut unseen, mut all) = (0, 0);
+                for attribute in status {
+                    match attribute {
+                        StatusAttribute::Unseen(n) => unseen = *n,
+                        StatusAttribute::Messages(n) => all = *n,
+                        _ => {}
+                    }
+                }
+                counted.insert(mailbox.to_string(), (unseen, all));
+            }
+            Response::Done { tag, status, .. } => {
+                if let Some(folder) = waiting.remove(&tag.0)
+                    && *status != Status::Ok
+                {
+                    counted.remove(folder);
+                    tracing::debug!(?status, "a folder couldn't be counted");
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(counted)
 }
 
 /// A folder as LIST names it.
@@ -1467,6 +1522,65 @@ mod tests {
         }
         raw.push_str("--b--\r\n");
         raw.into_bytes()
+    }
+
+    #[tokio::test]
+    async fn folders_are_counted_in_one_round_trip() {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let (read, mut write) = socket.into_split();
+            let mut lines = BufReader::new(read).lines();
+            write.write_all(b"* OK ready\r\n").await.unwrap();
+            let login = lines.next_line().await.unwrap().unwrap();
+            let tag = login.split(' ').next().unwrap();
+            write
+                .write_all(format!("{tag} OK signed in\r\n").as_bytes())
+                .await
+                .unwrap();
+            // All three come before any answer.
+            let mut asked = Vec::new();
+            for _ in 0..3 {
+                asked.push(lines.next_line().await.unwrap().unwrap());
+            }
+            // Answered out of order, with news of the open folder between.
+            write
+                .write_all(
+                    b"* 4 EXISTS\r\n\
+                      * STATUS \"Rechnungen 2026\" (MESSAGES 7 UNSEEN 2)\r\n\
+                      S1 OK done\r\n\
+                      * STATUS Archive (MESSAGES 3 UNSEEN 0)\r\n\
+                      S0 OK done\r\n\
+                      S2 NO [NONEXISTENT] no such folder\r\n",
+                )
+                .await
+                .unwrap();
+            asked
+        });
+        let mut session = sign_in(&Login {
+            host: "127.0.0.1",
+            port,
+            username: "anna",
+            password: "dev",
+        })
+        .await
+        .unwrap();
+        let folders = ["Archive", "Rechnungen 2026", "Gone"].map(String::from);
+        let counted = unseen(&mut session, &folders).await.unwrap();
+        assert_eq!(
+            server.await.unwrap(),
+            [
+                "S0 STATUS \"Archive\" (MESSAGES UNSEEN)",
+                "S1 STATUS \"Rechnungen 2026\" (MESSAGES UNSEEN)",
+                "S2 STATUS \"Gone\" (MESSAGES UNSEEN)",
+            ]
+        );
+        assert_eq!(counted.len(), 2);
+        assert_eq!(counted["Archive"], (0, 3));
+        assert_eq!(counted["Rechnungen 2026"], (2, 7));
     }
 
     #[test]

@@ -140,8 +140,8 @@ Only the Inbox is followed and kept, and what conversations need of Sent
 and Archive (below). The other folders are read when
 they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
 account's folders, each once by its role (Sent, Archive, Drafts, Trash,
-Junk) or its name, with what's unread (`STATUS`, logged at debug as
-counts only); `/folders/{key}` is a folder's
+Junk) or its name, with what's unread (`STATUS`, every folder's sent at
+once on one connection, `imap::unseen`; logged at debug as counts only); `/folders/{key}` is a folder's
 newest mail; `/search?q=` asks every folder but Drafts, Trash and Junk for
 the mail with every word in it (IMAP `TEXT`). Before the servers answer,
 `/search?q=&here=true` finds the words in what this Mac has already, the

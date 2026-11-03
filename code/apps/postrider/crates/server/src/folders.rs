@@ -79,12 +79,16 @@ impl Mail {
         let counted = self
             .on_server(account, |session| {
                 Box::pin(async move {
-                    let mut counted = Vec::new();
-                    for place in imap::folders(session).await? {
-                        let unseen = imap::unseen(session, &place.path).await?;
-                        counted.push((place, unseen));
-                    }
-                    Ok(counted)
+                    let places = imap::folders(session).await?;
+                    let paths: Vec<String> = places.iter().map(|p| p.path.clone()).collect();
+                    let unseen = imap::unseen(session, &paths).await?;
+                    Ok(places
+                        .into_iter()
+                        .map(|place| {
+                            let counts = unseen.get(&place.path).copied().unwrap_or((0, 0));
+                            (place, counts)
+                        })
+                        .collect::<Vec<_>>())
                 })
             })
             .await;
