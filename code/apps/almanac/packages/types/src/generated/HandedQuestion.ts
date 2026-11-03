@@ -17,9 +17,14 @@ system: string,
  */
 prompt: string, 
 /**
- * The talk's photos, after the prompt.
+ * The talk's latest photos, after the prompt.
  */
 photos: Array<HandedPhoto>, 
+/**
+ * The number of the first of `photos` in the talk, which the prompt
+ * names them by: earlier ones aren't sent again. None is 1.
+ */
+first_photo?: number, 
 /**
  * Whether it may search the web and read pages.
  */

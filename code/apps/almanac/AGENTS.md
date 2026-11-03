@@ -197,7 +197,10 @@ What they do:
   current talk. The answer streams back as server-sent events: `talk`,
   then `text` pieces, then `done` or `problem`. A problem is also kept as a
   message, so the talk shows it after a reload.
-  The talk's photos go with every question in it, after the text. A
+  The talk's latest six photos go with a question, after the text (a
+  question's own always do); earlier ones keep their numbers, so "photo 1"
+  still puts one on the page, but Claude sees them only through what was
+  said about them (`hidden_photos` in `talks.rs`). A
   question asked from a section's own page names it (`about`), and the
   prompt says which section they're looking at: what's kept goes under
   it, and a layout asked from there moves and draws only what's under it.

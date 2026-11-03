@@ -40,6 +40,7 @@ pub fn question(question: &Question<'_>) -> HandedQuestion {
                 data: image.data.clone(),
             })
             .collect(),
+        first_photo: u32::try_from(question.first_photo).ok(),
         web: question.web,
         tools: question.tools.iter().map(|t| t.to_string()).collect(),
     }
@@ -67,6 +68,7 @@ pub async fn answer(
         system: &question.system,
         prompt: &question.prompt,
         images: &images,
+        first_photo: question.first_photo.map_or(1, |n| n.max(1) as usize),
         web: question.web,
         tools: &tools,
         token: &question.token,

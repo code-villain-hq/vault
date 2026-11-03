@@ -343,8 +343,13 @@ pub struct HandedQuestion {
     pub system: String,
     /// What they ask, with the talk so far.
     pub prompt: String,
-    /// The talk's photos, after the prompt.
+    /// The talk's latest photos, after the prompt.
     pub photos: Vec<HandedPhoto>,
+    /// The number of the first of `photos` in the talk, which the prompt
+    /// names them by: earlier ones aren't sent again. None is 1.
+    #[serde(default)]
+    #[ts(optional)]
+    pub first_photo: Option<u32>,
     /// Whether it may search the web and read pages.
     pub web: bool,
     /// Almanac's tools it may use.

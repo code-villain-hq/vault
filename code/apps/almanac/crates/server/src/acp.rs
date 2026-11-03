@@ -110,8 +110,10 @@ pub struct Question<'a> {
     pub system: &'a str,
     /// What they ask, with the talk so far.
     pub prompt: &'a str,
-    /// The talk's photos, after the prompt.
+    /// The talk's latest photos, after the prompt.
     pub images: &'a [Image],
+    /// The number of the first of `images` in the talk, as the prompt names them.
+    pub first_photo: usize,
     /// Whether it may search the web and read pages.
     pub web: bool,
     /// Almanac's tools it may use, by their names in [`MCP_NAME`].
@@ -222,6 +224,7 @@ impl Adapter {
             system: "",
             prompt: "",
             images: &[],
+            first_photo: 1,
             web: false,
             tools: &[],
             token: "",
@@ -247,6 +250,7 @@ impl Adapter {
             system: "",
             prompt: "",
             images: &[],
+            first_photo: 1,
             web: false,
             tools: &[],
             token: "",
@@ -525,7 +529,8 @@ fn prompt(question: &Question<'_>) -> Vec<Value> {
     let mut blocks = vec![json!({ "type": "text", "text": question.prompt })];
     // Numbered, as the prompt names them.
     for (n, image) in question.images.iter().enumerate() {
-        blocks.push(json!({ "type": "text", "text": format!("Photo {}:", n + 1) }));
+        let number = question.first_photo + n;
+        blocks.push(json!({ "type": "text", "text": format!("Photo {number}:") }));
         blocks.push(json!({ "type": "image", "mimeType": image.media_type, "data": image.data }));
     }
     blocks
@@ -760,12 +765,34 @@ fn failure_of(error: &Value) -> Failure {
 mod tests {
     use super::*;
 
+    #[test]
+    fn photos_keep_their_numbers_in_the_talk() {
+        let image = Image {
+            id: uuid::Uuid::nil(),
+            media_type: "image/jpeg".into(),
+            data: "AAAA".into(),
+        };
+        let images = [image.clone(), image];
+        let blocks = prompt(&Question {
+            system: "",
+            prompt: "Und das hier?",
+            images: &images,
+            first_photo: 4,
+            web: false,
+            tools: &[],
+            token: "",
+        });
+        assert_eq!(blocks[1]["text"], "Photo 4:");
+        assert_eq!(blocks[3]["text"], "Photo 5:");
+    }
+
     /// What a question with the web as `web` and Almanac's add_items may run.
     fn given(web: bool) -> Vec<String> {
         allowed(&Question {
             system: "",
             prompt: "",
             images: &[],
+            first_photo: 1,
             web,
             tools: &["add_items"],
             token: "",

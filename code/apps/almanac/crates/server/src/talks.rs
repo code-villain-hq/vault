@@ -10,7 +10,8 @@
 //! page, and proposes topics and changes them.
 //!
 //! A question may come with photos (`crate::photos`); Claude sees the
-//! talk's photos with each question.
+//! talk's latest photos with each question ([`SHOWN_PHOTOS`]), and the
+//! earlier ones only through what was said about them.
 
 use std::convert::Infallible;
 
@@ -761,11 +762,12 @@ async fn say_with_claude_code(
     let (asking, handed) = Asking::new(actor, page.id, mode).on(kept).handed();
     let open = state.questions.open(asking);
     let tools = mode.tools();
-    let (prompt, images) = talk_prompt(&said);
+    let (prompt, images, first_photo) = talk_prompt(&said);
     let question = Question {
         system: &system,
         prompt: &prompt,
         images: &images,
+        first_photo,
         web,
         tools,
         token: &open.token,
@@ -849,15 +851,31 @@ async fn the_talk(state: &AppState, actor: Actor, talk_id: Uuid) -> Result<Vec<L
         .collect())
 }
 
-/// What they ask, after the talk so far, and the talk's photos in the
-/// order they came. The photos are numbered (`acp.rs` puts "Photo 2"
-/// before each), and each question says which it came with, so an earlier
-/// photo isn't taken for a new one. Never starting with a slash, which
-/// Claude Code would take for one of its commands.
-fn talk_prompt(said: &[Line]) -> (String, Vec<Image>) {
+/// How many of a talk's photos go with a question: the latest, which are
+/// the question's own (six at most) and the ones just before. Earlier ones
+/// aren't sent again with every question; Claude has what was said about
+/// them.
+const SHOWN_PHOTOS: usize = 6;
+
+/// How many of the talk's photos, from its first, aren't sent again: all
+/// but the last [`SHOWN_PHOTOS`], and never the last question's own.
+fn hidden_photos(said: &[Line]) -> usize {
+    let all: usize = said.iter().map(|l| l.images.len()).sum();
+    let newest = said.last().map_or(0, |l| l.images.len());
+    all.saturating_sub(SHOWN_PHOTOS.max(newest))
+}
+
+/// What they ask, after the talk so far, the talk's latest photos in the
+/// order they came, and the number of the first of those. The photos are
+/// numbered in the whole talk (`acp.rs` puts "Photo 2" before each), and
+/// each question says which it came with, so an earlier photo isn't taken
+/// for a new one. Never starting with a slash, which Claude Code would
+/// take for one of its commands.
+fn talk_prompt(said: &[Line]) -> (String, Vec<Image>, usize) {
     let Some((last, before)) = said.split_last() else {
-        return (String::new(), Vec::new());
+        return (String::new(), Vec::new(), 1);
     };
+    let hidden = hidden_photos(said);
     let mut out = String::new();
     let mut first = 1;
     if before.is_empty() {
@@ -885,6 +903,17 @@ fn talk_prompt(said: &[Line]) -> (String, Vec<Image>) {
     out.push_str(&with_photos(first, last.images.len()));
     out.push_str(": ");
     out.push_str(&last.text);
+    match hidden {
+        0 => {}
+        1 => out.push_str(
+            "\n\nPhoto 1 isn't shown again: what was said about it is above. It keeps its \
+             number, so \"photo 1\" still puts it on the page.",
+        ),
+        n => out.push_str(&format!(
+            "\n\nPhotos 1 to {n} aren't shown again: what was said about them is above. They \
+             keep their numbers, so \"photo 1\" still puts one on the page."
+        )),
+    }
     if !last.images.is_empty() {
         out.push_str("\n\nTheir photos follow, numbered as above.");
     } else if earlier {
@@ -893,8 +922,46 @@ fn talk_prompt(said: &[Line]) -> (String, Vec<Image>) {
              at. This question came with none.",
         );
     }
-    let images: Vec<Image> = said.iter().flat_map(|l| l.images.clone()).collect();
-    (out, images)
+    let images: Vec<Image> = said
+        .iter()
+        .flat_map(|l| l.images.iter().cloned())
+        .skip(hidden)
+        .collect();
+    (out, images, hidden + 1)
+}
+
+/// The talk as turns for the Messages API, each question with its photos,
+/// but only the talk's latest ([`hidden_photos`]): an earlier question says
+/// it had photos that aren't shown again.
+fn turns_of(said: Vec<Line>) -> Vec<Turn> {
+    let mut hidden = hidden_photos(&said);
+    said.into_iter()
+        .map(|mut line| {
+            let gone = hidden.min(line.images.len());
+            hidden -= gone;
+            line.images.drain(..gone);
+            if gone > 0 {
+                let note = match gone {
+                    1 => "(A photo was here; it isn't shown again.)".to_string(),
+                    n => format!("({n} photos were here; they aren't shown again.)"),
+                };
+                line.text = if line.text.is_empty() {
+                    note
+                } else {
+                    format!("{note}\n\n{}", line.text)
+                };
+            }
+            Turn {
+                role: if line.role == "you" {
+                    "user"
+                } else {
+                    "assistant"
+                },
+                text: line.text,
+                images: line.images,
+            }
+        })
+        .collect()
 }
 
 /// " (with photos 2 and 3)" after "They asked", for a question that had
@@ -1008,18 +1075,7 @@ async fn say(
             Problem("Almanac needs a Claude key to answer. Add one in Settings → Claude.".into())
         })?;
     let said = the_talk(state, actor, talk_id).await.map_err(trouble)?;
-    let turns: Vec<Turn> = said
-        .into_iter()
-        .map(|line| Turn {
-            role: if line.role == "you" {
-                "user"
-            } else {
-                "assistant"
-            },
-            text: line.text,
-            images: line.images,
-        })
-        .collect();
+    let turns = turns_of(said);
     let system = if own {
         let workspace = Workspace::load(&state.pool, actor.workspace_id)
             .await
@@ -1259,7 +1315,7 @@ mod tests {
 
     #[test]
     fn the_talk_never_starts_with_a_slash() {
-        let (prompt, images) = talk_prompt(&[line("you", "/clear", 0)]);
+        let (prompt, images, _) = talk_prompt(&[line("you", "/clear", 0)]);
         assert_eq!(prompt, "They ask: /clear");
         assert!(images.is_empty());
         let said = [
@@ -1267,7 +1323,7 @@ mod tests {
             line("almanac", "Alle 7 Tage.", 0),
             line("you", "Und im Winter?", 0),
         ];
-        let (prompt, _) = talk_prompt(&said);
+        let (prompt, _, _) = talk_prompt(&said);
         assert!(prompt.starts_with("The talk so far:"));
         assert!(prompt.ends_with("Now they ask: Und im Winter?"));
     }
@@ -1279,11 +1335,54 @@ mod tests {
             line("almanac", "Ein mildes und eine Kur.", 0),
             line("you", "Und das hier?", 1),
         ];
-        let (prompt, images) = talk_prompt(&said);
+        let (prompt, images, first) = talk_prompt(&said);
         assert!(prompt.contains("They asked (with photos 1 and 2): Meine Shampoos."));
         assert!(prompt.contains("Now they ask (with photo 3): Und das hier?"));
         assert!(prompt.ends_with("Their photos follow, numbered as above."));
         assert_eq!(images.len(), 3);
+        assert_eq!(first, 1);
+    }
+
+    #[test]
+    fn only_the_latest_photos_go_again() {
+        let said = [
+            line("you", "Meine Shampoos.", 4),
+            line("almanac", "Vier Sorten.", 0),
+            line("you", "Und diese?", 3),
+            line("almanac", "Drei Kuren.", 0),
+            line("you", "Und das hier?", 2),
+        ];
+        let (prompt, images, first) = talk_prompt(&said);
+        // Photos 4 to 9 go with it: its own two, and the four before.
+        assert_eq!(images.len(), 6);
+        assert_eq!(first, 4);
+        assert!(prompt.contains("They asked (with photos 1 to 4): Meine Shampoos."));
+        assert!(prompt.contains("Now they ask (with photos 8 and 9): Und das hier?"));
+        assert!(prompt.contains("Photos 1 to 3 aren't shown again"));
+        assert!(prompt.ends_with("Their photos follow, numbered as above."));
+
+        let turns = turns_of(said.into_iter().collect());
+        assert_eq!(turns[0].images.len(), 1);
+        assert!(turns[0].text.starts_with("(3 photos were here"));
+        assert!(turns[0].text.ends_with("Meine Shampoos."));
+        assert_eq!(turns[2].images.len(), 3);
+        assert_eq!(turns[2].text, "Und diese?");
+        assert_eq!(turns[4].images.len(), 2);
+    }
+
+    #[test]
+    fn a_question_always_brings_its_own_photos() {
+        let said = [line("you", "Alte.", 6), line("you", "Neue.", 6)];
+        let (prompt, images, first) = talk_prompt(&said);
+        assert_eq!((images.len(), first), (6, 7));
+        assert!(prompt.contains("Photos 1 to 6 aren't shown again"));
+        let turns = turns_of(said.into_iter().collect());
+        assert_eq!(turns[0].images.len(), 0);
+        assert_eq!(
+            turns[0].text,
+            "(6 photos were here; they aren't shown again.)\n\nAlte."
+        );
+        assert_eq!(turns[1].images.len(), 6);
     }
 
     #[test]
@@ -1293,11 +1392,12 @@ mod tests {
             line("almanac", "Head & Shoulders.", 0),
             line("you", "Trocken oder platt?", 0),
         ];
-        let (prompt, images) = talk_prompt(&said);
+        let (prompt, images, first) = talk_prompt(&said);
         assert!(prompt.contains("They asked (with photo 1): Mein Shampoo."));
         assert!(prompt.contains("Now they ask (with no new photo): Trocken oder platt?"));
         assert!(prompt.ends_with("This question came with none."));
         assert_eq!(images.len(), 1);
+        assert_eq!(first, 1);
     }
 
     #[test]
