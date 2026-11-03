@@ -721,11 +721,16 @@ impl Validate for PointPatch {
                 .iter()
                 .try_for_each(|(name, c)| cell(name, c.as_ref()))?;
         }
-        // A picture's caption may be taken off, with its photo given again.
+        // A picture's caption may be taken off, with its photo given again,
+        // whole or as the one cell that changes.
         let picture = self
             .cells
             .as_ref()
-            .is_some_and(|c| c.contains_key(PICTURE_CELL));
+            .is_some_and(|c| c.contains_key(PICTURE_CELL))
+            || self
+                .changed_cells
+                .as_ref()
+                .is_some_and(|c| matches!(c.get(PICTURE_CELL), Some(Some(_))));
         match &self.text {
             Some(text) if !(picture && text.is_empty()) => {
                 words(text, "A point needs some words.", 2000)
@@ -995,6 +1000,16 @@ mod tests {
         let unnamed: PointPatch =
             serde_json::from_str(r#"{"changed_cells": {" ": null}}"#).unwrap();
         assert!(unnamed.validate().is_err());
+    }
+
+    #[test]
+    fn a_pictures_caption_comes_off_with_its_photo_as_its_one_changed_cell() {
+        let off: PointPatch =
+            serde_json::from_str(r#"{"text": "", "changed_cells": {"photo": "abc"}}"#).unwrap();
+        assert!(off.validate().is_ok());
+        let none: PointPatch =
+            serde_json::from_str(r#"{"text": "", "changed_cells": {"photo": null}}"#).unwrap();
+        assert!(none.validate().is_err());
     }
 
     #[test]

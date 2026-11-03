@@ -234,7 +234,11 @@ What they do:
   client sees it. What's added, changed, moved and removed is one
   `TopicChange` with a `PageLayout`, so Undo (`layout.rs`) puts the
   blocks and points back and takes off what it started ("Kept a point
-  under Gewicht. Changed a point and removed Plants."); only ticks are
+  under Gewicht. Changed a point and removed Plants."). Of a row's cells
+  and a block's or point's place it puts back only what the answer
+  changed (`wrote`), through `changed_cells`, and only while that is
+  still as the answer left it, so what people changed since stays;
+  older answers put them back whole. Only ticks are
   the message's `kept` words. The layout names the collections it
   changed (`collections`), which the answer draws as their pictures, and
   the rows in them it made, changed or moved in (`rows`), which those

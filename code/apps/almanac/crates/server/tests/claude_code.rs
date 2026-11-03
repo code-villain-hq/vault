@@ -713,6 +713,88 @@ async fn an_item_rings_and_a_tick_ticks_its_reminder(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn undoing_an_answer_keeps_the_cells_people_changed_since(pool: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let (app, _, _serving) = with_claude_code(pool, dir.path()).await;
+    let (ada, home) = app.signup("Ada", "Home").await;
+    let started = app
+        .post(
+            &format!("/api/w/{home}/topics"),
+            Some(&ada),
+            json!({ "name": "Umzug", "template": "routine" }),
+        )
+        .await;
+    let topic = started.body["id"].as_str().unwrap().to_string();
+    let (block, row) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    let fields = json!([
+        { "name": "Gepackt", "kind": "check", "unit": "", "goal": null, "options": [] },
+        { "name": "Geputzt", "kind": "check", "unit": "", "goal": null, "options": [] },
+        { "name": "Notiz", "kind": "text", "unit": "", "goal": null, "options": [] },
+    ]);
+    let made = app
+        .sync(
+            &ada,
+            &home,
+            json!([
+                { "action": "create", "model": "Block", "id": block,
+                  "data": { "topic_id": topic, "kind": "collection", "title": "Küche", "fields": fields } },
+                { "action": "create", "model": "Point", "id": row,
+                  "data": { "topic_id": topic, "block_id": block, "text": "Küche",
+                            "cells": { "Notiz": "Herd" } } },
+            ]),
+        )
+        .await;
+    assert!(made.status.is_success(), "{}", made.text);
+    let cells = |points: Vec<Value>| {
+        points.into_iter().find(|p| p["id"] == json!(row)).unwrap()["cells"].clone()
+    };
+
+    // The answer ticks Gepackt and rewrites the Notiz.
+    let answer = ask(
+        &app,
+        &ada,
+        &home,
+        &topic,
+        r#"set p1 {"Gepackt": true, "Notiz": "Herd und Ofen"}"#,
+    )
+    .await;
+    assert_eq!(
+        cells(app.synced(&ada, &home, "Point").await),
+        json!({ "Gepackt": true, "Notiz": "Herd und Ofen" })
+    );
+    // Then another device ticks Geputzt, and writes another Notiz.
+    for changed in [json!({ "Geputzt": true }), json!({ "Notiz": "Spüle" })] {
+        let other = app
+            .sync(
+                &ada,
+                &home,
+                json!([{ "action": "update", "model": "Point", "id": row,
+                         "data": { "changed_cells": changed } }]),
+            )
+            .await;
+        assert!(other.status.is_success(), "{}", other.text);
+    }
+
+    let undone = app
+        .post(
+            &format!(
+                "/api/w/{home}/messages/{}/undo",
+                answer["id"].as_str().unwrap()
+            ),
+            Some(&ada),
+            json!({}),
+        )
+        .await;
+    assert!(undone.status.is_success(), "{}", undone.body);
+    // Gepackt goes, as the answer made it; the other device's tick and
+    // Notiz stay.
+    assert_eq!(
+        cells(app.synced(&ada, &home, "Point").await),
+        json!({ "Geputzt": true, "Notiz": "Spüle" })
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_talk_moves_a_row_and_its_page_to_a_sub_topic_with_undo(pool: PgPool) {
     let dir = tempfile::tempdir().unwrap();
     let (app, _, _serving) = with_claude_code(pool, dir.path()).await;

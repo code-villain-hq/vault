@@ -238,6 +238,19 @@ pub struct BlockWas {
     pub position: i32,
     /// Whether the layout removed it.
     pub removed: bool,
+    /// What the answer wrote to it, for Undo to put back only that; none on
+    /// a change kept before Undo knew, which puts its place back whole.
+    #[serde(default)]
+    #[ts(optional)]
+    pub wrote: Option<BlockWrote>,
+}
+
+/// What an answer wrote to a block it kept.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BlockWrote {
+    /// The place it moved the block to; none, it left it where it was.
+    pub moved_to: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -272,6 +285,25 @@ pub struct PointWas {
     #[serde(default)]
     #[ts(optional)]
     pub source_url: Option<String>,
+    /// What the answer wrote to it, for Undo to put back only that; none on
+    /// a removed point, and on a change kept before Undo knew, which puts
+    /// its cells and place back whole.
+    #[serde(default)]
+    #[ts(optional)]
+    pub wrote: Option<PointWrote>,
+}
+
+/// What an answer wrote to a point it kept: Undo puts back these cells and
+/// this place only, and those only while they're still as the answer left
+/// them, so what people changed since stays.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PointWrote {
+    /// The cells it changed, as it left them; none, a cell it took out.
+    pub cells: BTreeMap<String, Option<Cell>>,
+    /// Where it moved the point, its block and its place there; none, it
+    /// left it where it was.
+    pub moved_to: Option<(Uuid, i32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

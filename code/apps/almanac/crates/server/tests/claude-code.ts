@@ -114,6 +114,10 @@ async function answer(prompt: string) {
     const [, what, to] = /move ([bp]\d+) to (\S+)/i.exec(prompt) ?? [];
     await tool("move_to_sub_topic", { to, takes: [what] });
     say("Moved.");
+  } else if (/\bset (p\d+) (\{.*\})$/m.test(prompt)) {
+    const [, point, cells] = /\bset (p\d+) (\{.*\})$/m.exec(prompt) ?? [];
+    await tool("change_points", { points: [{ point, cells: JSON.parse(cells ?? "{}") }] });
+    say("Changed.");
   } else if (/tidy/i.test(prompt)) {
     await tool("change_points", {
       points: [{ point: "p1", text: "Water every 7 days, once the top is dry." }],

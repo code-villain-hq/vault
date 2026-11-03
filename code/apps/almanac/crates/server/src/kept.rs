@@ -15,9 +15,9 @@
 use std::collections::{BTreeMap, HashSet};
 
 use almanac_domain::{
-    Actor, BlockWas, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind, Operation,
-    PICTURE_CELL, PageLayout, PointWas, Proposal, ProposedReminder, SET_KINDS, STICKS_TO_MAX,
-    TopicChange, TopicPatch,
+    Actor, BlockWas, BlockWrote, Cell, FIELD_KINDS, Field, LOOKS, MOST_FIELDS, ModelKind,
+    Operation, PICTURE_CELL, PageLayout, PointWas, PointWrote, Proposal, ProposedReminder,
+    SET_KINDS, STICKS_TO_MAX, TopicChange, TopicPatch,
 };
 use almanac_sync::SyncError;
 use chrono::{Days, Local, NaiveDate, NaiveTime};
@@ -1009,12 +1009,16 @@ impl Kept {
                 }
             }
             if !data.is_empty() {
+                let mut was = block_was(was, false);
+                was.wrote = Some(BlockWrote {
+                    moved_to: data.contains_key("position").then_some(block.position),
+                });
                 operations.push(Operation::Update {
                     model: ModelKind::Block,
                     id: block.id,
                     data,
                 });
-                layout.blocks.push(block_was(was, false));
+                layout.blocks.push(was);
             }
         }
         let mut deletes = Vec::new();
@@ -1098,7 +1102,7 @@ impl Kept {
             // the answer is written: a tick made meanwhile stays.
             let changed = cells_changed(&was.cells.0, &point.cells.0);
             if !changed.is_empty() {
-                data.insert("changed_cells".into(), Value::Object(changed));
+                data.insert("changed_cells".into(), json!(changed));
             }
             let reworded = !data.is_empty();
             let into_rows = point.block_id != was.block_id
@@ -1136,7 +1140,13 @@ impl Kept {
             }
             // A tick isn't a change to undo: it shows with what's kept.
             if !data.is_empty() {
-                layout.points.push(point_was(was, false));
+                let mut was = point_was(was, false);
+                let moved = data.contains_key("block_id") || data.contains_key("position");
+                was.wrote = Some(PointWrote {
+                    cells: changed,
+                    moved_to: moved.then_some((point.block_id, point.position)),
+                });
+                layout.points.push(was);
             }
             if let Some((_, done)) = self.checked.iter().find(|(c, _)| *c == point.id) {
                 let block = self.blocks.iter().find(|b| b.id == point.block_id);
@@ -1145,7 +1155,7 @@ impl Kept {
                     cells.insert(check.to_string(), Cell::Check(*done));
                     let changed = cells_changed(&was.cells.0, &cells);
                     if !changed.is_empty() {
-                        data.insert("changed_cells".into(), Value::Object(changed));
+                        data.insert("changed_cells".into(), json!(changed));
                     }
                 }
             }
@@ -1630,15 +1640,18 @@ impl Kept {
 }
 
 /// What a row's cells change from `was` to `now`, as `changed_cells` takes
-/// them: what's new or different, and null for what went.
-fn cells_changed(was: &BTreeMap<String, Cell>, now: &BTreeMap<String, Cell>) -> Map<String, Value> {
-    let mut changed: Map<String, Value> = now
+/// them: what's new or different, and none (null) for what went.
+fn cells_changed(
+    was: &BTreeMap<String, Cell>,
+    now: &BTreeMap<String, Cell>,
+) -> BTreeMap<String, Option<Cell>> {
+    let mut changed: BTreeMap<String, Option<Cell>> = now
         .iter()
         .filter(|(name, cell)| was.get(*name) != Some(*cell))
-        .map(|(name, cell)| (name.clone(), json!(cell)))
+        .map(|(name, cell)| (name.clone(), Some(cell.clone())))
         .collect();
     for name in was.keys().filter(|name| !now.contains_key(*name)) {
-        changed.insert(name.clone(), Value::Null);
+        changed.insert(name.clone(), None);
     }
     changed
 }
@@ -2160,6 +2173,7 @@ fn block_was(block: &RefBlock, removed: bool) -> BlockWas {
         row_id: block.row_id,
         position: block.position,
         removed,
+        wrote: None,
     }
 }
 
@@ -2180,6 +2194,7 @@ fn point_was(point: &PagePoint, removed: bool) -> PointWas {
         removed,
         source: point.source.clone(),
         source_url: point.source_url.clone(),
+        wrote: None,
     }
 }
 
@@ -2846,7 +2861,7 @@ mod tests {
         now.insert("Gewicht".into(), Cell::Number(3.4));
         now.remove("Notiz");
         assert_eq!(
-            Value::Object(cells_changed(&was, &now)),
+            json!(cells_changed(&was, &now)),
             json!({"Gewicht": 3.4, "Notiz": null})
         );
         assert!(cells_changed(&was, &was).is_empty());

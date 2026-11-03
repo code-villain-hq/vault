@@ -473,18 +473,7 @@ pub async fn undo(
         if let Some(layout) = &change.layout
             && let Some(page) = Page::load(&state.pool, actor.workspace_id, change.topic_id).await?
         {
-            let blocks: Vec<Uuid> = page.blocks.iter().map(|b| b.block.id).collect();
-            let points: Vec<(Uuid, Uuid)> = page
-                .blocks
-                .iter()
-                .flat_map(|b| b.points.iter().map(|p| (p.id, p.block_id)))
-                .collect();
-            operations.extend(crate::layout::undo(
-                change.topic_id,
-                layout,
-                &blocks,
-                &points,
-            ));
+            operations.extend(crate::layout::undo(change.topic_id, layout, &page.blocks));
         }
     }
     operations.push(Operation::Update {
