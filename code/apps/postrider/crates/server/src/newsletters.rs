@@ -62,6 +62,7 @@ use tokio::task::AbortHandle;
 use uuid::Uuid;
 
 use crate::auth::Member;
+use crate::conversations;
 use crate::error::AppError;
 use crate::folders::listing;
 use crate::imap::{self, Failure, Headed, Place};
@@ -118,6 +119,47 @@ const GENERIC_NAMES: &[&str] = &[
     "mail",
     "email",
     "admin",
+];
+
+/// Domains a mailing service sends from for many companies, where the
+/// domain says nothing of who writes: the same name there joins no
+/// addresses.
+const SERVICES: &[&str] = &[
+    "amazonses.com",
+    "beehiiv.com",
+    "brevosend.com",
+    "ccsend.com",
+    "cmail19.com",
+    "cmail20.com",
+    "convertkit-mail.com",
+    "convertkit-mail2.com",
+    "createsend.com",
+    "customeriomail.com",
+    "exacttarget.com",
+    "ghost.io",
+    "googlegroups.com",
+    "groups.io",
+    "hubspotemail.net",
+    "intercom-mail.com",
+    "klaviyomail.com",
+    "list-manage.com",
+    "mailchimpapp.net",
+    "mailerlite.com",
+    "mailgun.net",
+    "mailgun.org",
+    "mailjet.com",
+    "mandrillapp.com",
+    "mcdlv.net",
+    "mcsv.net",
+    "mktomail.com",
+    "mlsend.com",
+    "postmarkapp.com",
+    "rsgsv.net",
+    "sendgrid.net",
+    "sendinblue.com",
+    "sparkpostmail.com",
+    "substack.com",
+    "teamtailor-mail.com",
 ];
 
 /// What a domain may have between its organisation and its top-level
@@ -199,6 +241,9 @@ struct Sent {
     seen: bool,
     name: String,
     address: String,
+    /// Who sends it, by its name and domain ([`sender_of`]): one sender's
+    /// addresses are one row on the page.
+    sender: Option<String>,
     way: Option<Way>,
 }
 
@@ -408,23 +453,62 @@ impl Mail {
     }
 
     /// A sender's newest mail in Newsletters, from every account it writes
-    /// to.
+    /// to, and from every address it writes from there.
     pub async fn sender_mail(
         &self,
         workspace_id: Uuid,
         address: &str,
     ) -> Result<Listing, AppError> {
         let accounts = self.accounts(workspace_id).await?;
-        let query =
-            &imap::from_query(address).map_err(|failure| AppError::invalid(failure.message()))?;
+        let address = &address.trim().to_lowercase();
+        imap::from_query(address).map_err(|failure| AppError::invalid(failure.message()))?;
         let read = join_all(accounts.iter().map(|account| async move {
-            match self.newsletters_folder(account).await? {
-                Some(place) => self.read(account, &place, Some(query)).await,
-                None => Ok(Vec::new()),
-            }
+            let Some(place) = self.newsletters_folder(account).await? else {
+                return Ok(Vec::new());
+            };
+            let when: Vec<When> = self
+                .addresses_of(account, &place, address)
+                .await?
+                .into_iter()
+                .map(When::From)
+                .collect();
+            let query = rules::search(&when, "")?;
+            self.read(account, &place, Some(&query)).await
         }))
         .await;
         Ok(listing(&accounts, read, HashMap::new()))
+    }
+
+    /// Every address the sender at `address` writes from to the account's
+    /// Newsletters, as the page counts them: by what it read last, else by
+    /// reading it now.
+    async fn addresses_of(
+        &self,
+        account: &MailAccount,
+        place: &Place,
+        address: &str,
+    ) -> Result<Vec<String>, Failure> {
+        let now = Utc::now();
+        let kept = self
+            .lock_newsletter_headers()
+            .get(&(account.id, place.path.clone()))
+            .cloned();
+        let newsletters = match kept {
+            Some(kept) => {
+                let local = is_this_mac(&account.host);
+                let sent = kept
+                    .mails
+                    .into_values()
+                    .filter_map(|h| read(h, local))
+                    .collect();
+                by_sender(account.id, sent, now)
+            }
+            None => self.newsletters_of(account, now).await?,
+        };
+        Ok(newsletters
+            .into_iter()
+            .find(|n| n.addresses.iter().any(|a| a == address))
+            .map_or_else(|| vec![address.to_string()], |n| n.addresses))
     }
 
     /// All of the account's newsletters, by sender: what the page read
@@ -788,6 +872,7 @@ fn read(headed: Headed, local: bool) -> Option<Sent> {
     let from = message.from().and_then(|list| list.first());
     let address = from.as_ref()?.address()?.trim().to_lowercase();
     let name = sender_name(from.as_ref().and_then(|f| f.name()), &address);
+    let sender = sender_of(&name, &address);
     let raw = |field: &str| {
         message
             .headers()
@@ -802,8 +887,28 @@ fn read(headed: Headed, local: bool) -> Option<Sent> {
         seen: headed.seen,
         name,
         address,
+        sender,
         way,
     })
+}
+
+/// Who sends a mail, by the name the page calls it ([`sender_name`]) and
+/// the domain its owner registered (`example.co.uk` of
+/// `news.example.co.uk`, by the public suffix list), so the addresses one
+/// sender writes from count as one. Never by the name alone: an "Info" is
+/// its organisation's, at its domain. `None` where the address alone says
+/// who: at a domain many send from, a mailing service's or a free mail one.
+fn sender_of(name: &str, address: &str) -> Option<String> {
+    let name: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect();
+    let domain = psl::domain_str(address.rsplit_once('@')?.1)?;
+    if SERVICES.contains(&domain) || conversations::SHARED.contains(&domain) {
+        return None;
+    }
+    Some(format!("{name} {domain}"))
 }
 
 /// What the page calls a sender: the name it gives, unless it gives none
@@ -923,32 +1028,49 @@ fn percent_decoded(text: &str) -> String {
 }
 
 /// Newsletters by sender: how much each sent, how much of it was opened,
-/// and how often it writes.
+/// and how often it writes. Addresses whose newest mail gives the same
+/// name at the same domain are one sender.
 fn by_sender(account_id: Uuid, sent: Vec<Sent>, now: DateTime<Utc>) -> Vec<Newsletter> {
-    let mut senders: HashMap<String, Vec<Sent>> = HashMap::new();
+    let mut by_address: HashMap<String, Vec<Sent>> = HashMap::new();
     for mail in sent {
-        senders.entry(mail.address.clone()).or_default().push(mail);
+        by_address
+            .entry(mail.address.clone())
+            .or_default()
+            .push(mail);
+    }
+    let mut senders: HashMap<String, Vec<Sent>> = HashMap::new();
+    for (address, mails) in by_address {
+        let sender = by_newest(&mails)
+            .first()
+            .and_then(|mail| mail.sender.clone())
+            .unwrap_or(address);
+        senders.entry(sender).or_default().extend(mails);
     }
     let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
     senders
-        .into_iter()
-        .filter_map(|(address, mails)| {
+        .into_values()
+        .filter_map(|mails| {
             let newest = mails.iter().max_by_key(|mail| (mail.arrived, mail.uid))?;
             let oldest = mails.iter().map(|mail| mail.arrived).min()?;
             // A week at least, or one mail yesterday reads as daily.
             let weeks = (now - oldest).num_minutes().max(7 * 24 * 60) / 60;
             let sent = count(mails.len());
             let mut names: Vec<String> = Vec::new();
+            let mut addresses: Vec<String> = Vec::new();
             for mail in by_newest(&mails) {
                 if !names.contains(&mail.name) {
                     names.push(mail.name.clone());
+                }
+                if !addresses.contains(&mail.address) {
+                    addresses.push(mail.address.clone());
                 }
             }
             Some(Newsletter {
                 account_id,
                 name: newest.name.clone(),
                 names,
-                address,
+                address: newest.address.clone(),
+                addresses,
                 sent,
                 opened: count(mails.iter().filter(|mail| mail.seen).count()),
                 recent: count(
@@ -1596,7 +1718,122 @@ mod tests {
             seen,
             name: address.split('@').next().unwrap().into(),
             address: address.into(),
+            sender: None,
             way: None,
+        }
+    }
+
+    /// A mail from `address`, giving `name` as its sender's.
+    fn from(uid: u32, days_ago: i64, seen: bool, name: &str, address: &str) -> Sent {
+        Sent {
+            name: sender_name(Some(name), address),
+            sender: sender_of(&sender_name(Some(name), address), address),
+            ..mail(uid, days_ago, seen, address, Utc::now())
+        }
+    }
+
+    #[test]
+    fn a_sender_is_its_name_at_the_domain_its_owner_registered() {
+        let who = |name, address| sender_of(&sender_name(name, address), address);
+        let deep = who(
+            Some("Deep Teaching Solutions"),
+            "news@mail.deepteaching.com",
+        );
+        assert_eq!(
+            deep.as_deref(),
+            Some("deepteachingsolutions deepteaching.com")
+        );
+        assert_eq!(
+            who(Some("Deep  teaching solutions"), "hello@deepteaching.com"),
+            deep
+        );
+        assert_eq!(
+            who(Some("Handelsbanken"), "news@shop.handelsbanken.co.uk"),
+            who(Some("Handelsbanken"), "info@handelsbanken.co.uk")
+        );
+        assert_ne!(
+            who(Some("Shop"), "news@shop.co.uk"),
+            who(Some("Shop"), "news@other.co.uk")
+        );
+        assert_eq!(
+            who(Some("Kino"), "news@kino.test").as_deref(),
+            Some("kino kino.test")
+        );
+        // A name that says nothing is its organisation's, never one of its own.
+        assert_eq!(
+            who(Some("Info"), "info@deepteaching.com"),
+            who(None, "news@mail.deepteaching.com")
+        );
+        assert_ne!(
+            who(Some("Info"), "info@deepteaching.com"),
+            who(Some("Info"), "info@other.com")
+        );
+        // A domain many send from says no one.
+        assert_eq!(
+            who(Some("Kustom"), "no-reply@kustom.teamtailor-mail.com"),
+            None
+        );
+        assert_eq!(who(Some("Info"), "info@sendgrid.net"), None);
+        assert_eq!(who(Some("Anna Berg"), "anna@gmail.com"), None);
+    }
+
+    #[test]
+    fn the_addresses_one_sender_writes_from_are_one_row() {
+        let now = Utc::now();
+        let sent = vec![
+            from(
+                1,
+                9,
+                true,
+                "Deep Teaching Solutions",
+                "news@mail.deepteaching.com",
+            ),
+            from(
+                2,
+                2,
+                false,
+                "Deep Teaching Solutions",
+                "events@deepteaching.com",
+            ),
+            from(
+                3,
+                5,
+                false,
+                "Deep Teaching Solutions",
+                "news@mail.deepteaching.com",
+            ),
+            from(4, 1, false, "Info", "info@deepteaching.com"),
+            from(5, 3, false, "Info", "info@news.deepteaching.com"),
+            from(6, 2, false, "Info", "info@other.com"),
+            from(7, 4, false, "Kustom", "jobs@kustom.teamtailor-mail.com"),
+            from(8, 4, false, "Kustom", "no-reply@kustom.teamtailor-mail.com"),
+        ];
+        let newsletters = by_sender(Uuid::nil(), sent, now);
+        assert_eq!(newsletters.len(), 5);
+        let deep = newsletters
+            .iter()
+            .find(|n| n.name == "Deep Teaching Solutions")
+            .unwrap();
+        assert_eq!(
+            deep.addresses,
+            ["events@deepteaching.com", "news@mail.deepteaching.com"]
+        );
+        assert_eq!(deep.address, "events@deepteaching.com");
+        assert_eq!((deep.sent, deep.opened, deep.newest_uid), (3, 1, 2));
+        // The page calls an "Info" by its organisation: one row for each.
+        let info = newsletters
+            .iter()
+            .find(|n| n.name == "Deepteaching")
+            .unwrap();
+        assert_eq!(
+            info.addresses,
+            ["info@deepteaching.com", "info@news.deepteaching.com"]
+        );
+        for n in newsletters
+            .iter()
+            .filter(|n| !["Deep Teaching Solutions", "Deepteaching"].contains(&n.name.as_str()))
+        {
+            assert_eq!(n.addresses, [n.address.clone()]);
         }
     }
 

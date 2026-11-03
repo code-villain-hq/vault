@@ -23,6 +23,7 @@ function sender(
     name,
     names: [name],
     address: `${name.toLowerCase()}@news.test`,
+    addresses: [`${name.toLowerCase()}@news.test`],
     sent,
     opened: read,
     recent: sent,
@@ -101,11 +102,17 @@ test("a sender is found by any name it wrote as, or its address", () => {
     ...sender("Anna Berg via LinkedIn", 3, 1),
     names: ["Anna Berg via LinkedIn", "Dimitrios Kombas via LinkedIn"],
     address: "messaging-digest-noreply@linkedin.com",
+    addresses: ["messaging-digest-noreply@linkedin.com"],
   };
   expect(finds(linkedin, "dimitrios")).toBe(true);
   expect(finds(linkedin, "kombas linkedin")).toBe(true);
   expect(finds(linkedin, "messaging-digest")).toBe(true);
   expect(finds(linkedin, "dimitrios berlin")).toBe(false);
+  const deep = {
+    ...sender("Deep Teaching Solutions", 3, 0),
+    addresses: ["events@deepteaching.com", "news@mail.deepteaching.com"],
+  };
+  expect(finds(deep, "mail.deepteaching")).toBe(true);
   expect(finds(sender("Zoë Café", 1, 0), "zoe cafe")).toBe(true);
   expect(finds(sender("Zalando", 1, 0), "")).toBe(true);
 });
@@ -122,4 +129,7 @@ test("the page goes on below a sender that left, else above", () => {
   expect(nearest(rows, "kino@news.test")?.name).toBe("heise");
   expect(nearest(rows, "zalando@news.test")).toBeUndefined();
   expect(nearest([sender("Kino", 1, 0)], "kino@news.test")).toBeUndefined();
+  // A sender's other address is the sender.
+  const deep = { ...sender("Deep", 2, 0), addresses: ["deep@news.test", "events@deep.test"] };
+  expect(nearest([deep, sender("Kino", 1, 0)], "EVENTS@deep.test")?.name).toBe("Kino");
 });

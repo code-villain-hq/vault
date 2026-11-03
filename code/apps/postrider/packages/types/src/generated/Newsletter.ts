@@ -14,10 +14,20 @@ name: string,
  * Every name its mail gives, the newest first: LinkedIn's
  * messaging-digest-noreply@ writes as each person who wrote you.
  */
-names: Array<string>, address: string, 
+names: Array<string>, 
+/**
+ * The address its newest mail came from: its view's, by which the
+ * page knows it.
+ */
+address: string, 
+/**
+ * Every address it writes from, the newest first: one sender writes
+ * as the same name from news.example.com and mail.example.com.
+ */
+addresses: Array<string>, 
 /**
  * How many of its mails are in Newsletters, and how many of those you
- * opened.
+ * opened, from all of them.
  */
 sent: number, opened: number, 
 /**

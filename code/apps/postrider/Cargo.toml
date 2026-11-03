@@ -26,6 +26,7 @@ lettre = { version = "0.11.23", default-features = false, features = [
   "aws-lc-rs",
 ] }
 mail-parser = "1"
+psl = "2.1"
 quick-xml = { version = "0.42", features = ["escape-html"] }
 reqwest = { version = "0.13", features = ["json"] }
 rustls = { version = "0.23.46", default-features = false, features = ["std", "aws_lc_rs"] }

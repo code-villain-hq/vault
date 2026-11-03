@@ -401,14 +401,21 @@ The page (`newsletters.tsx`, `GET /newsletters`) reads all of each
 account's Newsletters by sender, so nothing in the folder is left off it
 (named as its newest mail names it, or by its organisation when that
 name is none or says nothing, "Notification": `sender_name`; `names`
-keeps every name it wrote as): when each last wrote, how often it writes
+keeps every name it wrote as). A sender is that name at the domain its
+owner registered (`sender_of`, `example.co.uk` of `news.example.co.uk` by
+the public suffix list, `psl`), so the addresses it writes from are one
+row (`addresses`, newest first, named in its tooltip): their counts add
+up. Never by the name alone, and not at a domain many send from
+(`SERVICES`, a mailing service's such as teamtailor-mail.com, or a free
+mail one, `conversations::SHARED`): there each address is its own. Rows
+stay one per account. The page shows when each last wrote, how often it writes
 (`rhythm.ts`) and how much of it you opened, the least read first. A
 sender with mail you haven't opened comes first, whatever the order, with
 how much of it beside its name, as the sidebar shows what's unread in
 Newsletters: both count `\Seen`, so they add up. Each column's head sorts
 by it, clicked again the other way, and the order is kept on this device
 (`localStorage`). / finds a sender by any of its
-names or its address; a find with no sender says so. It leads with the
+names or addresses; a find with no sender says so. It leads with the
 ones you never open that wrote in the last month, and a button for all
 of them, but not while you find one. The server keeps the headers it
 read (`KeptHeaders`, by UIDVALIDITY), so each read fetches only what came
@@ -424,8 +431,10 @@ and that Keep in Inbox takes one off.
 
 A sender's name, or Enter, opens what it sent (`SenderList`, at
 `/newsletters/{address}`): every account's Newsletters asked for that
-sender (`GET /newsletters/sender?address=`, IMAP `FROM`), in the list
-column. A mail opened from it keeps `sender` in its search, so Esc goes
+sender, from every address it writes from (`GET
+/newsletters/sender?address=`, IMAP `FROM`, `addresses_of`), in the list
+column. Unsubscribe goes to each address by its own `List-Unsubscribe`,
+and Keep in Inbox names them all in the rule. A mail opened from it keeps `sender` in its search, so Esc goes
 back to the sender's list, and Esc there back to the page. With none of
 its mail open, the reading pane (`SenderPane`, `sender.tsx`) says how much
 of the list you opened and leads with Unsubscribe, Keep in Inbox beside

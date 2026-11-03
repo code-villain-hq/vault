@@ -51,7 +51,7 @@ const SETTLE: Duration = Duration::from_secs(5);
 const FILED: [FolderRole; 2] = [FolderRole::Sent, FolderRole::Archive];
 
 /// Domains many people share, where the domain says nothing of who writes.
-const SHARED: &[&str] = &[
+pub(crate) const SHARED: &[&str] = &[
     "aol.com",
     "fastmail.com",
     "freenet.de",

@@ -115,10 +115,16 @@ export function useSender(sender: string) {
   // Named as the Newsletters page names it, else as its mail does.
   const name =
     pageName(workspace.id, sender) ?? (doing.done ? doing.name : mails[0]?.from_name || sender);
-  const senders = [...new Set(mails.map((mail) => mail.account_id))].map((account_id) => ({
-    account_id,
-    address: sender,
-  }));
+  // Each address it wrote from, in each account: one sender writes from
+  // several, and its list holds the mail of all of them.
+  const senders = [
+    ...new Map(
+      mails.map((mail) => {
+        const address = (mail.from_address || sender).toLowerCase();
+        return [`${mail.account_id}:${address}`, { account_id: mail.account_id, address }];
+      }),
+    ).values(),
+  ];
   const ready = senders.length > 0 && !doing.busy && !doing.done;
 
   /** Waits for the request to go, then says whether it failed. */

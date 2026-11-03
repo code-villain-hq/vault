@@ -651,9 +651,14 @@ pub struct Newsletter {
     /// Every name its mail gives, the newest first: LinkedIn's
     /// messaging-digest-noreply@ writes as each person who wrote you.
     pub names: Vec<String>,
+    /// The address its newest mail came from: its view's, by which the
+    /// page knows it.
     pub address: String,
+    /// Every address it writes from, the newest first: one sender writes
+    /// as the same name from news.example.com and mail.example.com.
+    pub addresses: Vec<String>,
     /// How many of its mails are in Newsletters, and how many of those you
-    /// opened.
+    /// opened, from all of them.
     pub sent: u32,
     pub opened: u32,
     /// How many of them came in the last 30 days.

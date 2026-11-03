@@ -1,7 +1,8 @@
 // Newsletters: every sender whose mail went to many, as its header says or
 // Claude Code found reading it, the least read first, led by the ones you
-// never open. Those with mail you haven't opened come first, with how much,
-// as the sidebar counts it. Each column's head sorts
+// never open. A sender that writes from several addresses, as the same
+// name at the same domain, is one row (the server folds them). Those with
+// mail you haven't opened come first, with how much, as the sidebar counts it. Each column's head sorts
 // by it, remembered on this device, and / finds a sender by any name it
 // wrote as. Unsubscribing asks nothing: it archives what the sender sent,
 // and the request waits 10 seconds on the server, so Undo really undoes it.
@@ -41,6 +42,7 @@ import {
   senderKey,
   sorted,
   unread,
+  writesFrom,
 } from "./rhythm";
 import { undoSender, useDoings } from "./sender";
 import { Button, Empty, ErrorMessage } from "./ui";
@@ -73,12 +75,10 @@ export function pageName(workspace: string, address: string): string | undefined
   return pageRows(workspace, address)[0]?.name;
 }
 
-/** A sender's rows on the page, one per account it wrote to. */
+/** A sender's rows on the page, one per account it wrote to, by any
+ * address it writes from. */
 export function pageRows(workspace: string, address: string): Newsletter[] {
-  const its = address.toLowerCase();
-  return (lastRead.get(workspace)?.newsletters ?? []).filter(
-    (n) => n.address.toLowerCase() === its,
-  );
+  return (lastRead.get(workspace)?.newsletters ?? []).filter((n) => writesFrom(n, address));
 }
 
 /** The sender whose view emptied and came back here, by its address. */
@@ -201,7 +201,7 @@ export function NewslettersPage() {
 
   /** Waits for the requests to go, then shows which failed. */
   const follow = useCallback(
-    async (id: string) => {
+    async (id: string, rowOf: Map<string, Newsletter>) => {
       for (let tries = 0; tries < 3; tries++) {
         try {
           const sent = await api<UnsubscribeSent>(
@@ -210,7 +210,7 @@ export function NewslettersPage() {
             undefined,
             place,
           );
-          updateBatch(id, { waiting: false, failed: failedBySender(sent.failed) });
+          updateBatch(id, { waiting: false, failed: failedByRow(sent.failed, rowOf) });
           return;
         } catch (problem) {
           // Undone: nothing went.
@@ -229,31 +229,15 @@ export function NewslettersPage() {
       const gone = await api<Unsubscribed>(
         "POST",
         `${base}/unsubscribe`,
-        { senders: senders.map(({ account_id, address }) => ({ account_id, address })) },
+        { senders: refs(senders) },
         place,
       );
-      const rowOf = new Map(senders.map((n) => [senderKey(n), n]));
-      setDone((all) => {
-        const next = new Map(all);
-        for (const sender of gone.senders) {
-          const row = rowOf.get(senderKey(sender));
-          if (!row) continue;
-          next.set(senderKey(sender), {
-            row,
-            done: {
-              kind: "unsubscribed",
-              batch: gone.id,
-              archived: sender.archived,
-              asked: sender.asked,
-              page: sender.page,
-            },
-          });
-        }
-        return next;
-      });
+      const rowOf = byAddress(senders);
+      const each = unsubscribedRows(gone, rowOf);
+      setDone((all) => new Map([...all, ...each]));
       setBatches((all) =>
         new Map(all).set(gone.id, {
-          keys: gone.senders.map(senderKey),
+          keys: [...each.keys()],
           waiting: gone.waiting,
           failed: new Map(),
           undoing: false,
@@ -261,10 +245,12 @@ export function NewslettersPage() {
         }),
       );
       // One sender's page opens; for many, each row links to its own.
-      const [only] = gone.senders;
-      if (gone.senders.length === 1 && only?.page) openPage(only.page);
+      const [only, ...more] = each.values();
+      if (only?.done.kind === "unsubscribed" && only.done.page && more.length === 0) {
+        openPage(only.done.page);
+      }
       moved();
-      if (gone.waiting) void follow(gone.id);
+      if (gone.waiting) void follow(gone.id, rowOf);
     } catch (problem) {
       setProblem(messageOf(problem));
     } finally {
@@ -280,7 +266,7 @@ export function NewslettersPage() {
       const kept = await api<KeptInInbox>(
         "POST",
         `${base}/keep`,
-        { senders: [{ account_id: sender.account_id, address: sender.address }] },
+        { senders: refs([sender]) },
         place,
       );
       const key = senderKey(sender);
@@ -691,7 +677,7 @@ function SenderRow({
         <Link
           {...senderMail(workspace.url_key, row)}
           className="name"
-          title={account ? `${row.address}, to ${account.name}` : row.address}
+          title={`${row.addresses.join(", ")}${account ? `, to ${account.name}` : ""}`}
         >
           {row.name}
         </Link>
@@ -776,8 +762,59 @@ function undoable(batch: Batch, keys: string[], done: Map<string, { done: Done }
   });
 }
 
-function failedBySender(failed: SenderProblem[]): Map<string, string> {
-  return new Map(failed.map((f) => [senderKey(f), f.message]));
+/** Every address the rows write from, as the server takes senders. */
+function refs(rows: Newsletter[]): NewsletterRef[] {
+  return rows.flatMap(({ account_id, addresses }) =>
+    addresses.map((address) => ({ account_id, address })),
+  );
+}
+
+/** The rows by each address they write from, keyed as `senderKey` keys. */
+function byAddress(rows: Newsletter[]): Map<string, Newsletter> {
+  return new Map(
+    rows.flatMap((row) =>
+      row.addresses.map(
+        (address) => [senderKey({ account_id: row.account_id, address }), row] as const,
+      ),
+    ),
+  );
+}
+
+/** What unsubscribing did to each row, by its key: its addresses' added up. */
+function unsubscribedRows(
+  gone: Unsubscribed,
+  rowOf: Map<string, Newsletter>,
+): Map<string, { row: Newsletter; done: Done }> {
+  const each = new Map<string, { row: Newsletter; done: Done }>();
+  for (const sender of gone.senders) {
+    const row = rowOf.get(senderKey(sender));
+    if (!row) continue;
+    const had = each.get(senderKey(row))?.done;
+    const before = had?.kind === "unsubscribed" ? had : { archived: 0, asked: false, page: null };
+    const asked = before.asked || sender.asked;
+    each.set(senderKey(row), {
+      row,
+      done: {
+        kind: "unsubscribed",
+        batch: gone.id,
+        archived: before.archived + sender.archived,
+        asked,
+        page: asked ? null : (before.page ?? sender.page),
+      },
+    });
+  }
+  return each;
+}
+
+/** Why each row's request failed, its addresses' reasons together. */
+function failedByRow(failed: SenderProblem[], rowOf: Map<string, Newsletter>): Map<string, string> {
+  const each = new Map<string, string>();
+  for (const f of failed) {
+    const row = rowOf.get(senderKey(f));
+    const key = senderKey(row ?? f);
+    each.set(key, [each.get(key), f.message].filter(Boolean).join(" "));
+  }
+  return each;
 }
 
 /** The senders Postrider's rule names, since their mail doesn't say it went
@@ -787,7 +824,7 @@ function Named({ named, rows }: { named: NewsletterRef[]; rows: Newsletter[] }) 
     ...new Set(
       named.map(
         (n) =>
-          rows.find((r) => r.account_id === n.account_id && r.address === n.address)?.name ??
+          rows.find((r) => r.account_id === n.account_id && writesFrom(r, n.address))?.name ??
           n.address,
       ),
     ),

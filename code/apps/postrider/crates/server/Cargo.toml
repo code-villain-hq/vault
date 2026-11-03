@@ -21,6 +21,7 @@ lettre.workspace = true
 mail-parser.workspace = true
 postrider-domain.workspace = true
 postrider-sync.workspace = true
+psl.workspace = true
 quick-xml.workspace = true
 reqwest.workspace = true
 rustls.workspace = true

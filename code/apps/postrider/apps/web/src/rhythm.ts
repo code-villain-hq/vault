@@ -90,11 +90,12 @@ function plain(text: string): string {
 
 /**
  * Whether a sender has every word of `text` in a name its mail gave or in
- * its address: "dimitrios" finds LinkedIn's messages, whoever wrote last.
+ * an address it writes from: "dimitrios" finds LinkedIn's messages,
+ * whoever wrote last.
  */
 export function finds(sender: Newsletter, text: string): boolean {
   const words = plain(text).split(/\s+/).filter(Boolean);
-  const said = plain([sender.name, ...sender.names, sender.address].join(" "));
+  const said = plain([sender.name, ...sender.names, ...sender.addresses].join(" "));
   return words.every((word) => said.includes(word));
 }
 
@@ -103,13 +104,19 @@ export function senderKey(n: { account_id: string; address: string }): string {
   return `${n.account_id}:${n.address}`;
 }
 
+/** Whether `address` is one a sender writes from. */
+export function writesFrom(sender: Pick<Newsletter, "addresses">, address: string): boolean {
+  const its = address.toLowerCase();
+  return sender.addresses.some((a) => a.toLowerCase() === its);
+}
+
 /**
  * Where the page goes on from a sender whose view emptied: the row below
  * its own, another sender's, else the one above. Its rows in each account
  * count as one.
  */
 export function nearest(rows: Newsletter[], address: string): Newsletter | undefined {
-  const its = (n: Newsletter) => n.address.toLowerCase() === address.toLowerCase();
+  const its = (n: Newsletter) => writesFrom(n, address);
   const at = rows.findIndex(its);
   if (at < 0) return undefined;
   return rows.slice(at).find((n) => !its(n)) ?? rows.slice(0, at).findLast((n) => !its(n));
