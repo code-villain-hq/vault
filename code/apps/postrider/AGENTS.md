@@ -195,8 +195,11 @@ Every change happens on the account's server; the Inbox follows it there.
   along for how formally you speak, as a stranger's words. Back to yours,
   or ⌘Z, puts yours back; writing again forgets it.
 - A mail's files (`files.rs`) come by their place among its attachments.
-  The desktop app saves one in Downloads and opens it
-  (`apps/desktop/src-tauri/src/files.rs`); the browser downloads it.
+  The desktop app saves one in Downloads, quarantined as a browser's
+  download is, and opens it, or shows it in Finder when it would run
+  something (`.command`, `.app`, `.webloc`…), under a name without
+  direction marks (`apps/desktop/src-tauri/src/files.rs`); the browser
+  downloads it.
 
 New unread mail is a notification in the desktop app (more than three at
 once are one), through `code/kit/notify`, and the dock badge counts the

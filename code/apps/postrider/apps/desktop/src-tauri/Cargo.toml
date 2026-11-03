@@ -24,6 +24,9 @@ tracing-subscriber.workspace = true
 serde_json.workspace = true
 tauri-plugin-notification = "2.6"
 tauri-plugin-opener = "2.7"
+# The quarantine mark on a mail's files: std can't set extended attributes,
+# unsafe code (libc) is forbidden here, and tar already builds this crate.
+xattr = "1"
 
 [lints]
 workspace = true
