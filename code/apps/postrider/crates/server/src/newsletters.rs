@@ -1833,7 +1833,7 @@ mod tests {
             .iter()
             .filter(|n| !["Deep Teaching Solutions", "Deepteaching"].contains(&n.name.as_str()))
         {
-            assert_eq!(n.addresses, [n.address.clone()]);
+            assert_eq!(n.addresses, std::slice::from_ref(&n.address));
         }
     }
 
