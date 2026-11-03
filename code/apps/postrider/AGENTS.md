@@ -303,7 +303,10 @@ Claude Code on this Mac reads it, and what the header sorted
 (`judging.rs`, started by `serve.rs` beside the sorter): the sender, how it was sent, the subject and its
 first lines, twenty at a time, with no tools. Is it about something of
 yours (an order, a delivery, a booking, a code, a sign-in, your account, a
-payment, a person writing you) or sent to many? Lines like `3: many` say;
+payment, a person writing you) or sent to many? What a service has to
+tell every customer is yours too: new terms or a privacy policy, a change
+to your account or the service, how to delete your account, a security or
+data-sharing notice. Mail that's both is yours. Lines like `3: many` say;
 what it isn't sure of stays. Mail sent to many moves to Newsletters. The
 verdict is kept by sender and kind of mail (`newsletter_verdicts`; the
 kind is the subject in lower case, numbers left out), so the same isn't
@@ -315,8 +318,12 @@ unread (Google's notices). A sender found
 writing to many in two kinds of mail, and never about something of
 yours, is named in the newsletters' rule (`Rule::senders`, `address :is
 "from"` beside the header test): from then on the server sorts its mail
-at once, with the Mac off, and its new kinds of mail aren't asked. One
-found writing about something of yours comes off it again, and a sender that writes both stays with Claude Code.
+at once, with the Mac off, and its new kinds of mail aren't asked while
+its verdicts are on record. One found writing about something of yours
+comes off it again, and a sender that writes both stays with Claude Code.
+When the question changes, a migration forgets what it found sent to many
+and has Newsletters read again (`0017_question.sql`), so the notices it
+put there go back.
 Keep in Inbox wins: it takes the sender off the rule and forgets its
 verdicts. Without Claude Code, such mail stays in the Inbox.
 
