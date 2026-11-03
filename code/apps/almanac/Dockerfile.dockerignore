@@ -7,6 +7,8 @@
 !kit/desktop
 !kit/scim
 !kit/settings
+!kit/auth
+!kit/notify
 **/target
 **/node_modules
 apps/almanac/apps/web/dist

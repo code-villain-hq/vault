@@ -95,6 +95,11 @@ the callback `<public_url>/api/auth/oidc/callback`, make the groups
 with `<public_url>/api/scim/v2` and the settings' token. Guests see no
 topics.
 
+The image's server runs as `code-villain` (uid and gid 10001), not root,
+and keeps everything in Postgres, so it needs no volume; it must be able
+to read the settings file (`chown 10001 almanac.toml`). Upgrading from an
+image that ran as root needs nothing more.
+
 ## What works
 
 - **The workspace's own topic, Almanac**: every workspace starts with it,
