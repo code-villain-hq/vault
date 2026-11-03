@@ -6,7 +6,7 @@
 //! stranger's words, and moves what it says fits. It reads each mail once,
 //! by its Message-ID, so one you move back to the Inbox stays there.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 use std::sync::Arc;
 use std::time::Duration;
@@ -182,12 +182,24 @@ async fn sort_account(
         if new.is_empty() {
             return Ok(());
         }
+        // Their header and first lines, all in one fetch.
+        let uids: Vec<u32> = new
+            .iter()
+            .filter_map(|(uid, _)| u32::try_from(*uid).ok())
+            .collect();
+        let glances = match mail.glances_of(account, None, &uids).await {
+            Ok(glances) => glances,
+            Err(e) => {
+                tracing::warn!(error = %e, "couldn't read new mail to sort it");
+                HashMap::new()
+            }
+        };
         let mut read = Vec::new();
         for (uid, key) in new {
-            match mail.source_of(account, None, uid).await {
-                Ok((_, raw)) => read.push((uid, key, as_read(&raw, account.id, READ_AT_MOST))),
-                Err(e) => {
-                    tracing::warn!(error = %e, uid, "couldn't read a mail to sort it");
+            match u32::try_from(uid).ok().and_then(|uid| glances.get(&uid)) {
+                Some(raw) => read.push((uid, key, as_read(raw, account.id, READ_AT_MOST))),
+                None => {
+                    tracing::warn!(uid, "couldn't read a mail to sort it");
                     skipped.push(uid);
                 }
             }

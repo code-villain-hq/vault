@@ -454,23 +454,25 @@ impl Judge<'_> {
         asks.sort_by_key(|(_, uid)| std::cmp::Reverse(*uid));
         let mut unread = Vec::new();
         for batch in asks.chunks(BATCH) {
+            // Their header and first lines, all in one fetch.
+            let uids: Vec<u32> = batch.iter().map(|(_, uid)| *uid).collect();
+            let glances = self
+                .mail
+                .glances_of(self.account, place.map(Place::key).as_deref(), &uids)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!(error = %e, "couldn't read mail to judge it");
+                    HashMap::new()
+                });
             let mut read = Vec::new();
             for (key, uid) in batch {
                 let Some(mail) = told.iter().find(|m| m.uid == *uid) else {
                     continue;
                 };
-                let source = self
-                    .mail
-                    .source_of(
-                        self.account,
-                        place.map(Place::key).as_deref(),
-                        i64::from(*uid),
-                    )
-                    .await;
-                match source {
-                    Ok((_, raw)) => read.push((*key, shown(mail, &raw, self.account))),
-                    Err(e) => {
-                        tracing::warn!(error = %e, uid, "couldn't read a mail to judge it");
+                match glances.get(uid) {
+                    Some(raw) => read.push((*key, shown(mail, raw, self.account))),
+                    None => {
+                        tracing::warn!(uid, "couldn't read a mail to judge it");
                         unread.extend(by_kind[*key].iter().copied());
                     }
                 }

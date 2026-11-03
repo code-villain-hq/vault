@@ -466,6 +466,72 @@ impl Mail {
         Ok(raw)
     }
 
+    /// The header and the start of each of these mails, for judging and
+    /// sorting: in the Inbox, or the folder `key` names. An Inbox mail kept
+    /// here once opened is read whole from here; the rest come in one
+    /// fetch, marking nothing and keeping nothing. A mail that isn't there
+    /// any more is left out.
+    pub(crate) async fn glances_of(
+        &self,
+        account: &MailAccount,
+        key: Option<&str>,
+        uids: &[u32],
+    ) -> Result<HashMap<u32, Vec<u8>>, AppError> {
+        let refused = |failure: Failure| AppError::refused(failure.message());
+        let mut glances = HashMap::new();
+        let (path, validity) = match key {
+            None => {
+                let wanted: Vec<i64> = uids.iter().copied().map(i64::from).collect();
+                let validity: Option<i64> =
+                    sqlx::query_scalar("SELECT uid_validity FROM inboxes WHERE account_id = $1")
+                        .bind(account.id)
+                        .fetch_optional(&self.pool)
+                        .await?;
+                let Some(validity) = validity else {
+                    return Ok(glances);
+                };
+                let kept: Vec<(i64, Vec<u8>)> = sqlx::query_as(
+                    "SELECT uid, raw FROM mail_sources WHERE account_id = $1 AND uid = ANY($2)",
+                )
+                .bind(account.id)
+                .bind(&wanted)
+                .fetch_all(&self.pool)
+                .await?;
+                for (uid, raw) in kept {
+                    if let Ok(uid) = u32::try_from(uid) {
+                        glances.insert(uid, raw);
+                    }
+                }
+                ("INBOX".to_string(), Some(validity))
+            }
+            Some(key) => {
+                let place = self.place(account, key).await.map_err(refused)?;
+                let Some(place) = place else {
+                    return Ok(glances);
+                };
+                (place.path, None)
+            }
+        };
+        let wanted: Vec<u32> = uids
+            .iter()
+            .copied()
+            .filter(|uid| !glances.contains_key(uid))
+            .collect();
+        if wanted.is_empty() {
+            return Ok(glances);
+        }
+        let read = self
+            .on_server(account, |session| {
+                let path = path.clone();
+                let wanted = wanted.clone();
+                Box::pin(async move { imap::glances(session, &path, validity, &wanted).await })
+            })
+            .await
+            .map_err(refused)?;
+        glances.extend(read.unwrap_or_default());
+        Ok(glances)
+    }
+
     /// Takes a mail's line out of the Inbox's copy at once, when it has
     /// left the Inbox: before the watcher hears so from its server.
     pub(crate) async fn forget_inbox_line(

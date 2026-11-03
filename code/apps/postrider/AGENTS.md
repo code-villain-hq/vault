@@ -306,7 +306,9 @@ like), moves the Inbox mail the answer found already, and the answer says
 it sorts only while Postrider is open. The sorter (`reading.rs`, started
 by `serve.rs` with Claude Code) wakes when an Inbox changes, takes the mail
 that came since the rule was made (its INTERNALDATE) and hasn't been read
-for it, ten at a time, and asks Claude Code with no tools at all, since a
+for it, ten at a time, each its header and the first 64 KB of the rest
+in one fetch (`imap::glances`; an opened mail from `mail_sources`), and
+asks Claude Code with no tools at all, since a
 mail is a stranger's words: lines like `3: 1` put mail 3 in folder 1. It
 moves those with `UID MOVE` and keeps every mail it read in
 `reading_read`, by Message-ID, so one you move back stays in the Inbox.
@@ -345,7 +347,8 @@ log says how many, and by which header and sender's domain they'd come.
 What offers to unsubscribe but says neither stays in the Inbox, and
 Claude Code on this Mac reads it, and what the header sorted
 (`judging.rs`, started by `serve.rs` beside the sorter): the sender, how it was sent, the subject and its
-first lines, twenty at a time, with no tools. Is it about something of
+first lines, twenty at a time, read as the sorter reads them, with no
+tools. Is it about something of
 yours (an order, a delivery, a booking, a code, a sign-in, your account, a
 payment, a person writing you) or sent to many? What a service has to
 tell every customer is yours too: new terms or a privacy policy, a change

@@ -382,6 +382,67 @@ pub async fn source(
         .map(<[u8]>::to_vec))
 }
 
+/// How much of a mail past its header [`glances`] reads: the first lines of
+/// any mail, and the names of the files that come before a big one.
+pub const GLANCE: u32 = 64 * 1024;
+
+/// The header and the first [`GLANCE`] bytes of the rest of each mail at
+/// `uids` in `folder`, as a source: the whole of a mail no longer than
+/// that. In one FETCH, without marking anything read. A mail
+/// no longer there is left out; `None` when the folder's UIDs changed
+/// meaning since `validity`, when that's known.
+pub async fn glances(
+    session: &mut Session,
+    folder: &str,
+    validity: Option<i64>,
+    uids: &[u32],
+) -> Result<Option<HashMap<u32, Vec<u8>>>, Failure> {
+    let mailbox = session.examine(folder).await?;
+    if validity.is_some_and(|v| i64::from(mailbox.uid_validity.unwrap_or(0)) != v) {
+        return Ok(None);
+    }
+    // Each mail's header and text, as they come.
+    type Parts = (Option<Vec<u8>>, Option<Vec<u8>>);
+    let mut parts: HashMap<u32, Parts> = HashMap::new();
+    for batch in uids.chunks(BATCH) {
+        let fetches: Vec<Fetch> = session
+            .uid_fetch(
+                uid_set(batch),
+                format!("(UID BODY.PEEK[HEADER] BODY.PEEK[TEXT]<0.{GLANCE}>)"),
+            )
+            .await?
+            .try_collect()
+            .await?;
+        // A server may answer a mail's parts in more than one line.
+        for fetch in &fetches {
+            let Some(uid) = fetch.uid.filter(|uid| batch.contains(uid)) else {
+                continue;
+            };
+            let (header, text) = parts.entry(uid).or_default();
+            if header.is_none() {
+                *header = fetch.header().map(<[u8]>::to_vec);
+            }
+            if text.is_none() {
+                *text = fetch.text().map(<[u8]>::to_vec);
+            }
+        }
+    }
+    Ok(Some(
+        parts
+            .into_iter()
+            .filter_map(|(uid, (header, text))| Some((uid, glance(header?, text))))
+            .collect(),
+    ))
+}
+
+/// A mail's source from its header and the start of its text, as
+/// `BODY[HEADER]` and `BODY[TEXT]<0.GLANCE>` give them: the header ends
+/// with its blank line, so the two together are the source.
+fn glance(mut header: Vec<u8>, text: Option<Vec<u8>>) -> Vec<u8> {
+    header.extend_from_slice(&text.unwrap_or_default());
+    header
+}
+
 /// Marks a mail read, as opening it does.
 pub async fn mark_read(session: &mut Session, folder: &str, uid: i64) -> Result<(), Failure> {
     session.select(folder).await?;
@@ -1376,6 +1437,56 @@ impl AsyncWrite for Stream {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A mail as [`glances`] reads it: `BODY[HEADER]`, with its blank line,
+    /// and the first [`GLANCE`] bytes of `BODY[TEXT]`.
+    fn glanced(raw: &[u8]) -> Vec<u8> {
+        let split = raw.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+        let text = &raw[split..];
+        let text = &text[..text.len().min(GLANCE as usize)];
+        glance(raw[..split].to_vec(), Some(text.to_vec()))
+    }
+
+    fn with_files(files: &[(&str, usize)]) -> Vec<u8> {
+        let mut raw = String::from(
+            "From: Shop <billing@shop.test>\r\nTo: me@example.test\r\n\
+             Subject: Your invoice\r\nDate: Mon, 2 Nov 2026 09:12:00 +0100\r\n\
+             MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n\
+             --b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\
+             Thanks for your order. Your invoice is attached.\r\n",
+        );
+        for (name, size) in files {
+            let line = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9wcXJzdHV2\r\n";
+            let _ = write!(
+                raw,
+                "--b\r\nContent-Type: application/pdf; name=\"{name}\"\r\n\
+                 Content-Disposition: attachment; filename=\"{name}\"\r\n\
+                 Content-Transfer-Encoding: base64\r\n\r\n{}",
+                line.repeat(size / line.len() + 1)
+            );
+        }
+        raw.push_str("--b--\r\n");
+        raw.into_bytes()
+    }
+
+    #[test]
+    fn a_glance_is_read_as_the_whole_mail() {
+        let read = |raw: &[u8]| crate::ask::as_read(raw, uuid::Uuid::nil(), 600);
+        // A mail shorter than a glance is all of it.
+        let small = with_files(&[("Rechnung.pdf", 20_000)]);
+        assert_eq!(glanced(&small), small);
+        // One with a big file reads the same: its text and the file's name
+        // come before the cut.
+        let big = with_files(&[("Rechnung.pdf", 2_000_000)]);
+        assert!(glanced(&big).len() < 70_000);
+        assert_eq!(read(&glanced(&big)), read(&big));
+        // A file that starts after a big one isn't seen.
+        let two = with_files(&[("Rechnung.pdf", 2_000_000), ("AGB.pdf", 1_000)]);
+        let seen = read(&glanced(&two));
+        assert!(seen.contains("Files: Rechnung.pdf\n"), "{seen}");
+        assert!(seen.contains("Thanks for your order."));
+        assert!(read(&two).contains("Files: Rechnung.pdf, AGB.pdf\n"));
+    }
 
     #[test]
     fn a_mail_reads_as_one_line_of_the_list() {
