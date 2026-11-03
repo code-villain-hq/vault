@@ -136,6 +136,11 @@ a loop runs (LOOP-1).
   nothing, and gets the app's own copy as an added one does (REPO-4). A
   clone added by Add repositories that fetches from it does the same. Its
   check command comes with it but is not run until confirmed here (LOOP-1).
+  A repository's name in the workspace MUST be one folder's name: no `/`
+  or `\`, no control characters, not starting with `.` or `-`. A name
+  that is not (from before this, or from a server that let it through) is
+  made one as TASK-1 says wherever it names a folder: the clone's, the
+  app's copy (REPO-4) and each checkout.
 
 Code: `commands/projects.rs`, `commands/repos.rs`, `commands/cleanup.rs`,
 `commands/cleanup_folders.rs`, `commands/cleanup_remote.rs`, `git/store.rs`,
@@ -170,7 +175,10 @@ and under it the branch, which carries the ticket key, with the repo
 count, running agents, uncommitted changes and the review verdict.
 
 - **TASK-1** A task MUST have a folder, `<worktree root>/<branch, / → ->`.
-  Each checkout is a subfolder named after its repo. Agents start in the
+  Each checkout is a subfolder named after its repo, made one folder's
+  name: `/`, `\` and control characters become `-`, and leading dots,
+  dashes and spaces are dropped, so a name never reaches outside the task
+  folder or makes a dot-folder in it (REPO-9). Agents start in the
   task folder, where every repo is a sibling, unless started for one repo.
   A folder that exists or belongs to another task gets `-2`, `-3`, ….
 - **TASK-2** The branch MUST be: the explicit name if given; else the

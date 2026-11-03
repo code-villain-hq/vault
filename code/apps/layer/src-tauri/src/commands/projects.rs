@@ -321,10 +321,12 @@ pub(crate) fn ensure_store(state: &AppState, project_id: &str) -> Result<PathBuf
         return Err(Error::NotFound(format!("{} is gone, and the app has no copy of it to work from", project.path)));
     }
     let root = state.config.worktree_root().join(".repos");
-    let mut store = root.join(format!("{}.git", project.name));
+    // A name the workspace sent is anyone's: `../x` made the copy elsewhere.
+    let name = layer_domain::repository_folder(&project.name);
+    let mut store = root.join(format!("{name}.git"));
     let mut n = 2;
     while store.exists() && !git::is_store_of(&store, &source) {
-        store = root.join(format!("{}-{n}.git", project.name));
+        store = root.join(format!("{name}-{n}.git"));
         n += 1;
     }
     if !store.exists() {

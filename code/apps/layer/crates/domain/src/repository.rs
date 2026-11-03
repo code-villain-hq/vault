@@ -78,7 +78,7 @@ pub struct RepositoryPatch {
 impl Validate for RepositoryCreate {
     fn validate(&self) -> Result<(), ValidationError> {
         remote(&self.remote_key)?;
-        text(&self.name, "A repository's name", 100)?;
+        name(&self.name)?;
         branch(&self.default_branch)?;
         settings(
             self.group_name.as_deref(),
@@ -90,10 +90,7 @@ impl Validate for RepositoryCreate {
 
 impl Validate for RepositoryPatch {
     fn validate(&self) -> Result<(), ValidationError> {
-        self.name
-            .as_deref()
-            .map(|n| text(n, "A repository's name", 100))
-            .transpose()?;
+        self.name.as_deref().map(name).transpose()?;
         self.default_branch.as_deref().map(branch).transpose()?;
         settings(
             self.group_name.as_ref().and_then(Option::as_deref),
@@ -121,6 +118,49 @@ fn remote(value: &str) -> Result<(), ValidationError> {
         );
     }
     Ok(())
+}
+
+/// One folder's name. Each Mac clones a repository into a folder of its
+/// name, and checks it out in every task as one: a name like
+/// `../.claude/skills/x` or `/etc` put them outside the folder chosen.
+fn name(value: &str) -> Result<(), ValidationError> {
+    text(value, "A repository's name", 100)?;
+    let valid = !value.contains(['/', '\\'])
+        && !value.starts_with(['.', '-'])
+        && !value.chars().any(char::is_control);
+    if valid {
+        Ok(())
+    } else {
+        invalid(format!(
+            "{value:?} can't be a repository's name: it is one folder's name, with no / or \\, \
+             not starting with . or -."
+        ))
+    }
+}
+
+/// `name` as one folder's name, for a clone or a checkout on disk: what
+/// [`RepositoryCreate`] refuses made harmless rather than refused, since a
+/// record may be from before that, or from a server that let it through,
+/// and a clone's folder name (`.dotfiles`) is any name at all.
+pub fn repository_folder(name: &str) -> String {
+    let name: String = name
+        .chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\') || c.is_control() {
+                '-'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let name = name
+        .trim_start_matches(|c: char| c == '.' || c == '-' || c.is_whitespace())
+        .trim_end();
+    if name.is_empty() {
+        "repository".into()
+    } else {
+        name.to_string()
+    }
 }
 
 /// A branch name git takes: no spaces, and never an option.
@@ -197,6 +237,48 @@ mod tests {
         assert!(branch("release/1.2").is_ok());
         for bad in ["", "-x", "a b", "a..b", "a:b"] {
             assert!(branch(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_repositorys_name_is_one_folder_and_never_a_path() {
+        for good in ["api", "billing-service", "my repo", "web.v2", "café"] {
+            assert!(name(good).is_ok(), "{good}");
+            assert_eq!(repository_folder(good), good);
+        }
+        for bad in [
+            "../.claude/skills/x",
+            "/etc",
+            "a/b",
+            "a\\b",
+            ".",
+            "..",
+            ".claude",
+            "-x",
+            "a\nb",
+            "",
+        ] {
+            assert!(name(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn a_name_that_got_through_still_makes_one_folder_inside_the_one_chosen() {
+        let chosen = std::path::Path::new("/Users/ada/code");
+        for (bad, folder) in [
+            ("../.claude/skills/x", "claude-skills-x"),
+            ("/etc", "etc"),
+            ("..", "repository"),
+            (".", "repository"),
+            ("", "repository"),
+            (".claude", "claude"),
+            ("--upload-pack=x", "upload-pack=x"),
+            ("a\\..\\b", "a-..-b"),
+            ("a\nb", "a-b"),
+        ] {
+            assert_eq!(repository_folder(bad), folder, "{bad:?}");
+            let into = chosen.join(repository_folder(bad));
+            assert_eq!(into.parent(), Some(chosen), "{bad:?}");
         }
     }
 

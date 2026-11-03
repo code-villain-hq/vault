@@ -33,7 +33,9 @@ pub async fn locate_elsewhere(app: AppHandle, repository_id: String, path: Strin
 pub async fn clone_elsewhere(app: AppHandle, repository_id: String, folder: String) -> Result<Project> {
     let placed = super::blocking(app.clone(), move |state| {
         let e = find(state, &repository_id)?;
-        let into = Path::new(&folder).join(&e.name);
+        // The name is the workspace's, so anyone's: one folder, inside the
+        // one picked, whatever it says.
+        let into = Path::new(&folder).join(layer_domain::repository_folder(&e.name));
         git::clone_by_key(&e.remote_key, &into)?;
         place(state, &repository_id, &into.to_string_lossy())
     })

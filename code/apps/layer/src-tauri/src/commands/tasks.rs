@@ -308,12 +308,16 @@ pub(crate) fn unique_task_root(config: &ConfigStore, dir_name: &str) -> PathBuf 
     candidate
 }
 
-/// `<task root>/<repo-name>`, deduped if two repos share a name.
+/// `<task root>/<repo-name>`, deduped if two repos share a name. The name
+/// may be the workspace's, so anyone's: it is made one folder, never a path
+/// out of the task (`../../.claude/skills/x`) or a dot-folder in it
+/// (`.claude`) an agent would read as its own settings.
 pub(crate) fn checkout_path(root: &Path, project: &Project, taken: &[String]) -> PathBuf {
-    let mut name = project.name.clone();
+    let folder = layer_domain::repository_folder(&project.name);
+    let mut name = folder.clone();
     let mut n = 2;
     while taken.iter().any(|t| t == &name) {
-        name = format!("{}-{n}", project.name);
+        name = format!("{folder}-{n}");
         n += 1;
     }
     root.join(name)
@@ -1017,6 +1021,24 @@ mod tests {
         let added = add_checkout_inner(&state, &task.id, "web").unwrap();
 
         assert_eq!(added.base, "develop");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_repository_named_like_a_path_by_the_workspace_is_checked_out_and_copied_inside_the_task() {
+        let root = std::env::temp_dir().join(format!("vl-tasks-{}", uuid::Uuid::new_v4()));
+        let api = github_and_clone(&root, "api", &["main"]);
+        let mut named = project("api", &api, "main");
+        named.name = "../../.claude/skills/x".into();
+        let state = state(&root, vec![named]);
+        let task = task_on(&state, "api", "main");
+
+        let checkout = &state.config.checkouts_of(&task.id)[0];
+        assert_eq!(Path::new(&checkout.path).parent(), Some(Path::new(&task.root)), "{}", checkout.path);
+        assert!(!Path::new(&checkout.path).file_name().unwrap().to_string_lossy().starts_with('.'));
+        let store = state.config.project("api").unwrap().store.unwrap();
+        assert_eq!(Path::new(&store).parent(), Some(root.join("worktrees/.repos").as_path()), "{store}");
+        assert!(!root.join(".claude").exists() && !root.join("worktrees/.claude").exists());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

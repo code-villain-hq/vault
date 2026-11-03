@@ -39,5 +39,7 @@ pub use protocol::{
     ApiError, Bootstrap, Operation, ServerMessage, SyncAction, SyncEntry, Transaction,
     TransactionResult,
 };
-pub use repository::{Repository, RepositoryCreate, RepositoryPatch, UpdateBy, remote_key};
+pub use repository::{
+    Repository, RepositoryCreate, RepositoryPatch, UpdateBy, remote_key, repository_folder,
+};
 pub use user::User;
