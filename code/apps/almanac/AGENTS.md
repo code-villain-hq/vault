@@ -382,6 +382,12 @@ date it rang each reminder for, and the day it began. What was due before
 that day stays quiet. The server isn't told, so every Mac you use rings once,
 for every reminder in the workspace.
 
+A reminder's day and time are the time where you are, with no zone stored:
+`reminders.rs` reads the server's clock only because the Mac's own server is
+the one with a Mac listening, and `ringing.tsx` the device's. An answer's
+"today", in its prompt and for the day a ticked reminder comes round again,
+is the asker's: the app sends its time zone (`time_zone`) with each question.
+
 ## Layout
 
 - `crates/domain`: models, validation, sync protocol types (no database).

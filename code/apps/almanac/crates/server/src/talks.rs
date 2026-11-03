@@ -20,7 +20,8 @@ use almanac_domain::{
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
-use chrono::{Local, Utc};
+use chrono::{Local, NaiveDate, Utc};
+use chrono_tz::Tz;
 use futures::Stream;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -487,6 +488,7 @@ pub async fn ask(
 
     let own = kind == "almanac";
     let here = request.here == Some(true);
+    let today = today_in(request.time_zone.as_deref());
     let (events, heard) = mpsc::unbounded_channel::<Event>();
     let _ = events.send(json_event("talk", json!({ "talk_id": talk_id })));
     tokio::spawn(async move {
@@ -494,7 +496,7 @@ pub async fn ask(
         let about = (!own).then(|| about_line(about.as_deref(), row));
         let about = about.as_deref().filter(|a| !a.is_empty());
         answer(
-            &state, actor, &page, own, talk_id, &text, about, here, events,
+            &state, actor, &page, own, talk_id, &text, about, here, today, events,
         )
         .await;
     });
@@ -522,6 +524,7 @@ async fn answer(
     question: &str,
     about: Option<&str>,
     here: bool,
+    today: NaiveDate,
     events: mpsc::UnboundedSender<Event>,
 ) {
     let answer_id = Uuid::now_v7();
@@ -545,24 +548,21 @@ async fn answer(
         None if here => Some(By::TheirMac),
         None => None,
     };
+    let asked = Asked {
+        page,
+        own,
+        talk_id,
+        about,
+        unnamed,
+        today,
+    };
     let said = match by {
-        Some(by) => {
-            let asked = Asked {
-                page,
-                own,
-                talk_id,
-                about,
-                unnamed,
-            };
-            say_with_claude_code(state, by, actor, &asked, &events).await
-        }
-        None => say(state, actor, page, own, talk_id, about, &events)
-            .await
-            .map(|text| Said {
-                text,
-                sources: Vec::new(),
-                kept: None,
-            }),
+        Some(by) => say_with_claude_code(state, by, actor, &asked, &events).await,
+        None => say(state, actor, &asked, &events).await.map(|text| Said {
+            text,
+            sources: Vec::new(),
+            kept: None,
+        }),
     };
     let said = match said {
         Ok(said) => said,
@@ -644,7 +644,7 @@ async fn answer(
     drop(events);
     if said.kept.is_none()
         && !own
-        && let Err(error) = keep(state, actor, page, &at, question, about, &said.text).await
+        && let Err(error) = keep(state, actor, &asked, &at, question, &said.text).await
     {
         tracing::warn!(%error, "couldn't keep what the talk said");
     }
@@ -659,6 +659,8 @@ struct Asked<'a> {
     about: Option<&'a str>,
     /// The talk still has its first question for a title.
     unnamed: bool,
+    /// The day it is where they ask.
+    today: NaiveDate,
 }
 
 /// "They ask from the section Intifada…", after the page, when they ask
@@ -710,6 +712,7 @@ async fn say_with_claude_code(
         talk_id,
         about,
         unnamed,
+        today,
     } = *asked;
     let trouble = |error: sqlx::Error| {
         tracing::warn!(%error, "couldn't read the talk");
@@ -728,7 +731,7 @@ async fn say_with_claude_code(
             .map_err(trouble)?;
         format!(
             "{OWN}\n{OWN_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}\nThe groups so far: {}.\n",
-            today(),
+            day_line(today),
             workspace.describe(),
             match workspace.groups() {
                 groups if groups.is_empty() => "none yet".into(),
@@ -738,7 +741,7 @@ async fn say_with_claude_code(
     } else {
         format!(
             "{ANSWER}\n\n{ANSWER_TOOLS}\n\n{web_line}\n\nToday is {}.\n\n{}{}",
-            today(),
+            day_line(today),
             page.describe(),
             about.unwrap_or_default()
         )
@@ -750,6 +753,7 @@ async fn say_with_claude_code(
     };
     let mode = if own { Mode::Own } else { Mode::Topic };
     let mut kept = Kept::on(page.refs());
+    kept.today = today;
     kept.photos = said
         .iter()
         .flat_map(|line| line.images.iter().map(|i| i.id))
@@ -786,13 +790,11 @@ async fn say_with_claude_code(
             if matches!(by, By::TheirMac) && has_key(state).await =>
         {
             drop(open);
-            return say(state, actor, page, own, talk_id, about, events)
-                .await
-                .map(|text| Said {
-                    text,
-                    sources: Vec::new(),
-                    kept: None,
-                });
+            return say(state, actor, asked, events).await.map(|text| Said {
+                text,
+                sources: Vec::new(),
+                kept: None,
+            });
         }
         answer => answer.map_err(|failure| problem_of(kind, failure))?,
     };
@@ -982,12 +984,17 @@ async fn has_key(state: &AppState) -> bool {
 async fn say(
     state: &AppState,
     actor: Actor,
-    page: &Page,
-    own: bool,
-    talk_id: Uuid,
-    about: Option<&str>,
+    asked: &Asked<'_>,
     events: &mpsc::UnboundedSender<Event>,
 ) -> Result<String, Problem> {
+    let Asked {
+        page,
+        own,
+        talk_id,
+        about,
+        today,
+        ..
+    } = *asked;
     let trouble = |error: sqlx::Error| {
         tracing::warn!(%error, "couldn't read the talk");
         Problem("Almanac couldn't read this talk. Ask again.".into())
@@ -1019,13 +1026,13 @@ async fn say(
             .map_err(trouble)?;
         format!(
             "{OWN}\n{OWN_WITHOUT_TOOLS}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}",
-            today(),
+            day_line(today),
             workspace.describe()
         )
     } else {
         format!(
             "{ANSWER}\n\n{ANSWER_WITHOUT_TOOLS}\n\n{WEB_OFF}\n\nToday is {}.\n\n{}{}",
-            today(),
+            day_line(today),
             page.describe(),
             about.unwrap_or_default()
         )
@@ -1043,18 +1050,20 @@ async fn say(
 async fn keep(
     state: &AppState,
     actor: Actor,
-    page: &Page,
+    asked: &Asked<'_>,
     at: &Answering,
     question: &str,
-    about: Option<&str>,
     answer: &str,
 ) -> Result<(), AppError> {
+    let Asked {
+        page, about, today, ..
+    } = *asked;
     let Some(key) = state.claude.key(&state.pool).await? else {
         return Ok(());
     };
     let prompt = format!(
         "Today is {}.\n\n{}{}\nThe exchange:\n\nThey asked: {question}\n\nAlmanac answered: {answer}",
-        today(),
+        day_line(today),
         page.describe(),
         about.unwrap_or_default(),
     );
@@ -1064,6 +1073,7 @@ async fn keep(
         .await
         .map_err(AppError::internal)?;
     let mut kept = Kept::on(page.refs());
+    kept.today = today;
     // Each on its own: what doesn't fit the page is left out, not the rest.
     for block in &from.blocks {
         let fields: Vec<FieldArg> = block
@@ -1183,8 +1193,18 @@ pub async fn write_kept(
     Ok(())
 }
 
-fn today() -> String {
-    Local::now().format("%A, %Y-%m-%d").to_string()
+/// The day it is in a time zone ("Europe/Vienna"). Without one, or with
+/// one it doesn't know, as from an app from before, it's the server's:
+/// the same on the Mac's own server.
+pub fn today_in(zone: Option<&str>) -> NaiveDate {
+    match zone.and_then(|z| z.parse::<Tz>().ok()) {
+        Some(zone) => Utc::now().with_timezone(&zone).date_naive(),
+        None => Local::now().date_naive(),
+    }
+}
+
+fn day_line(day: NaiveDate) -> String {
+    day.format("%A, %Y-%m-%d").to_string()
 }
 
 fn json_event(name: &str, data: Value) -> Event {
@@ -1206,6 +1226,24 @@ mod tests {
             text: text.into(),
             images: vec![image; photos],
         }
+    }
+
+    #[test]
+    fn today_is_the_askers_day() {
+        // Twenty-five hours apart: never the same day.
+        let east = today_in(Some("Pacific/Kiritimati"));
+        let west = today_in(Some("Pacific/Pago_Pago"));
+        assert!(east > west, "{east} {west}");
+        assert_eq!(
+            east,
+            (Utc::now() + chrono::Duration::hours(14)).date_naive()
+        );
+        // A zone it doesn't know, or none, is the server's.
+        assert_eq!(today_in(Some("Mars/Olympus")), today_in(None));
+        assert_eq!(
+            day_line(NaiveDate::from_ymd_opt(2026, 11, 3).unwrap()),
+            "Tuesday, 2026-11-03"
+        );
     }
 
     #[test]

@@ -28,4 +28,9 @@ row?: string,
  * server hands it the question (`question`, a [`HandedQuestion`])
  * and waits for what it made of it ([`Answered`]).
  */
-here?: boolean, };
+here?: boolean, 
+/**
+ * The asker's time zone ("Europe/Vienna"): "today" in the answer, and
+ * the day a tick comes due again from, are theirs, not the server's.
+ */
+time_zone?: string, };

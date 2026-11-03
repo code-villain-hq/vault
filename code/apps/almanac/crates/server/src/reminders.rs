@@ -49,7 +49,9 @@ pub async fn watch(state: AppState) {
 }
 
 /// Marks what's due as told and sends it. The Mac's clock says what's due:
-/// reminders are in the time where you are.
+/// reminders are in the time where you are, and only the Mac's own server
+/// has a Mac listening, so its clock is the Mac's. A company's server marks
+/// nothing; the app rings its reminders by the device's clock.
 pub async fn tell(state: &AppState, due: &broadcast::Sender<Due>) -> Result<usize, AppError> {
     let now = Local::now().naive_local();
     let rows: Vec<(Uuid, Uuid, Uuid, String, String, NaiveDate)> =

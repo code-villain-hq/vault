@@ -326,6 +326,9 @@ pub struct AskRequest {
     /// server hands it the question (`question`, a [`HandedQuestion`])
     /// and waits for what it made of it ([`Answered`]).
     pub here: Option<bool>,
+    /// The asker's time zone ("Europe/Vienna"): "today" in the answer, and
+    /// the day a tick comes due again from, are theirs, not the server's.
+    pub time_zone: Option<String>,
 }
 
 /// A question a server hands to the asker's Mac, for Claude Code there.

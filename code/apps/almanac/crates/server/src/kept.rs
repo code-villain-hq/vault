@@ -56,7 +56,8 @@ pub struct Kept {
     pub photos: Vec<Uuid>,
     /// The photo the topic's page opens with from now on.
     cover: Option<Uuid>,
-    /// For when a ticked reminder comes round again.
+    /// For when a ticked reminder comes round again: the asker's day,
+    /// which an answer sets; the server's until then.
     pub today: NaiveDate,
     pub questions: Vec<KeptQuestion>,
     pub reminders: Vec<KeptReminder>,

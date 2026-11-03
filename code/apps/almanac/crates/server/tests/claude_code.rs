@@ -317,7 +317,11 @@ async fn a_talk_changes_the_page_and_undo_puts_it_back(pool: PgPool) {
         .post(
             &format!("/api/w/{home}/topics/{topic}/ask"),
             Some(&ada),
-            json!({ "text": "How often do I water the Monstera?", "about": "Monstera" }),
+            json!({
+                "text": "How often do I water the Monstera?",
+                "about": "Monstera",
+                "time_zone": "Pacific/Kiritimati",
+            }),
         )
         .await;
     assert!(asked.text.contains("event: done"), "{}", asked.text);
@@ -329,6 +333,10 @@ async fn a_talk_changes_the_page_and_undo_puts_it_back(pool: PgPool) {
             .contains("They ask from the section Monstera of the page"),
         "{system}"
     );
+    // Today is the asker's, fourteen hours ahead of UTC there.
+    let today = (chrono::Utc::now() + chrono::Duration::hours(14)).date_naive();
+    let today = format!("Today is {}.", today.format("%A, %Y-%m-%d"));
+    assert!(system.as_str().unwrap().contains(&today), "{system}");
     let blocks = app.synced(&ada, &home, "Block").await;
     assert_eq!(titles(&blocks), ["To do", "Plants", "You", "Care"]);
     let care = blocks.iter().find(|b| b["title"] == "Care").unwrap()["id"].clone();

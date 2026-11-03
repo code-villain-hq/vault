@@ -122,6 +122,8 @@ export function TalksProvider({ children }: { children: ReactNode }) {
             ...(about ? { about: about.section } : {}),
             ...(about?.row ? { row: about.row } : {}),
             ...(asksHere(place) ? { here: true } : {}),
+            // "Today" in the answer is the asker's day, not the server's.
+            time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             ...(photos.length > 0
               ? {
                   photos: photos.map(({ media_type, data, width, height }) => ({
