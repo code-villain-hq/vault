@@ -463,6 +463,7 @@ impl Adapter {
         Ok(Agent {
             app: self.app,
             kind: self.kind,
+            web: question.web,
             child,
             stdin,
             lines: BufReader::new(stdout).lines(),
@@ -530,6 +531,8 @@ fn heard(update: &Value, answer: &mut Answer, piece: &mut impl FnMut(&str)) {
 struct Agent {
     app: App,
     kind: Kind,
+    /// Whether this question may search the web and read pages.
+    web: bool,
     child: Child,
     stdin: ChildStdin,
     lines: Lines<BufReader<ChildStdout>>,
@@ -650,7 +653,7 @@ impl Agent {
             match message["method"].as_str() {
                 Some("session/update") => update(&message["params"]["update"]),
                 Some(asked) if !message["id"].is_null() => {
-                    let reply = reply_to(self.app, asked, &message["params"]);
+                    let reply = reply_to(self.app, self.web, asked, &message["params"]);
                     let mut answer = json!({ "jsonrpc": "2.0", "id": message["id"] });
                     if let (Some(answer), Some(reply)) = (answer.as_object_mut(), reply.as_object())
                     {
@@ -720,11 +723,12 @@ impl Agent {
 }
 
 /// The app's answer to something the adapter asks. Only the app's MCP
-/// tools and the web's may run; anything else (shell, files, …) is cancelled.
-fn reply_to(app: App, method: &str, params: &Value) -> Value {
+/// tools and, when `web` is on, the web's may run; anything else (shell,
+/// files, …) is cancelled.
+fn reply_to(app: App, web: bool, method: &str, params: &Value) -> Value {
     match method {
         "session/request_permission" => {
-            if !permission_is_for_the_app(app, params) {
+            if !permission_is_for_the_app(app, web, params) {
                 return json!({ "result": { "outcome": { "outcome": "cancelled" } } });
             }
             let allow = params["options"].as_array().and_then(|options| {
@@ -751,29 +755,27 @@ fn reply_to(app: App, method: &str, params: &Value) -> Value {
 }
 
 /// Whether the permission is for a tool the app means to allow: one of its
-/// MCP tools (`mcp__forge__…`) or a web tool when those are on. Shell,
-/// files and anything unnamed are refused.
-fn permission_is_for_the_app(app: App, params: &Value) -> bool {
+/// MCP tools (`mcp__forge__…`), or a web tool when `web` is on. Shell, files
+/// and anything unnamed are refused. The tool is known by the name the
+/// adapter gives it, never by the title or the input, which the model
+/// writes: a page it read could put `mcp__forge__` in either.
+fn permission_is_for_the_app(app: App, web: bool, params: &Value) -> bool {
     let tool = &params["toolCall"];
     let kind = tool["kind"].as_str().unwrap_or("");
     if matches!(kind, "execute" | "edit" | "delete" | "move") {
         return false;
     }
-    let names = [
-        tool["title"].as_str(),
-        tool["name"].as_str(),
-        tool["rawInput"]["name"].as_str(),
-        tool["rawInput"]["toolName"].as_str(),
-    ];
-    let mcp = format!("mcp__{}__", app.key);
-    if names
-        .into_iter()
-        .flatten()
-        .any(|name| WEB_TOOLS.iter().any(|w| name == *w || name.contains(w)) || name.contains(&mcp))
-    {
-        return true;
+    let Some(name) = tool["name"]
+        .as_str()
+        .or_else(|| tool["_meta"]["claudeCode"]["toolName"].as_str())
+    else {
+        return false;
+    };
+    if WEB_TOOLS.contains(&name) {
+        return web;
     }
-    kind == "fetch"
+    name.strip_prefix(&format!("mcp__{}__", app.key))
+        .is_some_and(|tool| !tool.is_empty())
 }
 
 /// What a JSON-RPC error from the adapter means for the question.
@@ -805,7 +807,7 @@ mod tests {
     #[test]
     fn a_permission_is_given_once() {
         let params = json!({
-            "toolCall": { "title": "mcp__almanac__add_items" },
+            "toolCall": { "name": "mcp__almanac__add_items", "title": "add_items" },
             "options": [
                 { "optionId": "always", "kind": "allow_always" },
                 { "optionId": "once", "kind": "allow_once" },
@@ -813,23 +815,23 @@ mod tests {
             ]
         });
         assert_eq!(
-            reply_to(ALMANAC, "session/request_permission", &params)["result"]["outcome"]["optionId"],
+            reply_to(ALMANAC, false, "session/request_permission", &params)["result"]["outcome"]["optionId"],
             "once"
         );
-        assert!(!reply_to(ALMANAC, "fs/read_text_file", &json!({}))["error"].is_null());
+        assert!(!reply_to(ALMANAC, false, "fs/read_text_file", &json!({}))["error"].is_null());
     }
 
     #[test]
     fn a_shell_permission_is_refused() {
         let params = json!({
-            "toolCall": { "title": "Bash", "kind": "execute" },
+            "toolCall": { "name": "Bash", "title": "Bash", "kind": "execute" },
             "options": [
                 { "optionId": "once", "kind": "allow_once" },
                 { "optionId": "no", "kind": "reject_once" },
             ]
         });
         assert_eq!(
-            reply_to(ALMANAC, "session/request_permission", &params)["result"]["outcome"]["outcome"],
+            reply_to(ALMANAC, true, "session/request_permission", &params)["result"]["outcome"]["outcome"],
             "cancelled"
         );
     }
@@ -837,13 +839,70 @@ mod tests {
     #[test]
     fn another_apps_tools_are_refused() {
         let params = json!({
-            "toolCall": { "title": "mcp__forge__suggest" },
+            "toolCall": { "name": "mcp__forge__suggest", "title": "mcp__forge__suggest" },
             "options": [{ "optionId": "once", "kind": "allow_once" }]
         });
         assert_eq!(
-            reply_to(ALMANAC, "session/request_permission", &params)["result"]["outcome"]["outcome"],
+            reply_to(ALMANAC, true, "session/request_permission", &params)["result"]["outcome"]["outcome"],
             "cancelled"
         );
+    }
+
+    fn allowed(web: bool, tool: Value) -> bool {
+        let params =
+            json!({ "toolCall": tool, "options": [{ "optionId": "once", "kind": "allow_once" }] });
+        reply_to(ALMANAC, web, "session/request_permission", &params)["result"]["outcome"]["outcome"]
+            == "selected"
+    }
+
+    #[test]
+    fn the_web_is_allowed_only_when_it_is_on() {
+        let fetch =
+            json!({ "name": "WebFetch", "title": "Fetch https://example.org", "kind": "fetch" });
+        let search = json!({ "name": "WebSearch", "title": "\"news\"", "kind": "fetch" });
+        assert!(allowed(true, fetch.clone()));
+        assert!(allowed(true, search.clone()));
+        assert!(!allowed(false, fetch));
+        assert!(!allowed(false, search));
+        // A fetch that doesn't say which tool it is.
+        assert!(!allowed(
+            true,
+            json!({ "title": "Fetch https://example.org", "kind": "fetch" })
+        ));
+    }
+
+    #[test]
+    fn the_apps_tools_are_known_by_their_name_alone() {
+        assert!(allowed(
+            false,
+            json!({ "name": "mcp__almanac__add_items", "kind": "other" })
+        ));
+        assert!(allowed(
+            false,
+            json!({ "_meta": { "claudeCode": { "toolName": "mcp__almanac__add_items" } } })
+        ));
+        // Titles and input are the model's words, a page's it read included.
+        assert!(!allowed(
+            false,
+            json!({ "name": "Read", "title": "Read mcp__almanac__x", "kind": "read" })
+        ));
+        assert!(!allowed(
+            false,
+            json!({ "title": "mcp__almanac__add_items" })
+        ));
+        assert!(!allowed(
+            false,
+            json!({ "name": "Glob", "rawInput": { "name": "mcp__almanac__add_items" } })
+        ));
+        assert!(!allowed(
+            true,
+            json!({ "name": "Read", "title": "WebFetch", "kind": "read" })
+        ));
+        assert!(!allowed(false, json!({ "name": "mcp__almanac__" })));
+        assert!(!allowed(
+            false,
+            json!({ "name": "mcp__almanac_x__add_items" })
+        ));
     }
 
     #[test]
