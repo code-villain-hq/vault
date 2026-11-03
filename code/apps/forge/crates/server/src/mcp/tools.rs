@@ -243,7 +243,9 @@ pub async fn search_issues(pool: &PgPool, actor: Actor, input: SearchIssues) -> 
     let limit = input.limit.unwrap_or(25).min(200);
     // The issues the agent sees (in the teams it sees) that match, counted
     // in all, and the first `limit` of them. Words are matched as they are,
-    // so `%` and `_` are no wildcards.
+    // so `%` and `_` are no wildcards. Lowered by Unicode's rules, not the
+    // database's locale: the desktop app's own Postgres is in C, where
+    // lower() leaves "Ü" as it is.
     let (total, found): (i64, Value) = sqlx::query_as(AssertSqlSafe(format!(
         "WITH found AS ( \
            SELECT t.* FROM issues AS t WHERE t.workspace_id = $1 AND t.team_id = ANY($2) \
@@ -256,8 +258,8 @@ pub async fn search_issues(pool: &PgPool, actor: Actor, input: SearchIssues) -> 
            AND ($10::uuid[] IS NULL OR (t.state_id = ANY($10) AND NOT t.id = ANY($11))) \
            AND ($12::text IS NULL \
                 OR (t.team_id = ANY($13) AND t.number = $14) \
-                OR strpos(lower(t.title), $12) > 0 \
-                OR strpos(lower(t.description), $12) > 0)) \
+                OR strpos(lower(t.title COLLATE pg_unicode_fast), $12) > 0 \
+                OR strpos(lower(t.description COLLATE pg_unicode_fast), $12) > 0)) \
          SELECT (SELECT count(*) FROM found), \
            COALESCE((SELECT jsonb_agg(to_jsonb(t.*) ORDER BY {order}) \
              FROM (SELECT * FROM found AS t ORDER BY {order} LIMIT $16) AS t), '[]')"

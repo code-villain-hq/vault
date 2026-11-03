@@ -2373,7 +2373,7 @@ async fn search_finds_words_and_identifiers_newest_first(pool: PgPool) {
             "In Progress",
         ),
         ("Old login bug", "", "Done"),
-        ("Unrelated", "Nothing to see.", "Backlog"),
+        ("Unrelated", "Nothing to see. Über alles.", "Backlog"),
         ("Reach 100% coverage", "snake_case names", "Todo"),
     ] {
         create_issue(
@@ -2418,6 +2418,11 @@ async fn search_finds_words_and_identifiers_newest_first(pool: PgPool) {
         ..search("login")
     };
     assert_eq!(found(pool, s.agent, none).await, (vec![], 2));
+    // Beyond ASCII too, whatever the database's locale.
+    assert_eq!(
+        found(pool, s.agent, search("über")).await,
+        (strs(&["FOR-4"]), 1)
+    );
 
     // An identifier finds its issue, closed only when asked.
     assert_eq!(
