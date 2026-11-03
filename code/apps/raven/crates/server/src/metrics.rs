@@ -317,16 +317,29 @@ pub struct ErrorGroup {
     last_trace_id: String,
 }
 
-const ERROR_GROUPS: &str = "SELECT name AS action, \
-      coalesce(error_message, 'HTTP ' || http_status::text, 'failed') AS message, \
-      count(*) FILTER (WHERE started_at > now() - make_interval(secs => $2)) AS count, \
-      min(started_at) AS first_seen, max(started_at) AS last_seen, \
-      (array_agg(version ORDER BY started_at))[1] AS first_version, \
-      (array_agg(trace_id ORDER BY started_at DESC))[1] AS last_trace_id \
-    FROM spans WHERE app_id = $1 AND kind = 'server' AND is_error AND ($3::text IS NULL OR name = $3) \
-    GROUP BY 1, 2 \
-    HAVING count(*) FILTER (WHERE started_at > now() - make_interval(secs => $2)) > 0 \
-    ORDER BY last_seen DESC LIMIT 20";
+/// The window's error groups, latest first, each with when and in which
+/// version it was first seen. Only the window is read in full; each
+/// group's first call comes from `spans_error_firsts`, however long ago.
+const ERROR_GROUPS: &str = "WITH recent AS ( \
+      SELECT name AS action, \
+        coalesce(error_message, 'HTTP ' || http_status::text, 'failed') AS message, \
+        count(*) AS count, max(started_at) AS last_seen, \
+        (array_agg(trace_id ORDER BY started_at DESC))[1] AS last_trace_id \
+      FROM spans WHERE app_id = $1 AND kind = 'server' AND is_error \
+        AND ($3::text IS NULL OR name = $3) \
+        AND started_at > now() - make_interval(secs => $2) \
+      GROUP BY 1, 2 ORDER BY last_seen DESC LIMIT 20) \
+    SELECT r.action, r.message, r.count, f.started_at AS first_seen, r.last_seen, \
+      f.version AS first_version, r.last_trace_id \
+    FROM recent r CROSS JOIN LATERAL ( \
+      SELECT started_at, version FROM spans s \
+      WHERE s.app_id = $1 AND s.kind = 'server' AND s.is_error \
+        AND md5(s.name) = md5(r.action) \
+        AND md5(coalesce(s.error_message, 'HTTP ' || s.http_status::text, 'failed')) = md5(r.message) \
+        AND s.name = r.action \
+        AND coalesce(s.error_message, 'HTTP ' || s.http_status::text, 'failed') = r.message \
+      ORDER BY s.started_at LIMIT 1) f \
+    ORDER BY r.last_seen DESC";
 
 async fn error_groups(
     pool: &PgPool,
@@ -345,6 +358,26 @@ async fn error_groups(
     )
     .await
 }
+
+/// The five newest versions by when each was first seen. It reads one
+/// call per version: a skip scan of `spans_version_firsts` finds each
+/// version, then that version's first call.
+const VERSIONS: &str = "WITH RECURSIVE found(hash) AS ( \
+      (SELECT md5(version) FROM spans \
+       WHERE app_id = $1 AND kind = 'server' AND version IS NOT NULL \
+       ORDER BY md5(version) LIMIT 1) \
+      UNION ALL \
+      SELECT (SELECT md5(s.version) FROM spans s \
+              WHERE s.app_id = $1 AND s.kind = 'server' AND s.version IS NOT NULL \
+                AND md5(s.version) > found.hash \
+              ORDER BY md5(s.version) LIMIT 1) \
+      FROM found WHERE found.hash IS NOT NULL) \
+    SELECT f.version, f.started_at AS first_seen FROM found CROSS JOIN LATERAL ( \
+      SELECT version, started_at FROM spans s \
+      WHERE s.app_id = $1 AND s.kind = 'server' AND s.version IS NOT NULL \
+        AND md5(s.version) = found.hash \
+      ORDER BY s.started_at LIMIT 1) f \
+    ORDER BY first_seen DESC LIMIT 5";
 
 #[derive(Serialize, FromRow)]
 pub struct VersionMark {
@@ -385,9 +418,6 @@ pub async fn technical_page(
             .then(b.stats.p95_ms.total_cmp(&a.stats.p95_ms))
     });
     let errors = error_groups(pool, app.id, secs, None).await?;
-    const VERSIONS: &str = "SELECT version, min(started_at) AS first_seen FROM spans \
-        WHERE app_id = $1 AND kind = 'server' AND version IS NOT NULL \
-        GROUP BY version ORDER BY first_seen DESC LIMIT 5";
     let versions = timed(
         "versions",
         VERSIONS,
@@ -634,6 +664,72 @@ pub async fn call_page(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Forge with 20,000 calls over 30 days in 20 versions, one in a
+    /// hundred failing in one of three ways, analysed; returns its id.
+    async fn busy_app(pool: &PgPool) -> Uuid {
+        let (workspace, app) = (Uuid::now_v7(), Uuid::now_v7());
+        sqlx::query("INSERT INTO workspaces (id, name, url_key) VALUES ($1, 'Studio', 'studio')")
+            .bind(workspace)
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO apps (id, workspace_id, key, name, position) VALUES ($1, $2, 'forge', 'Forge', 1)",
+        )
+        .bind(app)
+        .bind(workspace)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO spans (app_id, trace_id, span_id, name, kind, started_at, duration_ms, \
+             is_error, error_message, http_status, version) \
+             SELECT $1, 't' || i, 's' || i, 'GET /' || (i % 10), 'server', \
+               now() - make_interval(secs => i * 120), 5, i % 100 = 0, \
+               CASE WHEN i % 100 = 0 THEN 'boom ' || (i % 3) END, 200, 'v' || (i / 1000) \
+             FROM generate_series(1, 20000) i",
+        )
+        .bind(app)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql("ANALYZE spans").execute(pool).await.unwrap();
+        app
+    }
+
+    async fn plan(pool: &PgPool, sql: &str, app: Uuid, secs: Option<f64>) -> String {
+        let query = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("EXPLAIN {sql}"))).bind(app);
+        let query = match secs {
+            Some(secs) => query.bind(secs).bind(None::<String>),
+            None => query,
+        };
+        let lines: Vec<String> = query.fetch_all(pool).await.unwrap();
+        lines.join("\n")
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn when_errors_began_is_found_without_reading_every_call(pool: PgPool) {
+        let app = busy_app(&pool).await;
+        let plan = plan(&pool, ERROR_GROUPS, app, Some(3600.0)).await;
+        assert!(plan.contains("spans_error_firsts"), "{plan}");
+        assert!(!plan.contains("Seq Scan"), "{plan}");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn when_versions_began_is_found_without_reading_every_call(pool: PgPool) {
+        let app = busy_app(&pool).await;
+        let plan = plan(&pool, VERSIONS, app, None).await;
+        assert!(plan.contains("spans_version_firsts"), "{plan}");
+        assert!(!plan.contains("Seq Scan"), "{plan}");
+        let versions: Vec<VersionMark> = sqlx::query_as(VERSIONS)
+            .bind(app)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        let names: Vec<&str> = versions.iter().map(|v| v.version.as_str()).collect();
+        assert_eq!(names, ["v0", "v1", "v2", "v3", "v4"]);
+    }
 
     fn at(secs: i64) -> DateTime<Utc> {
         DateTime::from_timestamp(secs, 0).unwrap()
