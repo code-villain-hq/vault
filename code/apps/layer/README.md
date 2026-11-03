@@ -201,6 +201,10 @@ docker run -d --name layer -p 7680:7680 \
 ```
 
 Put it behind https at `public_url`; the image serves the web app too.
+The server runs as `code-villain` (uid and gid 10001), not root, and keeps
+everything in Postgres, so it needs no volume; it must be able to read the
+settings file (`chown 10001 layer.toml`). Upgrading from an image that ran
+as root needs nothing more.
 
 ## Roadmap
 
