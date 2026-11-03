@@ -1,15 +1,18 @@
 //! The start of a mail's text as the list shows it: one line of words,
 //! without what a text part carries for its links and layout. Link
 //! addresses go and their words stay; the `[1]` that numbers a link,
-//! pictures written in, rules, HTML comments and the invisible padding
-//! newsletters put after their first line go too.
+//! pictures written in, rules, HTML comments and tags, and the invisible
+//! padding newsletters put after their first line go too. `&amp;` and the
+//! other HTML entities read as what they stand for.
+
+use quick_xml::escape::resolve_html5_entity;
 
 /// How long a preview is, in characters.
 const LENGTH: usize = 160;
 
 /// The list's line for a mail's text.
 pub fn preview(text: &str) -> String {
-    let text = uncomment(text);
+    let text = unentity(&untag(&uncomment(text)));
     let mut text: String = text.chars().filter(|c| !is_invisible(*c)).collect();
     // A link's words can hold a link of their own: a picture in a link.
     for _ in 0..3 {
@@ -43,6 +46,90 @@ fn uncomment(text: &str) -> String {
     }
     kept.push_str(rest);
     kept
+}
+
+/// The text without HTML tags: `<strong>one</strong>` reads as "one". A
+/// tag that only marks words up joins them; any other parts them, as a
+/// `<br>` or a `<p>` would. What isn't a tag stays: "a < b", "<3",
+/// `<anna@example.test>`.
+fn untag(text: &str) -> String {
+    let mut kept = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find('<') {
+        kept.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        let named = after.strip_prefix('/').unwrap_or(after);
+        let length = named
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+            .unwrap_or(named.len());
+        let (name, tail) = named.split_at(length);
+        let is_tag = name.starts_with(|c: char| c.is_ascii_alphabetic())
+            && (tail.starts_with(['>', '/']) || tail.starts_with(char::is_whitespace));
+        // Up to its `>`, with no `<` before it.
+        let end = tail
+            .find(['<', '>'])
+            .filter(|&end| tail.as_bytes()[end] == b'>');
+        match end {
+            Some(end) if is_tag => {
+                if !INLINE.contains(&name.to_ascii_lowercase().as_str()) {
+                    kept.push(' ');
+                }
+                rest = &tail[end + 1..];
+            }
+            _ => {
+                kept.push('<');
+                rest = after;
+            }
+        }
+    }
+    kept.push_str(rest);
+    kept
+}
+
+/// Tags that mark words up inside a line, without parting them.
+const INLINE: [&str; 16] = [
+    "a", "abbr", "b", "big", "code", "em", "font", "i", "mark", "s", "small", "span", "strike",
+    "strong", "sub", "u",
+];
+
+/// `&amp;`, `&nbsp;`, `&#8217;` and the rest as what they stand for; an
+/// `&` that starts none stays.
+fn unentity(text: &str) -> String {
+    let mut kept = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(amp) = rest.find('&') {
+        kept.push_str(&rest[..amp]);
+        let after = &rest[amp + 1..];
+        let name = after
+            .find(';')
+            .filter(|&end| (1..=32).contains(&end))
+            .map(|end| &after[..end])
+            .filter(|name| name.chars().all(|c| c.is_ascii_alphanumeric() || c == '#'));
+        match name.and_then(|name| Some((name, entity(name)?))) {
+            Some((name, it)) => {
+                kept.push_str(&it);
+                rest = &after[name.len() + 1..];
+            }
+            None => {
+                kept.push('&');
+                rest = after;
+            }
+        }
+    }
+    kept.push_str(rest);
+    kept
+}
+
+/// What `&name;` stands for, by its name, or `#8217` or `#x2019`.
+fn entity(name: &str) -> Option<String> {
+    if let Some(number) = name.strip_prefix('#') {
+        let code = match number.strip_prefix(['x', 'X']) {
+            Some(hex) => u32::from_str_radix(hex, 16).ok()?,
+            None => number.parse().ok()?,
+        };
+        return char::from_u32(code).map(String::from);
+    }
+    resolve_html5_entity(name).map(String::from)
 }
 
 /// `[words](address)` as its words, and `![words](address)` too.
@@ -180,6 +267,26 @@ mod tests {
             "Your week in review Read on"
         );
         assert_eq!(preview("Hello <!-- never closed"), "Hello");
+    }
+
+    #[test]
+    fn tags_go_and_entities_read_as_what_they_stand_for() {
+        assert_eq!(
+            preview("Michael, we have <strong>one new job</strong> that match&shy;es"),
+            "Michael, we have one new job that matches"
+        );
+        assert_eq!(
+            preview("<p>Hi&nbsp;Anna,</p><p>Tom &amp; Jerry&#8217;s <b>new</b> show</p>"),
+            "Hi Anna, Tom & Jerry\u{2019}s new show"
+        );
+        assert_eq!(
+            preview("<table class=\"x\"><tr><td>Left</td><td>Right</td></tr></table>"),
+            "Left Right"
+        );
+        assert_eq!(
+            preview("a < b, <3 & <anna@example.test> &unknown; &#xZZ;"),
+            "a < b, <3 & <anna@example.test> &unknown; &#xZZ;"
+        );
     }
 
     #[test]

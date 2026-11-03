@@ -30,7 +30,8 @@ import { hue, useAccounts, useFolders, useInbox } from "./mail";
 import { MoveDialog } from "./move";
 import { pageName } from "./newsletters";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
-import { ErrorMessage } from "./ui";
+import { useDoings, type Wanted, want } from "./sender";
+import { Button, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /**
@@ -41,7 +42,9 @@ import { useWorkspace } from "./workspace";
  * while Space and the wheel scroll the mail; E archives it, ⌫ deletes it
  * and V moves it to a folder, the conversation's Inbox mail all at once,
  * and it closes on the list, at the next; R answers it, a conversation's
- * last mail but yours. Postrider opens no mail you didn't: opening one
+ * last mail but yours. A newsletter, opened from its sender's list or not,
+ * leads with Unsubscribe (U) and Keep in Inbox (I), done in its sender's
+ * view (`sender.tsx`). Postrider opens no mail you didn't: opening one
  * marks it read.
  */
 export function MailPage() {
@@ -122,6 +125,20 @@ export function MailPage() {
   const kept = summary?.folder?.toLowerCase();
   const archivable = summary !== undefined && kept !== "archive";
   const deletable = summary !== undefined && kept !== "trash";
+  // A newsletter's sender, as its own view knows it.
+  const newsletter = kept === "newsletters" ? (from.sender ?? summary?.from_address) : undefined;
+  const doing = useDoings().get(newsletter?.toLowerCase() ?? "");
+  const askable = newsletter !== undefined && !doing?.busy && !doing?.done && !doing?.wanted;
+
+  /** Unsubscribes from its sender or keeps it in the Inbox, in the sender's view. */
+  const ask = (wanted: Wanted) => {
+    if (!newsletter || !askable) return;
+    want(newsletter, wanted);
+    void navigate({
+      to: "/$workspace/newsletters/$sender",
+      params: { workspace: workspace.url_key, sender: newsletter },
+    });
+  };
 
   /**
    * Moves it to its account's Archive or Trash, or to a folder picked or
@@ -190,6 +207,10 @@ export function MailPage() {
       } else if (key === "r" && answered) {
         event.preventDefault();
         setReplying(true);
+      } else if ((key === "u" || key === "i") && newsletter && !event.defaultPrevented) {
+        // G then I goes to the Inbox: the shortcuts took that I already.
+        event.preventDefault();
+        ask(key === "u" ? "unsubscribe" : "keep");
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -217,6 +238,26 @@ export function MailPage() {
           {back.name}
         </a>
         <div className="-mr-2 ml-auto flex items-center gap-1">
+          {newsletter && (
+            <>
+              <Button
+                disabled={!askable}
+                title="Unsubscribe (U)"
+                onClick={() => ask("unsubscribe")}
+              >
+                Unsubscribe
+              </Button>
+              <Button
+                variant="secondary"
+                className="mr-1"
+                disabled={!askable}
+                title="Keep in Inbox (I)"
+                onClick={() => ask("keep")}
+              >
+                Keep in Inbox
+              </Button>
+            </>
+          )}
           {answered && (
             <ReaderButton icon={Reply} label="Reply (R)" onClick={() => setReplying(true)} />
           )}

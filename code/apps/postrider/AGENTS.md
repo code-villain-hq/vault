@@ -429,7 +429,11 @@ column. A mail opened from it keeps `sender` in its search, so Esc goes
 back to the sender's list, and Esc there back to the page. With none of
 its mail open, the reading pane (`SenderPane`, `sender.tsx`) says how much
 of the list you opened and leads with Unsubscribe, Keep in Inbox beside
-it; U and I do the same from the list, a mail open or not. What was done
+it; U and I do the same from the list. A mail open from Newsletters, from
+the sender's list or a search, has both in its toolbar, ahead
+of Reply, and U and I with them (`message.tsx`): they go to the sender's
+list and do it there once it's read (`want`, `Doing.wanted`), so the pane
+shows what was done, with Undo. What was done
 to a sender is kept in memory by its address, with the name it had and
 its rows on the page, since its mail leaves. Once the list is empty as
 read since it showed (kept, unsubscribed, or its last mail archived,
@@ -467,7 +471,8 @@ Like the ask field's, what it needs is kept in memory.
   `mail.rs`, the folders and search in `folders.rs`, conversations in
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
-  text part numbers its links with), archiving, replying and
+  text part numbers its links with, HTML tags or entities; a migration
+  cleaned the lines kept before, `0018_snippet_tags.sql`), archiving, replying and
   files (`archive.rs`, `reply.rs`, `files.rs`), More professional
   (`rewrite.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the

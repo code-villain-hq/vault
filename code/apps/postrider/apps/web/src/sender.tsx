@@ -1,14 +1,15 @@
 // What one sender sent, in Newsletters: with no mail of it open, the
 // reading pane leads with unsubscribing from it, and Keep in Inbox beside.
-// U and I do the same from its list, a mail open or not. Both work as on
-// the Newsletters page: Unsubscribe archives its mail at once and the
-// request waits 10 seconds on the server, so Undo really undoes it. Once
-// its mail has left, the list goes back to the page, where its row says
-// what was done, with Undo.
+// U and I do the same from its list; a newsletter open, from here or not,
+// has both above it (`message.tsx`), and they come back here to do it.
+// Both work as on the Newsletters page: Unsubscribe archives its mail at
+// once and the request waits 10 seconds on the server, so Undo really
+// undoes it. Once its mail has left, the list goes back to the page, where
+// its row says what was done, with Undo.
 
 import { messageOf, shortcutFree } from "@code-villain/web";
 import type { KeptInInbox, Newsletter, UnsubscribeSent, Unsubscribed } from "@postrider/types";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { api, RequestError } from "./api";
 import { useListed } from "./folders";
@@ -33,7 +34,12 @@ export type Doing = {
   /** Why its request failed. */
   failed: string;
   undoing: boolean;
+  /** Asked for with one of its mail open: done once its list is read. */
+  wanted?: Wanted;
 };
+
+/** What can be asked for a sender. */
+export type Wanted = "unsubscribe" | "keep";
 
 const IDLE: Doing = {
   busy: false,
@@ -64,6 +70,14 @@ function forget(sender: string) {
 function watch(watcher: () => void) {
   watchers.add(watcher);
   return () => void watchers.delete(watcher);
+}
+
+/**
+ * Asks to unsubscribe from a sender, or to keep it in the Inbox, from one
+ * of its mail: its own view does it once it has read its list.
+ */
+export function want(sender: string, wanted: Wanted) {
+  change(sender, { wanted, problem: "" });
 }
 
 /** What was done to each sender in its own view, by its address. */
@@ -198,27 +212,31 @@ export function useSender(sender: string) {
 
 /**
  * U unsubscribes from the sender and I keeps it in the Inbox, from its
- * list, a mail of it open or not: the pane shows what it did, with Undo.
- * Gives what `useSender` does, for the list's name.
+ * list with none of its mail open (an open one has its own, `message.tsx`):
+ * the pane shows what it did, with Undo. What one of its mail asked for
+ * is done here once the list is read. Gives what `useSender` does, for the
+ * list's name.
  */
 export function useSenderKeys(sender: string, reading: boolean) {
-  const { workspace } = useWorkspace();
-  const navigate = useNavigate();
   const actions = useSender(sender);
-  const { ready, unsubscribe, keep } = actions;
+  const { ready, unsubscribe, keep, doing } = actions;
   useEffect(() => {
+    if (!doing.wanted) return;
+    // Done already, from somewhere else: there's nothing left to ask.
+    if (!ready && !doing.done) return;
+    const wanted = doing.wanted;
+    change(sender, { wanted: undefined });
+    if (doing.done) return;
+    void (wanted === "unsubscribe" ? unsubscribe() : keep());
+  });
+  useEffect(() => {
+    if (reading) return;
     const onKeyDown = (event: KeyboardEvent) => {
       // G then I goes to the Inbox: the shortcuts took that I already.
       if (event.defaultPrevented || !shortcutFree(event)) return;
       const key = event.key.toLowerCase();
       if ((key !== "u" && key !== "i") || !ready) return;
       event.preventDefault();
-      if (reading) {
-        void navigate({
-          to: "/$workspace/newsletters/$sender",
-          params: { workspace: workspace.url_key, sender },
-        });
-      }
       void (key === "u" ? unsubscribe() : keep());
     };
     window.addEventListener("keydown", onKeyDown);
