@@ -31,18 +31,31 @@ pub(crate) async fn depart<D: Directory>(
 }
 
 /// Finish due removals, rechecking groups under the same lock as SCIM writes.
+/// Each person settles on their own: one whose removal fails (the app's
+/// `remove_member` refusing, say) is tried again next time, and doesn't keep
+/// everyone else in the workspace with their sessions.
 pub async fn settle_departures<D: Directory>(pool: &PgPool) -> anyhow::Result<()> {
-    let mut db = pool.begin().await?;
-    store::lock(&mut db).await?;
+    // Read outside the lock: a group update since may have kept someone,
+    // which reconciling them under it sees.
     let users: Vec<Uuid> = sqlx::query_scalar(
         "SELECT DISTINCT user_id FROM scim_departures WHERE remove_after <= now()",
     )
-    .fetch_all(&mut *db)
+    .fetch_all(pool)
     .await?;
-    for &user in &users {
-        reconcile::person::<D>(&mut db, user, None).await?;
+    for user in users {
+        if let Err(error) = settle::<D>(pool, user).await {
+            tracing::warn!(%error, %user, "couldn't settle a directory departure");
+        }
     }
-    D::groups_changed(&mut db, &users).await?;
+    Ok(())
+}
+
+/// One person's due removals, and what follows their groups, together.
+async fn settle<D: Directory>(pool: &PgPool, user: Uuid) -> anyhow::Result<()> {
+    let mut db = pool.begin().await?;
+    store::lock(&mut db).await?;
+    reconcile::person::<D>(&mut db, user, None).await?;
+    D::groups_changed(&mut db, &[user]).await?;
     db.commit().await?;
     Ok(())
 }
