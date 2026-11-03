@@ -434,10 +434,12 @@ function Said({
         />
       )}
       {message &&
-        (message.html ? (
+        (message.html?.trim() ? (
           <MailHtml html={message.html} />
-        ) : (
+        ) : message.text.trim() ? (
           <div className="letter-text">{linked(message.text)}</div>
+        ) : (
+          <p className="letter-none">Postrider can't show this mail's text.</p>
         ))}
     </section>
   );
@@ -614,11 +616,20 @@ function linked(text: string): ReactNode[] {
  * scripts. So it grows to its content and the page scrolls as one, its
  * links open in the browser, and Esc, J, K and the arrows work while it
  * has focus: the arrows move to the next mail there too, not down the page.
+ * A frame 0 tall, or one that says no height in time (`SILENT_AFTER`), is
+ * still shown, and scrolls, until it says more.
  */
 function MailHtml({ html }: { html: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(0);
+  const [height, setHeight] = useState<number>();
+  const [silent, setSilent] = useState(false);
   const srcDoc = useMemo(() => paper(html), [html]);
+
+  useEffect(() => {
+    setSilent(false);
+    const wait = setTimeout(() => setSilent(true), SILENT_AFTER);
+    return () => clearTimeout(wait);
+  }, [srcDoc]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -657,11 +668,14 @@ function MailHtml({ html }: { html: string }) {
         title="The mail"
         sandbox="allow-scripts"
         srcDoc={srcDoc}
-        style={{ height }}
+        style={{ height: height || (height === 0 || silent ? "70vh" : 0) }}
       />
     </div>
   );
 }
+
+/** How long a mail's frame has to say its height, in milliseconds. */
+const SILENT_AFTER = 2000;
 
 /** What the frame's script tells the page. */
 type FrameMessage = {
@@ -674,12 +688,73 @@ type FrameMessage = {
   shiftKey?: unknown;
 };
 
-/** The frame's script: its height, its links and its keys, to the page. */
+/**
+ * The rules that keep the paper light and the mail as tall as it is, after
+ * the mail's own: at the end of the frame's document, and again once it's
+ * read, since a comment or title the mail leaves open swallows the first.
+ */
+const LAST_RULES = `html:root { color-scheme: only light !important; }
+html:root, html:root > body { height: auto !important; min-height: 0 !important; max-height: none !important; }`;
+
+/**
+ * The frame's script: its height, its links and its keys, to the page. A
+ * mail that makes its html or body as tall as the frame in their own
+ * `style`, `!important`, beats any rule, and a frame that grows to its
+ * content is then 0 tall: once it's read, that height goes. One as tall
+ * as the frame and more (`100vh`) would grow with it for ever: when it
+ * grew just as much as the frame did, the frame stays. A mail that keeps
+ * itself in a box as tall as the frame, which scrolls or clips, is as tall
+ * as what that box holds, if the box grows with the frame: one that didn't
+ * is the mail's own size, and its height stays. Nothing is said before the
+ * mail is read, so a 0 is the mail's.
+ */
 const REPORTER = `
 const say = (message) => parent.postMessage(message, "*");
-new ResizeObserver(() =>
-  say({ height: Math.ceil(document.documentElement.getBoundingClientRect().height) }),
-).observe(document.documentElement);
+const boxes = new Map();
+const reach = (height) => {
+  let most = height;
+  if (!document.body || innerHeight === 0) return most;
+  for (const box of [document.body, ...document.body.getElementsByTagName("*")]) {
+    const seen = boxes.get(box);
+    if (seen === false) continue;
+    if (seen === undefined) {
+      if (box.scrollHeight <= box.clientHeight + 1 || getComputedStyle(box).overflowY === "visible") continue;
+      const height = box.getBoundingClientRect().height;
+      if (height < innerHeight - 1) continue;
+      boxes.set(box, { height, frame: innerHeight });
+    } else if (seen !== true && seen.frame !== innerHeight) {
+      const follows = Math.abs(box.getBoundingClientRect().height - seen.height - (innerHeight - seen.frame)) <= 1;
+      boxes.set(box, follows);
+      if (!follows) continue;
+    }
+    const more = box.scrollHeight - box.clientHeight;
+    const loose = /^(absolute|fixed)$/.test(getComputedStyle(box).position);
+    most = Math.max(most, loose ? Math.ceil(box.getBoundingClientRect().bottom + scrollY) + more : height + more);
+  }
+  return most;
+};
+let was;
+const tall = () => {
+  if (document.readyState === "loading") return;
+  const now = { height: reach(Math.ceil(document.documentElement.getBoundingClientRect().height)), frame: innerHeight };
+  if (was && now.height === was.height && now.frame === was.frame) return;
+  const grew = was ? now.frame - was.frame : 0;
+  const following = grew !== 0 && now.height - was.height === grew && now.height > now.frame;
+  was = now;
+  if (!following) say({ height: now.height });
+};
+new ResizeObserver(tall).observe(document.documentElement);
+addEventListener("DOMContentLoaded", () => {
+  for (const pinned of [document.documentElement, document.body]) {
+    for (const rule of ["height", "min-height", "max-height"]) pinned.style.removeProperty(rule);
+  }
+  const last = document.createElement("style");
+  last.textContent = ${JSON.stringify(LAST_RULES)};
+  document.body.append(last);
+  tall();
+});
+addEventListener("resize", tall);
+addEventListener("load", tall);
 document.addEventListener("click", (event) => {
   const link = event.target instanceof Element && event.target.closest("a[href]");
   if (!link) return;
@@ -720,6 +795,5 @@ html { background: Canvas; color: CanvasText; height: auto !important; min-heigh
 body { margin: 0; padding: 20px 24px; font: 14px/1.5 -apple-system, system-ui, sans-serif; overflow-wrap: break-word; height: auto !important; min-height: 0 !important; }
 img { max-width: 100%; height: auto; }
 </style></head><body>${body}
-<style>html:root { color-scheme: only light !important; }
-html:root, html:root > body { height: auto !important; min-height: 0 !important; max-height: none !important; }</style></body></html>`;
+<style>${LAST_RULES}</style></body></html>`;
 }

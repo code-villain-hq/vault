@@ -413,7 +413,7 @@ impl Mail {
         let mail = Arc::clone(self);
         let path = place.path.clone();
         tokio::spawn(async move { mail.mark_read(account, path, uid).await });
-        Ok(message::read(&raw, summary(account_id, &place, line)))
+        Ok(message::opened(&raw, summary(account_id, &place, line)))
     }
 }
 

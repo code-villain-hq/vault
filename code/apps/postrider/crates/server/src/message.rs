@@ -90,6 +90,63 @@ pub fn read(raw: &[u8], summary: MailSummary) -> Message {
     }
 }
 
+/// A mail you opened, read as [`read`] does, with how it's built in the
+/// log ([`structure`]): what to look at when one shows nothing.
+pub fn opened(raw: &[u8], summary: MailSummary) -> Message {
+    let uid = summary.uid;
+    let message = read(raw, summary);
+    let html = message.html.as_deref().map_or(0, str::len);
+    let text = message.text.trim().len();
+    if html == 0 && text == 0 {
+        tracing::warn!(uid, structure = %structure(raw), "an opened mail has nothing to show");
+    } else {
+        tracing::debug!(uid, html, text, structure = %structure(raw), "opened a mail");
+    }
+    message
+}
+
+/// How a mail is built, for the log, never its words: each part's type,
+/// charset, transfer encoding, disposition, size decoded, how the body uses
+/// it and what went wrong reading it, nested parts indented.
+pub fn structure(raw: &[u8]) -> String {
+    let Some(message) = MessageParser::new().parse(raw) else {
+        return format!("not a mail, {} bytes", raw.len());
+    };
+    message
+        .parts()
+        .map(|part| {
+            let depth = std::iter::successors(part.parent(), MessagePart::parent).count();
+            let kind = part.content_type();
+            let mut said = vec![kind.as_ref().map_or_else(
+                || "no type".to_string(),
+                |kind| match kind.subtype() {
+                    Some(subtype) => format!("{}/{subtype}", kind.ctype()),
+                    None => kind.ctype().to_string(),
+                },
+            )];
+            said.extend(
+                kind.and_then(|kind| kind.attribute("charset"))
+                    .map(str::to_string),
+            );
+            said.extend(part.content_transfer_encoding().map(str::to_string));
+            said.extend(part.content_disposition().map(|d| d.ctype().to_string()));
+            if !part.is_multipart() {
+                said.push(format!("{} bytes", part.decoded_len()));
+            }
+            said.push(format!("{:?}", part.role()));
+            said.extend(part.flags().names().map(str::to_string));
+            if let Some((text, problems)) = part.text_checked() {
+                said.extend(problems.names().map(str::to_string));
+                if text.trim().is_empty() {
+                    said.push("blank".into());
+                }
+            }
+            format!("{}{}", "  ".repeat(depth), said.join(" "))
+        })
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
+
 /// A file that came with a mail, to open.
 pub struct File {
     pub name: String,
@@ -254,5 +311,31 @@ mod tests {
         assert_eq!(file.content_type, "application/pdf");
         assert_eq!(file.bytes, b"%PDF-");
         assert!(super::file(raw, 1).is_none());
+    }
+
+    #[test]
+    fn the_log_says_how_a_mail_is_built_but_not_its_words() {
+        let raw = b"From: Shop <noreply@example.test>\r\n\
+            Subject: Meet the robot\r\n\
+            Content-Type: multipart/alternative; boundary=\"b\"\r\n\r\n\
+            --b\r\n\
+            Content-Type: text/plain; charset=utf-8\r\n\
+            Content-Transfer-Encoding: quoted-printable\r\n\r\n\
+            Meet the robot\r\n\
+            --b\r\n\
+            Content-Type: text/html; charset=x-unknown\r\n\r\n\
+            \r\n\
+            --b--\r\n";
+        let built = structure(raw);
+        assert_eq!(
+            built,
+            [
+                "multipart/alternative Container",
+                "  text/plain utf-8 quoted-printable 14 bytes TextBody",
+                "  text/html x-unknown 0 bytes HtmlBody unknown_charset blank",
+            ]
+            .join(" | ")
+        );
+        assert!(!built.contains("robot"));
     }
 }

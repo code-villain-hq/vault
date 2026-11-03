@@ -115,7 +115,18 @@ HTML with inline pictures written in, its attachments. The page shows the
 HTML in a frame where no script runs and pictures load without a referrer.
 The frame is as tall as the mail says it is; a last style sets the mail's
 `html` and `body` to `height: auto`, since newsletters that make them 100%
-tall would otherwise fold the frame to nothing.
+tall would otherwise fold the frame to nothing. The frame's script adds that
+style again once the mail is read, as a comment the mail leaves open
+swallows the first, and drops a height the mail's own `style` gives them; a
+mail as tall as the frame and more (`100vh`) doesn't grow it for ever. A
+mail that keeps itself in a box as tall as the frame, which scrolls or
+clips (Mondo Robotics' `100vh`, or `position: absolute` to every edge), is
+as tall as that box's content: the box grows with the frame, and one that
+doesn't is a box of the mail's own size and stays. A frame 0 tall is shown
+70% of the window tall until it says more, and so is one that says no
+height in 2 seconds; a mail with neither HTML nor text says so. Each mail
+opened logs how it's built, never its words (`message::structure`, at
+debug; a warning when it has nothing to show).
 
 Only the Inbox is followed and kept, and what conversations need of Sent
 and Archive (below). The other folders are read when

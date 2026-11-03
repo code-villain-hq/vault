@@ -651,6 +651,10 @@ input.crumb-name {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+.letter-none {
+  margin: 0;
+  color: var(--muted);
+}
 /* A reply or a new mail, as the storyboard's composer: To and Subject on
    lines of their own, the text with room, and the account it goes from
    beside More professional and Send. */

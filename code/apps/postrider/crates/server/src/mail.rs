@@ -379,7 +379,7 @@ impl Mail {
             seen: true,
             to_name: None,
         };
-        Ok(message::read(&raw, summary))
+        Ok(message::opened(&raw, summary))
     }
 
     /// A mail's source, and the folder it's in: the Inbox, or the one `key`
