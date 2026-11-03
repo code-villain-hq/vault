@@ -1568,8 +1568,13 @@ mod tests {
             at = *end;
             got.extend_from_slice(bytes);
         }
-        let want: String = (1..=20000).map(|n| format!("{n}\r\n")).collect();
-        assert!(String::from_utf8_lossy(&got).contains(&want), "output lost or reordered on the way");
+        // Carriage returns aside: with the pty's buffer full, as when the
+        // whole suite runs, macOS's line discipline now and then writes the
+        // CR of its "\n" → "\r\n" twice ("480\r\r\n"). It comes from the
+        // kernel like that, and a terminal draws it the same.
+        let want: String = (1..=20000).map(|n| format!("{n}\n")).collect();
+        let got = String::from_utf8_lossy(&got).replace('\r', "");
+        assert!(got.contains(&want), "output lost or reordered on the way");
         ptys.close(&printer.id).unwrap();
 
         // An interactive shell ignores SIGTERM; closing one used to take the
