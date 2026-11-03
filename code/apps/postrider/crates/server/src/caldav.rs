@@ -344,10 +344,12 @@ impl Draft {
             return None;
         }
         let (start, all_day) = self.start?;
+        // An end past the last date there is (`P999999999D`) is no event
+        // anyone keeps, and adding it would panic: it's left out.
         let end = match (self.end, self.duration) {
             (Some((end, _)), _) => end,
-            (None, Some(duration)) => start + duration,
-            (None, None) if all_day => start + chrono::Duration::days(1),
+            (None, Some(duration)) => start.checked_add_signed(duration)?,
+            (None, None) if all_day => start.checked_add_signed(chrono::Duration::days(1))?,
             (None, None) => start,
         };
         Some(Parsed {
@@ -421,23 +423,29 @@ fn local(time: NaiveDateTime) -> Option<DateTime<Utc>> {
         .map(|t| t.with_timezone(&Utc))
 }
 
-/// `PT1H30M`, `P1D`, `-PT15M`, `P1W`.
+/// `PT1H30M`, `P1D`, `-PT15M`, `P1W`. One too long to count is as long as
+/// a duration can be, so the event it ends is left out.
 fn parse_duration(value: &str) -> Option<chrono::Duration> {
     let (negative, value) = match value.strip_prefix('-') {
         Some(rest) => (true, rest),
         None => (false, value.strip_prefix('+').unwrap_or(value)),
     };
     let value = value.strip_prefix('P')?;
-    let mut seconds = 0i64;
+    // None once it's too long for an i64.
+    let mut seconds = Some(0i64);
     let mut number = String::new();
     for c in value.chars() {
         match c {
             'T' => {}
             '0'..='9' => number.push(c),
             unit => {
-                let n: i64 = number.parse().ok()?;
+                if number.is_empty() {
+                    return None;
+                }
+                // Only digits are in it: a number that won't parse is too big.
+                let n = number.parse::<i64>().ok();
                 number.clear();
-                seconds += n * match unit {
+                let unit = match unit {
                     'W' => 7 * 86400,
                     'D' => 86400,
                     'H' => 3600,
@@ -445,10 +453,15 @@ fn parse_duration(value: &str) -> Option<chrono::Duration> {
                     'S' => 1,
                     _ => return None,
                 };
+                seconds = seconds
+                    .zip(n)
+                    .and_then(|(seconds, n)| seconds.checked_add(n.checked_mul(unit)?));
             }
         }
     }
-    let duration = chrono::Duration::seconds(seconds);
+    let duration = seconds
+        .and_then(chrono::Duration::try_seconds)
+        .unwrap_or(chrono::Duration::MAX);
     Some(if negative { -duration } else { duration })
 }
 
@@ -782,6 +795,34 @@ mod tests {
         assert_eq!(events[0].end.to_rfc3339(), "2026-11-02T08:45:00+00:00");
         assert!(events[1].all_day);
         assert_eq!(events[1].end - events[1].start, chrono::Duration::days(1));
+    }
+
+    #[test]
+    fn an_endless_event_is_left_out() {
+        let event = |duration: &str| {
+            format!(
+                "BEGIN:VEVENT\r\nSUMMARY:Forever\r\nDTSTART:20261102T090000Z\r\n\
+                DURATION:{duration}\r\nEND:VEVENT\r\n"
+            )
+        };
+        for duration in [
+            "P999999999D",
+            "P9223372036854775807W",
+            "PT99999999999999999999S",
+            "-P999999999D",
+        ] {
+            assert!(parse_ics(&event(duration)).is_empty(), "{duration}");
+        }
+        assert_eq!(
+            parse_duration("P1W2DT3H4M5S"),
+            Some(chrono::Duration::seconds(9 * 86400 + 3 * 3600 + 4 * 60 + 5))
+        );
+        assert_eq!(parse_duration("PTH"), None);
+        let events = parse_ics(&event("PT90M"));
+        assert_eq!(
+            events[0].end - events[0].start,
+            chrono::Duration::minutes(90)
+        );
     }
 
     #[test]
