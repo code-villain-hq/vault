@@ -28,5 +28,9 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@v4
-      # The build is kept between jobs, so a push recompiles what changed.
+      # The crates.io builds are kept between jobs, so a push doesn't
+      # recompile those. The kits' own builds are removed after the check, as
+      # every app's are (`dev-id/trim-ci-target.ts` says why): they're small.
       - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/kit-target" bun dev-id/check-kits.ts
+      - if: always()
+        run: bun dev-id/trim-ci-target.ts "$HOME/.cache/forgejo-runner/kit-target"

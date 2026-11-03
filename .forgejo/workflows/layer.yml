@@ -40,10 +40,14 @@ jobs:
       # config of the job's own, since on this Mac `git config --global`
       # would be the owner's. Not GIT_AUTHOR_*/GIT_COMMITTER_*: those beat
       # the identity a test sets in its repo, and two tests check that one.
-      # Every job gets a fresh checkout; the Rust build is kept between them
-      # so a push recompiles what changed, not the whole app.
+      # Every job gets a fresh checkout. The crates.io builds are kept
+      # between jobs, so a push doesn't recompile those; the vault's own
+      # crates are built anew every time and removed after the check
+      # (`kit/dev-id/trim-ci-target.ts` says why).
       - run: |
           export GIT_CONFIG_GLOBAL="$(mktemp)"
           git config --global user.name ci
           git config --global user.email ci@localhost
           CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/layer-target" bun run check
+      - if: always()
+        run: bun ../../kit/dev-id/trim-ci-target.ts "$HOME/.cache/forgejo-runner/layer-target"

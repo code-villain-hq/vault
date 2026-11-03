@@ -35,6 +35,9 @@ jobs:
       # (port 5437), started if it isn't running. Each test gets a database
       # of its own and drops it, so the dev data is never touched.
       - run: bun run db
-      # The Rust build is kept between jobs, so a push recompiles what
-      # changed, not the whole app.
+      # The crates.io builds are kept between jobs, so a push doesn't
+      # recompile those. The vault's own crates are built anew every time
+      # and removed after the check (`kit/dev-id/trim-ci-target.ts` says why).
       - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/almanac-target" bun run check
+      - if: always()
+        run: bun ../../kit/dev-id/trim-ci-target.ts "$HOME/.cache/forgejo-runner/almanac-target"

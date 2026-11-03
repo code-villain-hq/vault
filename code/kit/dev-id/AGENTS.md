@@ -22,6 +22,9 @@ are in `people.toml`.
   which follows the sign-in without a browser. Each app's `scripts/check.ts`
   uses `runChecks` / `assertTypesCurrent` from `check.ts`, and
   `genDomainTypes` from the same file for `scripts/gen-types.ts`.
+- Every CI workflow runs `trim-ci-target.ts` after its check: it keeps the
+  runner's Rust build (`~/.cache/forgejo-runner/<app>-target`) to the
+  crates.io crates, since every job builds the vault's own anew.
 
 Its settings in an app, as `bun run dev` sets them:
 

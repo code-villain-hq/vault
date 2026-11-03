@@ -32,6 +32,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: bun install --frozen-lockfile
       # No test needs Postgres or the stand-in mail servers yet, so nothing
-      # starts in Docker. The Rust build is kept between jobs, so a push
-      # recompiles what changed, not the whole app.
+      # starts in Docker. The crates.io builds are kept between jobs, so a
+      # push doesn't recompile those. The vault's own crates are built anew
+      # every time and removed after the check (`kit/dev-id/trim-ci-target.ts`
+      # says why).
       - run: CARGO_TARGET_DIR="$HOME/.cache/forgejo-runner/postrider-target" bun run check
+      - if: always()
+        run: bun ../../kit/dev-id/trim-ci-target.ts "$HOME/.cache/forgejo-runner/postrider-target"
