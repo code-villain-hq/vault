@@ -7,6 +7,7 @@ import { api, messageOf } from "./api";
 import { AccountProblems, type From, MailList, mailKey, useNow } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
 import { useAccounts, useFolders, useInbox } from "./mail";
+import { useSenderKeys } from "./sender";
 import { Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -42,8 +43,13 @@ function listKey(from: From): string {
 
 /** The mails of the list a mail was opened from, as it shows them. */
 export function useListedMails(from: From) {
+  return useListed(from)?.mails ?? [];
+}
+
+/** The list a folder, a search or a sender showed last; none before it's read. */
+export function useListed(from: From): Listing | undefined {
   useSyncExternalStore(watch, () => version);
-  return listings.get(listKey(from))?.mails ?? [];
+  return listings.get(listKey(from));
 }
 
 /** A mail of a folder's or a search's, now read: so it shows read in its list. */
@@ -154,7 +160,8 @@ export function FolderList({ folder, open }: { folder: string; open: string | un
 /**
  * What one sender sent, in Newsletters, every account's: where its name on
  * the Newsletters page leads, and back. Esc with no mail open goes back to
- * the Newsletters page.
+ * the Newsletters page; U and I unsubscribe and keep it in the Inbox
+ * (`sender.tsx`).
  */
 export function SenderList({ sender, open }: { sender: string; open: string | undefined }) {
   const { workspace } = useWorkspace();
@@ -166,9 +173,9 @@ export function SenderList({ sender, open }: { sender: string; open: string | un
     `/newsletters/sender?${new URLSearchParams({ address: sender })}`,
     minutes,
   );
-  const name = listing?.mails[0]?.from_name || sender;
-
   const reading = open !== undefined;
+  // Unsubscribed or kept, its mail leaves, and the name it had stays.
+  const { name } = useSenderKeys(sender, reading);
   useEffect(() => {
     if (reading) return;
     const onKeyDown = (event: KeyboardEvent) => {

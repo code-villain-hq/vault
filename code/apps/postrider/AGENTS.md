@@ -371,7 +371,12 @@ A sender's name, or Enter, opens what it sent (`SenderList`, at
 `/newsletters/{address}`): every account's Newsletters asked for that
 sender (`GET /newsletters/sender?address=`, IMAP `FROM`), in the list
 column. A mail opened from it keeps `sender` in its search, so Esc goes
-back to the sender's list, and Esc there back to the page.
+back to the sender's list, and Esc there back to the page. With none of
+its mail open, the reading pane (`SenderPane`, `sender.tsx`) says how much
+of the list you opened and leads with Unsubscribe, Keep in Inbox beside
+it; U and I do the same from the list, a mail open or not, and the pane
+then shows what it did, with Undo. What was done to a sender is kept in
+memory by its address, with the name it had, since its mail leaves.
 
 - Unsubscribe (`POST /newsletters/unsubscribe`, U) asks nothing. It
   archives what the sender sent at once, and the request goes 10 seconds
@@ -381,7 +386,7 @@ back to the sender's list, and Esc there back to the page.
   unsubscribe on gets its page opened when it's the one unsubscribed, and
   a link to it when it's among several. `GET /newsletters/unsubscribed/{id}`
   waits for the requests and says which failed.
-- Keep in Inbox (`POST /newsletters/keep`), beyond the storyboard, writes
+- Keep in Inbox (`POST /newsletters/keep`, I), beyond the storyboard, writes
   a rule that keeps the sender's mail in the Inbox, ahead of the
   newsletters' rule, and moves its mail back there.
 
@@ -398,7 +403,8 @@ Like the ask field's, what it needs is kept in memory.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
   `mail.rs`, the folders and search in `folders.rs`, conversations in
   `conversations.rs`), reading a mail
-  (`message.rs`, its list line in `preview.rs`), archiving, replying and
+  (`message.rs`, its list line in `preview.rs`, without the `[1]` a
+  text part numbers its links with), archiving, replying and
   files (`archive.rs`, `reply.rs`, `files.rs`), More professional
   (`rewrite.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the

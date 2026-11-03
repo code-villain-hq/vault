@@ -1,8 +1,8 @@
 //! The start of a mail's text as the list shows it: one line of words,
 //! without what a text part carries for its links and layout. Link
-//! addresses go and their words stay; pictures written in, rules, HTML
-//! comments and the invisible padding newsletters put after their first
-//! line go too.
+//! addresses go and their words stay; the `[1]` that numbers a link,
+//! pictures written in, rules, HTML comments and the invisible padding
+//! newsletters put after their first line go too.
 
 /// How long a preview is, in characters.
 const LENGTH: usize = 160;
@@ -19,7 +19,8 @@ pub fn preview(text: &str) -> String {
         }
         text = unlinked;
     }
-    text.split_whitespace()
+    unnumber(&text)
+        .split_whitespace()
         .filter_map(word)
         .collect::<Vec<_>>()
         .join(" ")
@@ -60,6 +61,29 @@ fn unlink(text: &str) -> String {
         kept.push_str(before);
         kept.push_str(&rest[open + 1..close]);
         rest = &rest[end + 1..];
+    }
+    kept.push_str(rest);
+    kept
+}
+
+/// The text without the `[1]` a text part numbers a link with, its
+/// address listed at the end: "online-versionen [1]" reads as
+/// "online-versionen".
+fn unnumber(text: &str) -> String {
+    let mut kept = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find('[') {
+        kept.push_str(&rest[..open]);
+        let digits = rest[open + 1..]
+            .bytes()
+            .take_while(u8::is_ascii_digit)
+            .count();
+        if digits > 0 && rest[open + 1 + digits..].starts_with(']') {
+            rest = &rest[open + digits + 2..];
+        } else {
+            kept.push('[');
+            rest = &rest[open + 1..];
+        }
     }
     kept.push_str(rest);
     kept
@@ -115,6 +139,20 @@ mod tests {
         assert_eq!(
             preview("[![Logo](https://example.test/l.png)](https://example.test) Hi"),
             "Logo Hi"
+        );
+    }
+
+    #[test]
+    fn a_link_numbered_in_the_text_leaves_no_number() {
+        assert_eq!(
+            preview(
+                "Till online-versionen [1] [1] [1] Kundnummer: 4711\n\n[1] https://example.test/v"
+            ),
+            "Till online-versionen Kundnummer: 4711"
+        );
+        assert_eq!(
+            preview("See the terms[12], and [x] stays [ 3 ]."),
+            "See the terms, and [x] stays [ 3 ]."
         );
     }
 

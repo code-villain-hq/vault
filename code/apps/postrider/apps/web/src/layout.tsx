@@ -519,9 +519,18 @@ const SECTIONS: ShortcutSection[] = [
     title: "Newsletters",
     keys: [
       ["J K or ↓ ↑", "Next and previous sender"],
-      ["Enter or O", "Open its newest mail"],
+      ["Enter or O", "Open what it sent"],
       ["U", "Unsubscribe from it"],
+      ["I", "Keep it in the Inbox"],
       ["/", "Find a sender"],
+    ],
+  },
+  {
+    title: "A sender's mail",
+    keys: [
+      ["U", "Unsubscribe from the sender"],
+      ["I", "Keep the sender in the Inbox"],
+      ["Esc", "Back to Newsletters"],
     ],
   },
   {

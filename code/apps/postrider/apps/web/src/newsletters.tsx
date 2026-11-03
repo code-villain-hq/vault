@@ -42,7 +42,7 @@ import { Button, Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** What this page did to a sender, by the batch Undo names. */
-type Done =
+export type Done =
   | { kind: "unsubscribed"; batch: string; archived: number; asked: boolean; page: string | null }
   | { kind: "kept"; batch: string; moved: number };
 
@@ -268,7 +268,7 @@ export function NewslettersPage() {
   };
 
   // J and K move through the senders; Enter or O opens what the one they're
-  // on sent, U unsubscribes from it.
+  // on sent, U unsubscribes from it and I keeps it in the Inbox.
   const [focusedKey, setFocusedKey] = useState<string>();
   const focused = Math.max(
     0,
@@ -292,6 +292,10 @@ export function NewslettersPage() {
       } else if (row && key === "u" && !done.has(senderKey(row))) {
         event.preventDefault();
         void unsubscribe([row]);
+      } else if (row && key === "i" && !done.has(senderKey(row)) && !event.defaultPrevented) {
+        // G then I goes to the Inbox: the shortcuts took that I already.
+        event.preventDefault();
+        void keep(row);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -632,7 +636,7 @@ function SenderRow({
 }
 
 /** What happened to a sender, in a sentence or two. */
-function DoneWords({ done, name }: { done: Done; name: string }) {
+export function DoneWords({ done, name }: { done: Done; name: string }) {
   if (done.kind === "kept") {
     return <>Kept in the Inbox.{done.moved > 0 && ` Moved ${mails(done.moved)} there.`}</>;
   }
@@ -704,7 +708,7 @@ function Named({ named, rows }: { named: NewsletterRef[]; rows: Newsletter[] }) 
 }
 
 /** "1 mail", "23 mails". */
-function mails(count: number): string {
+export function mails(count: number): string {
   return `${count} ${count === 1 ? "mail" : "mails"}`;
 }
 
@@ -717,7 +721,7 @@ function senderMail(workspace: string, row: Newsletter) {
 }
 
 /** A sender's page to unsubscribe on, in the browser. */
-function openPage(url: string) {
+export function openPage(url: string) {
   if (isDesktop) void openInBrowser(url);
   else window.open(url, "_blank", "noopener");
 }

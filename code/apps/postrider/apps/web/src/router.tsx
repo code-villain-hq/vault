@@ -4,6 +4,7 @@ import { Home, NotFound, WorkspaceLayout } from "./layout";
 import { MailboxLayout, NoMailOpen } from "./mailbox";
 import { MailPage } from "./message";
 import { NewslettersPage } from "./newsletters";
+import { SenderPane } from "./sender";
 import { AccountsPage } from "./settings";
 
 const root = createRootRoute({ component: Outlet, notFoundComponent: NotFound });
@@ -81,7 +82,7 @@ const search = createRoute({
 const sender = createRoute({
   getParentRoute: () => mailbox,
   path: "/newsletters/$sender",
-  component: NoMailOpen,
+  component: SenderPane,
 });
 const newsletters = createRoute({
   getParentRoute: () => workspace,
