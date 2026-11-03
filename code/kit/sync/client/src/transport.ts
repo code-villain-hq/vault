@@ -39,6 +39,18 @@ export class RejectedError extends Error {
 /** Statuses worth retrying: signed out (until signed in again), timeouts, rate limits. */
 const RETRYABLE = new Set([401, 408, 425, 429]);
 
+/**
+ * Whether a refusal says the asker isn't in the workspace, or it's gone,
+ * rather than anything about the change. Every app's server answers so:
+ * its `Member` check before the transaction, and `Rules::guest_access`
+ * during it. Someone taken out of the workspace and put back (their groups
+ * settling, say) still has those edits to send; the server's `forbidden`,
+ * or `not_found` for a record, is about the change and still refuses it.
+ */
+function outsideWorkspace(status: number, body: ApiError | null): boolean {
+  return status === 404 && body?.code === "not_found" && body.message === "workspace not found";
+}
+
 /** How long sending a transaction may take before it's tried again. */
 const SEND_FOR = 30_000;
 /** How long the feed may take to open before it's tried again. */
@@ -113,6 +125,9 @@ export class HttpTransport implements Transport {
     if (response.ok) return response.json();
     if (response.status >= 400 && response.status < 500 && !RETRYABLE.has(response.status)) {
       const body = (await response.json().catch(() => null)) as ApiError | null;
+      // Held in the outbox until they're in the workspace again.
+      if (outsideWorkspace(response.status, body))
+        throw new Error("sending transaction failed: not in the workspace");
       throw new RejectedError(
         response.status,
         body?.code ?? "rejected",

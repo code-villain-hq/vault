@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { HttpTransport } from "./transport";
+import { HttpTransport, RejectedError } from "./transport";
 
 // A WebSocket that does what a test tells it to.
 class FakeSocket {
@@ -82,4 +82,45 @@ test("closing the feed stops waiting for it", async () => {
   await wait(80);
   expect(heard.closed).toBe(0);
   expect(socket.closed).toBe(true);
+});
+
+function answering(status: number, body: object) {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+  return () => {
+    globalThis.fetch = realFetch;
+  };
+}
+
+async function sendOnce() {
+  const transport = new HttpTransport({ workspaceId: "w", baseUrl: "http://localhost" });
+  return transport.send({ id: "t", operations: [] }).then(
+    () => "sent",
+    (error: Error) => (error instanceof RejectedError ? `rejected ${error.code}` : "held"),
+  );
+}
+
+test("someone outside the workspace keeps their changes to send later", async () => {
+  const restore = answering(404, { code: "not_found", message: "workspace not found" });
+  try {
+    expect(await sendOnce()).toBe("held");
+  } finally {
+    restore();
+  }
+});
+
+test("a change the server refuses is still refused", async () => {
+  for (const [status, body] of [
+    [403, { code: "forbidden", message: "only workspace admins can do that" }],
+    [404, { code: "not_found", message: "Task not found" }],
+    [422, { code: "invalid", message: "title can't be empty" }],
+  ] as const) {
+    const restore = answering(status, body);
+    try {
+      expect(await sendOnce()).toBe(`rejected ${body.code}`);
+    } finally {
+      restore();
+    }
+  }
 });
