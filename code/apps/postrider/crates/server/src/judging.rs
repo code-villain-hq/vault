@@ -40,7 +40,7 @@ use code_villain_claude::{Adapter, Question};
 use postrider_domain::{AccountState, MailAccount};
 use sqlx::PgPool;
 
-use crate::ask::as_read;
+use crate::ask::{Fence, as_read, said_once};
 use crate::imap::{Failure, Place};
 use crate::mail::Mail;
 use crate::newsletters::{Said, Told, but_yours, named};
@@ -478,13 +478,16 @@ impl Judge<'_> {
             if read.is_empty() {
                 continue;
             }
-            let texts: Vec<&str> = read.iter().map(|(_, text)| text.as_str()).collect();
+            // New for each question: no mail can know it, to start another.
+            let fence = Fence::new();
+            let system = format!("{SYSTEM}\n\n{}", fence.numbering());
+            let texts = read.iter().map(|(_, text)| text.as_str());
             let answer = self
                 .claude_code
                 .ask(
                     &Question {
-                        system: SYSTEM,
-                        prompt: &prompt(&texts),
+                        system: &system,
+                        prompt: &fence.numbered(texts),
                         images: &[],
                         web: false,
                         tools: &[],
@@ -655,18 +658,11 @@ fn shown(mail: &Told, raw: &[u8], account: &MailAccount) -> String {
     shown
 }
 
-fn prompt(mails: &[&str]) -> String {
-    let mut prompt = String::new();
-    for (n, text) in mails.iter().enumerate() {
-        let _ = write!(prompt, "=== Mail {} ===\n{text}\n\n", n + 1);
-    }
-    prompt
-}
-
 /// What Claude Code said of each mail, by its place: whether it went to
-/// many, from lines like "3: many", each mail once.
+/// many, from lines like "3: many", for each mail named once
+/// ([`said_once`]).
 fn said(answer: &str, mails: usize) -> Vec<(usize, bool)> {
-    let mut said: Vec<(usize, bool)> = Vec::new();
+    let mut said: Vec<(usize, Option<bool>)> = Vec::new();
     for line in answer.lines() {
         let Some((n, verdict)) = line.split_once(':') else {
             continue;
@@ -686,17 +682,15 @@ fn said(answer: &str, mails: usize) -> Vec<(usize, bool)> {
         };
         let verdict = verdict.trim().to_lowercase();
         let many = if verdict.starts_with("many") {
-            true
+            Some(true)
         } else if verdict.starts_with("own") {
-            false
+            Some(false)
         } else {
-            continue;
+            None
         };
-        if !said.iter().any(|(m, _)| *m == n - 1) {
-            said.push((n - 1, many));
-        }
+        said.push((n - 1, many));
     }
-    said
+    said_once(said)
 }
 
 #[cfg(test)]
@@ -729,10 +723,16 @@ mod tests {
     #[test]
     fn the_answer_is_read_line_by_line() {
         assert_eq!(
-            said("1: many\nMail 3: own\n3: many\n9: own\n2: maybe\nnone", 3),
+            said("1: many\nMail 3: own\n9: own\n2: maybe\nnone", 3),
             vec![(0, true), (2, false)]
         );
         assert!(said("", 3).is_empty());
+        // A mail that gets its numbers said for others gets them said twice:
+        // neither counts.
+        assert_eq!(
+            said("1: own\n2: own\n2: many\n3: maybe\n3: own", 3),
+            vec![(0, false)]
+        );
     }
 
     #[test]
