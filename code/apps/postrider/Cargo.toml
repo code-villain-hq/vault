@@ -25,6 +25,10 @@ lettre = { version = "0.11.23", default-features = false, features = [
   "rustls-platform-verifier",
   "aws-lc-rs",
 ] }
+mail-auth = { version = "0.15.1", default-features = false, features = [
+  "rust-crypto",
+  "dns-hickory",
+] }
 mail-parser = "1"
 psl = "2.1"
 quick-xml = { version = "0.42", features = ["escape-html"] }

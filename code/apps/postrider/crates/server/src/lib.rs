@@ -21,6 +21,7 @@ pub mod mail;
 pub mod message;
 pub mod newsletters;
 pub mod preview;
+mod proof;
 pub mod reading;
 pub mod reply;
 pub mod rewrite;

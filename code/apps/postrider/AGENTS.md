@@ -382,6 +382,13 @@ yours, is named in the newsletters' rule (`Rule::senders`, `address :is
 at once, with the Mac off, and its new kinds of mail aren't asked while
 its verdicts are on record. One found writing about something of yours
 comes off it again, and a sender that writes both stays with Claude Code.
+Only verdicts on mail signed by the sender's own organisation count
+(`proven`, `proof.rs`: Postrider checks the DKIM signature itself, with
+DNS, since Uberspace leaves no Authentication-Results on most mail), so a
+stranger writing a bank's address in From can't get the bank named. A
+named sender with verdicts but none signed comes off the rule, and a
+verdict found on unsigned mail is asked again when the sender's signed
+mail of that kind comes.
 When the question changes, a migration forgets what it found sent to many
 and has Newsletters read again (`0017_question.sql`), so the notices it
 put there go back.

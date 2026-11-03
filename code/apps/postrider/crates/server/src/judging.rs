@@ -17,7 +17,11 @@
 //! something of yours, is named in the newsletters' rule
 //! ([`Rule::senders`]): its mail skips the Inbox from then on, with the Mac
 //! off too. One that writes both stays with Claude Code, and Keep in Inbox
-//! wins, as everywhere.
+//! wins, as everywhere. It counts only where the mail read was signed by
+//! the sender's own organisation (`proof.rs`): anyone can write a bank's
+//! address in From, and naming the bank would send its real notices past
+//! the Inbox. A verdict found on mail that wasn't is asked again when the
+//! sender's signed mail of that kind comes.
 //!
 //! A header that says the mail went to many sorts it, but doesn't decide:
 //! big senders put `List-Id` or `Precedence: bulk` on notices about your
@@ -44,6 +48,7 @@ use crate::ask::{Fence, as_read, said_once};
 use crate::imap::{Failure, Place};
 use crate::mail::Mail;
 use crate::newsletters::{Said, Told, but_yours, named};
+use crate::proof;
 use crate::rules::{self, Rule, When};
 
 /// How many mails one question reads.
@@ -56,8 +61,12 @@ const LOOK_AT: i64 = 100;
 const READ_AT_MOST: usize = 600;
 
 /// How often a sender must be found writing to many, in different kinds of
-/// mail and never about something of yours, before the rule names it.
+/// mail it signed and never about something of yours, before the rule
+/// names it.
 const NAMED_AFTER: i64 = 2;
+
+/// How many verdicts found on unsigned mail one round checks again.
+const PROVE_AT_MOST: usize = 20;
 
 /// How long to let new mail settle before reading it: it comes in runs.
 const SETTLE: Duration = Duration::from_secs(5);
@@ -422,8 +431,8 @@ impl Judge<'_> {
                 .or_default()
                 .push(mail.uid);
         }
-        let kept: Vec<(String, String, bool)> = sqlx::query_as(
-            "SELECT address, kind, many FROM newsletter_verdicts \
+        let kept: Vec<(String, String, bool, bool)> = sqlx::query_as(
+            "SELECT address, kind, many, proven FROM newsletter_verdicts \
              WHERE account_id = $1 AND address = ANY($2)",
         )
         .bind(self.account.id)
@@ -433,17 +442,35 @@ impl Judge<'_> {
         .map_err(|e| e.to_string())?;
         let on_record: HashSet<String> = kept
             .iter()
-            .filter(|(_, _, many)| *many)
-            .map(|(address, _, _)| address.clone())
+            .filter(|(_, _, many, _)| *many)
+            .map(|(address, ..)| address.clone())
+            .collect();
+        let unproven: HashSet<(String, String)> = kept
+            .iter()
+            .filter(|(_, _, many, proven)| *many && !*proven)
+            .map(|(address, kind, ..)| (address.clone(), kind.clone()))
             .collect();
         let mut found: HashMap<(String, String), bool> = kept
             .into_iter()
-            .map(|(address, kind, many)| ((address, kind), many))
+            .map(|(address, kind, many, _)| ((address, kind), many))
             .collect();
         for key in by_kind.keys() {
             let named = self.senders.contains(&key.0) && on_record.contains(&key.0);
             if named && !found.contains_key(key) {
                 found.insert(key.clone(), true);
+            }
+        }
+        // Sent to many, found on mail its sender didn't sign: a stranger
+        // may have written it. The sender's own mail of that kind is asked
+        // again.
+        let mut signed = HashSet::new();
+        for (key, uids) in by_kind.iter().filter(|(key, _)| unproven.contains(*key)) {
+            if signed.len() >= PROVE_AT_MOST {
+                break;
+            }
+            if self.proven(place, uids[0], &key.0).await {
+                signed.insert(uids[0]);
+                found.remove(key);
             }
         }
         let mut asks: Vec<(&(String, String), u32)> = by_kind
@@ -470,7 +497,7 @@ impl Judge<'_> {
                     continue;
                 };
                 match glances.get(uid) {
-                    Some(raw) => read.push((*key, shown(mail, raw, self.account))),
+                    Some(raw) => read.push((*key, *uid, shown(mail, raw, self.account))),
                     None => {
                         tracing::warn!(uid, "couldn't read a mail to judge it");
                         unread.extend(by_kind[*key].iter().copied());
@@ -483,7 +510,7 @@ impl Judge<'_> {
             // New for each question: no mail can know it, to start another.
             let fence = Fence::new();
             let system = format!("{SYSTEM}\n\n{}", fence.numbering());
-            let texts = read.iter().map(|(_, text)| text.as_str());
+            let texts = read.iter().map(|(_, _, text)| text.as_str());
             let answer = self
                 .claude_code
                 .ask(
@@ -506,17 +533,20 @@ impl Judge<'_> {
                 tracing::warn!(answer = %answer.text, "Claude Code's judging said nothing we read");
             }
             for (n, many) in said {
-                let (address, kind) = read[n].0;
+                let ((address, kind), uid, _) = read[n];
+                let proven =
+                    many && (signed.contains(&uid) || self.proven(place, uid, address).await);
                 sqlx::query(
-                    "INSERT INTO newsletter_verdicts (account_id, address, kind, many) \
-                     VALUES ($1, $2, $3, $4) \
+                    "INSERT INTO newsletter_verdicts (account_id, address, kind, many, proven) \
+                     VALUES ($1, $2, $3, $4, $5) \
                      ON CONFLICT (account_id, address, kind) \
-                     DO UPDATE SET many = $4, judged_at = now()",
+                     DO UPDATE SET many = $4, proven = $5, judged_at = now()",
                 )
                 .bind(self.account.id)
                 .bind(address)
                 .bind(kind)
                 .bind(many)
+                .bind(proven)
                 .execute(&self.mail.pool)
                 .await
                 .map_err(|e| e.to_string())?;
@@ -533,16 +563,33 @@ impl Judge<'_> {
         }
         Ok((verdicts, unread))
     }
+
+    /// Whether this mail was signed by its sender's organisation.
+    async fn proven(&self, place: Option<&Place>, uid: u32, address: &str) -> bool {
+        let key = place.map(Place::key);
+        match self
+            .mail
+            .source_of(self.account, key.as_deref(), i64::from(uid))
+            .await
+        {
+            Ok((_, raw)) => proof::proven(&raw, address).await,
+            Err(e) => {
+                tracing::warn!(error = %e, "couldn't read a mail to see who signed it");
+                false
+            }
+        }
+    }
 }
 
 /// Names in the newsletters' rule the senders Claude Code found writing to
-/// many [`NAMED_AFTER`] times and never about something of yours, and
-/// names no more one found writing about something of yours, or kept in
-/// the Inbox.
+/// many [`NAMED_AFTER`] times, in mail they signed, and never about
+/// something of yours, and names no more one found writing about something
+/// of yours, kept in the Inbox, or found writing to many only in mail it
+/// didn't sign.
 async fn name_senders(mail: &Mail, account: &MailAccount, rules: &[Rule]) -> Result<(), String> {
     let found: Vec<(String, bool, i64)> = sqlx::query_as(
-        "SELECT address, bool_and(many), count(*) FROM newsletter_verdicts \
-         WHERE account_id = $1 GROUP BY address",
+        "SELECT address, bool_and(many), count(*) FILTER (WHERE proven) \
+         FROM newsletter_verdicts WHERE account_id = $1 GROUP BY address",
     )
     .bind(account.id)
     .fetch_all(&mail.pool)
@@ -553,11 +600,14 @@ async fn name_senders(mail: &Mail, account: &MailAccount, rules: &[Rule]) -> Res
     let mut senders: Vec<String> = before
         .iter()
         .filter(|sender| !kept(sender))
-        .filter(|sender| !found.iter().any(|(a, many, _)| a == *sender && !many))
+        .filter(|sender| match found.iter().find(|(a, ..)| a == *sender) {
+            Some((_, many, proven)) => *many && *proven > 0,
+            None => true,
+        })
         .cloned()
         .collect();
-    for (address, many, count) in found {
-        if many && count >= NAMED_AFTER && !kept(&address) && !senders.contains(&address) {
+    for (address, many, proven) in found {
+        if many && proven >= NAMED_AFTER && !kept(&address) && !senders.contains(&address) {
             senders.push(address);
         }
     }
