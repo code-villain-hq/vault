@@ -7,6 +7,9 @@
 !kit/desktop
 !kit/scim
 !kit/settings
+!kit/auth
+!kit/claude
+!kit/notify
 **/target
 **/node_modules
 apps/forge/apps/web/dist

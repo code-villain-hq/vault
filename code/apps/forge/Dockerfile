@@ -39,14 +39,24 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release -p forge-server && cp target/release/forge-server /usr/local/bin/forge-server
 
 FROM debian:trixie-slim
-# git: drift checks read repositories with it.
+# git: drift checks read repositories with it. Forge's own clones (under
+# /var/lib/forge/repos) belong to the user that runs it, so git trusts them;
+# repositories mounted under /repos (local_repos_root) belong to whoever owns
+# them on the host, so git is told to trust that folder, and only that one.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/* \
-    && git config --system --add safe.directory '*'
+    && git config --system --add safe.directory '/repos/*'
+# The server runs as code-villain (10001:10001, the same in every Code Villain
+# image), which owns only what the server writes: the data folder.
+RUN groupadd --gid 10001 code-villain \
+    && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent \
+       --shell /usr/sbin/nologin code-villain \
+    && install -d -o 10001 -g 10001 -m 0750 /var/lib/forge
 COPY --from=server /usr/local/bin/forge-server /usr/local/bin/forge-server
 COPY --from=web /code/apps/forge/apps/web/dist /srv/forge/web
 ENV FORGE_ADDR=0.0.0.0:7380 \
     FORGE_WEB_DIR=/srv/forge/web \
     FORGE_DATA_DIR=/var/lib/forge
 VOLUME /var/lib/forge
+USER 10001:10001
 EXPOSE 7380
 CMD ["forge-server"]

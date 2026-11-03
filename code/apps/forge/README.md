@@ -129,3 +129,20 @@ docker run -d --name forge -p 7380:7380 -v forge-data:/var/lib/forge \
 ```
 
 Put it behind https at `public_url`; the image serves the web app too.
+
+The server runs as `code-villain` (uid and gid 10001), not root. It writes
+only to `/var/lib/forge` (attachments and its clones of GitHub
+repositories), which a new volume gives it. It must be able to read the
+settings file and a GitHub key file (`chown 10001 forge.toml`). Git trusts
+repositories mounted under `/repos` (`local_repos_root = "/repos"`)
+whoever owns them; mount them there, read-only.
+
+Upgrading from an image that ran as root: its volume belongs to root, and
+Forge can't write attachments or clones until it's handed over. Once, with
+the new image and the container stopped:
+
+```sh
+docker run --rm --user 0 --entrypoint chown -v forge-data:/var/lib/forge forge -R 10001:10001 /var/lib/forge
+```
+
+(`bun run app`'s volume is `villain-forge_forge-data`.)
