@@ -24,6 +24,8 @@ import {
   openedFrom,
   ownAddresses,
   rememberOpened,
+  rowsOf,
+  useRowsShown,
 } from "./inbox";
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
@@ -62,10 +64,13 @@ export function MailPage() {
   const own = useMemo(() => ownAddresses(accounts), [accounts]);
   const folder = from.folder;
   const conversation = listed ? undefined : inbox?.conversations.find((c) => hasMail(c, key));
-  // The Inbox steps by conversation, as its rows do; the other lists by mail.
-  const mails = listed
-    ? listedMails
-    : (inbox?.conversations ?? []).flatMap((c) => anchorOf(c) ?? []);
+  // The Inbox steps by conversation, as its rows do; the other lists by
+  // mail; both through what the list's filter shows.
+  const rows = useMemo(
+    () => (listed ? rowsOf(listedMails) : rowsOf(undefined, inbox?.conversations ?? [])),
+    [listed, listedMails, inbox],
+  );
+  const mails = useRowsShown(from, rows, key).map((row) => row.mail);
   const at = conversation ? anchorOf(conversation) : undefined;
   const index = mails.findIndex((mail) => mailKey(mail) === (at ? mailKey(at) : key));
   const [replying, setReplying] = useState(false);

@@ -7,6 +7,7 @@ import { FIRST_HOUR, HOURS, hoursIntoTrack, inLanes, nextUp } from "./day";
 import { SearchField } from "./folders";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
+import { listOf, NoneShown, pick, ShownControl, useShown } from "./shown";
 import { buttonClass, Empty } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
@@ -22,6 +23,7 @@ export function InboxList({ open }: { open: string | undefined }) {
   return (
     <>
       <PageHeader title="Inbox">
+        <ShownControl list="inbox" />
         <SearchField />
       </PageHeader>
       <PageBody>
@@ -84,14 +86,54 @@ export function rememberOpened(key: string) {
 }
 
 /** A row of a list: a mail, or in the Inbox a conversation, opened by its newest Inbox mail. */
-type Row = { mail: MailSummary; conversation?: Conversation };
+export type Row = { mail: MailSummary; conversation?: Conversation };
+
+/** A list's rows: the Inbox's `conversations`, or the other lists' `mails`. */
+export function rowsOf(mails?: MailSummary[], conversations?: Conversation[]): Row[] {
+  return (
+    conversations?.flatMap((conversation) => {
+      const mail = anchorOf(conversation);
+      return mail ? [{ mail, conversation }] : [];
+    }) ??
+    mails?.map((mail) => ({ mail })) ??
+    []
+  );
+}
+
+/** Whether a row is unread: a conversation is while any of its Inbox mail is. */
+export function unreadRow({ mail, conversation }: Row): boolean {
+  return (conversation?.mails ?? [mail]).some((m) => m.folder === mail.folder && !m.seen);
+}
+
+/** Whether a row is the mail `key`, or a conversation that has it. */
+function holds(row: Row, key: string | undefined): boolean {
+  return row.conversation ? hasMail(row.conversation, key) : mailKey(row.mail) === key;
+}
+
+/**
+ * The rows of the list `from` its filter shows (`shown.tsx`), and always
+ * the one with the mail `open`.
+ */
+export function useRowsShown(from: From, rows: Row[], open: string | undefined): Row[] {
+  const list = listOf(from);
+  const to = useShown(list);
+  return pick(
+    list,
+    to,
+    rows,
+    (row) => mailKey(row.mail),
+    unreadRow,
+    (row) => holds(row, open),
+  );
+}
 
 /**
  * A list of mail, the Inbox's or another's: J and K (and the arrows) move
  * through it, Enter or O opens the one they're on. With a mail open beside
  * it (`open`, its key), the mail takes the keys and the list follows it.
  * One that leaves the list, filed away, leaves them on the mail that takes
- * its place. The Inbox lists `conversations`, the others `mails`.
+ * its place. The Inbox lists `conversations`, the others `mails`, as
+ * its filter shows them: all, unread or read.
  */
 export function MailList({
   mails,
@@ -111,19 +153,9 @@ export function MailList({
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const list = useRef<HTMLOListElement>(null);
-  const rows = useMemo<Row[]>(
-    () =>
-      conversations?.flatMap((conversation) => {
-        const mail = anchorOf(conversation);
-        return mail ? [{ mail, conversation }] : [];
-      }) ??
-      mails?.map((mail) => ({ mail })) ??
-      [],
-    [mails, conversations],
-  );
+  const listed = useMemo(() => rowsOf(mails, conversations), [mails, conversations]);
+  const rows = useRowsShown(from, listed, open);
   const own = useMemo(() => ownAddresses(byId.values()), [byId]);
-  const holds = (row: Row, key: string | undefined) =>
-    row.conversation ? hasMail(row.conversation, key) : mailKey(row.mail) === key;
   // By key, so new mail at the top doesn't move it to another; where it
   // was, for when it leaves.
   const [focus, setFocus] = useState({ key: open ?? lastOpened, at: 0 });
@@ -166,6 +198,7 @@ export function MailList({
     list.current?.querySelector(`[data-index="${focused}"]`)?.scrollIntoView({ block: "nearest" });
   }, [focused]);
 
+  if (rows.length === 0 && listed.length > 0) return <NoneShown list={listOf(from)} />;
   return (
     <ol ref={list} className="mails" aria-label="Mail">
       {rows.map((row, index) => (
@@ -225,7 +258,7 @@ function MailRow({
   const { workspace } = useWorkspace();
   const all = conversation?.mails ?? [mail];
   const last = all.at(-1) ?? mail;
-  const unread = all.some((m) => m.folder === mail.folder && !m.seen);
+  const unread = unreadRow({ mail, conversation });
   const others = [...new Set(all.filter((m) => !isYours(m, own)).map((m) => m.from_name))];
   // Sent mail names who it went to.
   const who = conversation ? others.join(", ") || mail.from_name : (mail.to_name ?? mail.from_name);

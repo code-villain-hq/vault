@@ -45,6 +45,7 @@ import {
   writesFrom,
 } from "./rhythm";
 import { undoSender, useDoings } from "./sender";
+import { NoneShown, pick, ShownControl, useShown } from "./shown";
 import { Button, Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -183,13 +184,24 @@ export function NewslettersPage() {
     return [...read, ...[...done.values()].map((d) => d.row)];
   }, [data, done]);
   const never = all.filter((n) => neverOpened(n) && !done.has(senderKey(n)));
+  // Those with mail you haven't opened, or those you opened all of, as
+  // the filter asks; what was done to one shows whatever it asks.
+  const showing = useShown("newsletters");
+  const found = useMemo(() => all.filter((n) => finds(n, find)), [all, find]);
   const rows = useMemo(
     () =>
       sorted(
-        all.filter((n) => finds(n, find)),
+        pick(
+          "newsletters",
+          showing,
+          found,
+          senderKey,
+          (n) => unread(n) > 0,
+          (n) => done.has(senderKey(n)),
+        ),
         sort,
       ),
-    [all, find, sort],
+    [found, showing, done, sort],
   );
 
   const updateBatch = useCallback((id: string, change: Partial<Batch>) => {
@@ -395,6 +407,7 @@ export function NewslettersPage() {
   return (
     <>
       <PageHeader title="Newsletters">
+        <ShownControl list="newsletters" of="senders" />
         <FindSender text={find} onChange={setFind} />
       </PageHeader>
       <PageBody>
@@ -413,9 +426,11 @@ export function NewslettersPage() {
           {bulk ? (
             <BulkLead id={bulk[0]} batch={bulk[1]} done={done} onUndo={undo} />
           ) : (
-            // While you look for one sender, the ones you never open wait.
+            // While you look for one sender, or at those you read, the ones
+            // you never open wait.
             never.length > 0 &&
-            !find.trim() && (
+            !find.trim() &&
+            showing !== "read" && (
               <div className="lead">
                 {never.length === 1 ? (
                   <div>
@@ -457,8 +472,13 @@ export function NewslettersPage() {
           {all.length > 0 && (
             <div className="nl-table">
               <SortHeads sort={sort} onSort={sortBy} />
-              {rows.length === 0 && (
+              {found.length === 0 && (
                 <p className="nl-none text-muted">No senders match “{find.trim()}”.</p>
+              )}
+              {found.length > 0 && rows.length === 0 && (
+                <div className="nl-none">
+                  <NoneShown list="newsletters" of="senders" />
+                </div>
               )}
               <ol ref={listRef} aria-label="Newsletters">
                 {rows.map((row, index) => {

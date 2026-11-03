@@ -9,6 +9,7 @@ import { PageBody, PageHeader } from "./layout";
 import { useAccounts, useFolders, useInbox } from "./mail";
 import { cameBack } from "./newsletters";
 import { useSenderKeys } from "./sender";
+import { listOf, ShownControl } from "./shown";
 import { Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -176,6 +177,7 @@ export function FolderList({ folder, open }: { folder: string; open: string | un
         title={name}
         crumb={shown?.role === null ? <FolderName folder={shown} /> : undefined}
       >
+        <ShownControl list={listOf(from)} />
         <SearchField />
       </PageHeader>
       <PageBody>
@@ -249,6 +251,7 @@ export function SenderList({ sender, open }: { sender: string; open: string | un
           </Link>
         }
       >
+        <ShownControl list={listOf(from)} />
         <SearchField />
       </PageHeader>
       <PageBody>
@@ -394,6 +397,8 @@ export function SearchList({ q, open }: { q: string; open: string | undefined })
   return (
     <>
       <PageHeader title={q.trim() ? `“${q.trim()}”` : "Search"}>
+        {/* What a search showed stays only while it's searched for. */}
+        {q.trim() && <ShownControl key={q} list={listOf(from)} />}
         <SearchField query={q} />
       </PageHeader>
       <PageBody>

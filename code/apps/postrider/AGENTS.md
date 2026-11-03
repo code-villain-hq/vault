@@ -5,8 +5,8 @@ account, read over IMAP, with today's events from a CalDAV server (Radicale)
 above it. [`storyboards/a-day-with-your-mail.html`](storyboards/a-day-with-your-mail.html)
 is the approved storyboard; build from it, a step at a time, not beyond it.
 Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
-Trash and the other folders in the sidebar, Search mail (/), Settings →
-Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
+Trash and the other folders in the sidebar, Search mail (/), All, Unread
+and Read on every list (F), Settings → Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
 R to reply and its files to open. A folder's name in the top bar renames
 it; a right click on a sidebar item, or ⇧F10 on it, marks it all read,
 renames or deletes it, or empties Trash and Junk. A mail opens beside its list, in three columns: the
@@ -157,6 +157,20 @@ changes, when a folder or unread mail is opened, and every minute while
 the app shows; the folder shown reads its mail again with it. Every
 item but Sent, Drafts and Trash shows its unread count, Newsletters too,
 and none when nothing is unread.
+
+Every list, the Inbox, a folder, a sender's mail and a search, shows all
+its mail, only the unread or only the read (`shown.tsx`): All, Unread and
+Read in its top bar, or F, which goes from one to the next. Each list
+keeps its own while the app runs; all searches share one. A conversation
+is unread while any of its Inbox mail is, as its dot says. What a list
+showed since its filter was picked stays while you're on it, so mail you
+open in Unread doesn't leave under you, and J and K on an open mail go
+through what the list shows. A list the filter leaves empty says so, "No
+unread mail", with Show all mail. The Newsletters page does the same with
+its senders: those with mail you haven't opened, or those you opened all
+of; a sender something was just done to shows either way. The list's top
+bar keeps room for the filter and the search field: the breadcrumb's
+parent gives way first, and under 480px it names only the list.
 
 Today is read live too: `GET /api/w/{id}/day?from&to` asks the CalDAV
 server for every calendar's events (`caldav.rs`). A calendar wears the hue

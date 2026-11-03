@@ -217,6 +217,7 @@
   color: var(--faint);
 }
 .search input {
+  width: 0;
   min-width: 0;
   flex: 1;
   background: none;
@@ -232,6 +233,40 @@
 }
 .search .ui-kbd {
   margin-left: auto;
+}
+
+/* The list's top bar keeps room for what it shows, all, unread or read,
+   and the search field: the breadcrumb gives way, a narrow list names only
+   itself, and a narrower one puts them under its name (`list`, the
+   column's width). */
+.mail-list .app-topbar > div {
+  min-width: min-content;
+}
+.mail-list .app-topbar nav > :first-child:not(:last-child) {
+  flex-shrink: 100;
+  min-width: 2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container list (width < 480px) {
+  .mail-list .app-topbar nav > :not(:last-child) {
+    display: none;
+  }
+  .mail-list .search .ui-kbd {
+    display: none;
+  }
+}
+@container list (width < 380px) {
+  .mail-list .app-topbar {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+  }
+  .mail-list .app-topbar > div {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 /* A folder's name in the top bar: clicked, a field to rename it. */
@@ -282,6 +317,7 @@ input.crumb-name {
   border-radius: var(--radius-lg);
 }
 .mail-list {
+  container: list / inline-size;
   width: min(var(--list-width), 50%);
 }
 /* The field to ask Postrider is the foot of the list's panel. */
