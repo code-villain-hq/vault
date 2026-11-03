@@ -2341,6 +2341,199 @@ async fn a_spec_change_follows_what_it_names(pool: PgPool) {
     assert_eq!(left, 0);
 }
 
+fn search(query: &str) -> SearchIssues {
+    SearchIssues {
+        query: Some(query.into()),
+        assignee: None,
+        ..search_assigned_to("me")
+    }
+}
+
+/// The identifiers a search found, in order, and how many it found in all.
+async fn found(pool: &PgPool, agent: Actor, input: SearchIssues) -> (Vec<String>, u64) {
+    let found = parse(search_issues(pool, agent, input).await.unwrap());
+    let identifiers = found["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["identifier"].as_str().unwrap().to_string())
+        .collect();
+    (identifiers, found["total"].as_u64().unwrap())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn search_finds_words_and_identifiers_newest_first(pool: PgPool) {
+    let s = setup(pool).await;
+    let pool = &s.app.pool;
+    for (title, description, status) in [
+        ("Fix the Login page", "Users can't sign in.", "Todo"),
+        (
+            "Add dark mode",
+            "A night theme for the LOGIN screen.",
+            "In Progress",
+        ),
+        ("Old login bug", "", "Done"),
+        ("Unrelated", "Nothing to see.", "Backlog"),
+        ("Reach 100% coverage", "snake_case names", "Todo"),
+    ] {
+        create_issue(
+            pool,
+            s.person,
+            CreateIssue {
+                description: Some(description.into()),
+                ..new_issue(title, status, Some(true))
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let strs = |ids: &[&str]| ids.iter().map(|i| i.to_string()).collect::<Vec<_>>();
+
+    // Titles and descriptions, whatever the case; open issues, last changed first.
+    assert_eq!(
+        found(pool, s.agent, search("login")).await,
+        (strs(&["FOR-2", "FOR-1"]), 2)
+    );
+    move_issue(pool, s.person, "FOR-1", Some("Backlog"), None).await;
+    assert_eq!(
+        found(pool, s.agent, search("LogIn")).await,
+        (strs(&["FOR-1", "FOR-2"]), 2)
+    );
+    let closed_too = SearchIssues {
+        include_closed: Some(true),
+        ..search("login")
+    };
+    assert_eq!(
+        found(pool, s.agent, closed_too).await,
+        (strs(&["FOR-1", "FOR-3", "FOR-2"]), 3)
+    );
+    // At most `limit`, still counting them all.
+    let one = SearchIssues {
+        limit: Some(1),
+        ..search("login")
+    };
+    assert_eq!(found(pool, s.agent, one).await, (strs(&["FOR-1"]), 2));
+    let none = SearchIssues {
+        limit: Some(0),
+        ..search("login")
+    };
+    assert_eq!(found(pool, s.agent, none).await, (vec![], 2));
+
+    // An identifier finds its issue, closed only when asked.
+    assert_eq!(
+        found(pool, s.agent, search("for-4")).await,
+        (strs(&["FOR-4"]), 1)
+    );
+    assert_eq!(found(pool, s.agent, search("FOR-3")).await, (vec![], 0));
+    let done = SearchIssues {
+        include_closed: Some(true),
+        ..search("FOR-3")
+    };
+    assert_eq!(found(pool, s.agent, done).await, (strs(&["FOR-3"]), 1));
+    assert_eq!(found(pool, s.agent, search("FOR-04")).await, (vec![], 0));
+
+    // Words are taken as they are, wildcards and all.
+    assert_eq!(
+        found(pool, s.agent, search("100%")).await,
+        (strs(&["FOR-5"]), 1)
+    );
+    assert_eq!(
+        found(pool, s.agent, search("e_c")).await,
+        (strs(&["FOR-5"]), 1)
+    );
+    assert_eq!(
+        found(pool, s.agent, search("%")).await,
+        (strs(&["FOR-5"]), 1)
+    );
+
+    // Filters without words; an empty query is none.
+    let in_progress = SearchIssues {
+        status: Some("in progress".into()),
+        ..search("")
+    };
+    assert_eq!(
+        found(pool, s.agent, in_progress).await,
+        (strs(&["FOR-2"]), 1)
+    );
+    let team = SearchIssues {
+        team: Some("for".into()),
+        query: None,
+        ..search("")
+    };
+    assert_eq!(found(pool, s.agent, team).await.1, 4);
+
+    // By project and service.
+    save_project(
+        pool,
+        s.agent,
+        SaveProject {
+            project: None,
+            name: Some("Launch".into()),
+            description: None,
+            status: None,
+            lead: None,
+            initiative: None,
+            target_date: None,
+        },
+    )
+    .await
+    .unwrap();
+    save_service(
+        pool,
+        s.agent,
+        SaveService {
+            service: None,
+            name: Some("Web app".into()),
+            description: None,
+            team: None,
+            repository: None,
+            paths: None,
+            current_state: None,
+        },
+    )
+    .await
+    .unwrap();
+    for (identifier, project, service) in
+        [("FOR-1", "Launch", "none"), ("FOR-4", "none", "Web app")]
+    {
+        update_issue(
+            pool,
+            s.person,
+            UpdateIssue {
+                project: Some(project.into()),
+                service: Some(service.into()),
+                ..update(identifier)
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let launch = SearchIssues {
+        project: Some("launch".into()),
+        ..search("")
+    };
+    assert_eq!(found(pool, s.agent, launch).await, (strs(&["FOR-1"]), 1));
+    let web = SearchIssues {
+        service: Some("Web app".into()),
+        ..search("")
+    };
+    assert_eq!(found(pool, s.agent, web).await, (strs(&["FOR-4"]), 1));
+
+    // Only issues in Triage wait for triage.
+    create_issue(
+        pool,
+        s.person,
+        new_issue("Something broke", "Triage", Some(true)),
+    )
+    .await
+    .unwrap();
+    let waiting = SearchIssues {
+        needs_triage: Some(true),
+        ..search("")
+    };
+    assert_eq!(found(pool, s.agent, waiting).await, (strs(&["FOR-6"]), 1));
+}
+
 fn search_assigned_to(assignee: &str) -> SearchIssues {
     SearchIssues {
         query: None,
@@ -2414,6 +2607,15 @@ async fn agents_take_their_issues_in_queue_order(pool: PgPool) {
             ("Someday", None),
         ]
     );
+
+    // Words narrow the list, not the queue: each keeps its place in it.
+    let low = SearchIssues {
+        query: Some("low".into()),
+        ..search_assigned_to("me")
+    };
+    let found = parse(search_issues(pool, s.agent, low).await.unwrap());
+    assert_eq!(found["total"], 1);
+    assert_eq!(found["issues"][0]["queue_position"], 3);
 
     // The issue itself says where it is in the queue.
     let issue = parse(get_issue(pool, s.agent, issue_ref("FOR-4")).await.unwrap());

@@ -8,12 +8,12 @@ use chrono::Utc;
 use forge_domain::{
     Actor, Decision, DecisionStatus, Issue, IssueChange, IssuePatch, ModelKind, Operation, Spec,
     SpecChange, SpecDelta, SpecStatus, StateType, Transaction, UserKind, Validate,
-    convention_warnings, parse_delta, queue_order, requirement_warnings, requirements, touched,
+    convention_warnings, parse_delta, requirement_warnings, requirements, touched,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use sqlx::PgPool;
+use sqlx::{AssertSqlSafe, PgPool};
 use uuid::Uuid;
 
 use super::snapshot::{Snapshot, ToolResult};
@@ -137,16 +137,38 @@ pub struct SearchIssues {
 }
 
 pub async fn search_issues(pool: &PgPool, actor: Actor, input: SearchIssues) -> ToolResult<String> {
-    let s = Snapshot::load(pool, actor).await?;
+    // Names to look up and summaries need these, not every issue: the
+    // database finds the issues.
+    let mut s = Snapshot::load_models(
+        pool,
+        actor,
+        &[
+            ModelKind::Team,
+            ModelKind::WorkflowState,
+            ModelKind::User,
+            ModelKind::Project,
+            ModelKind::Service,
+        ],
+    )
+    .await?;
     let team = input.team.as_deref().map(|t| s.team(t)).transpose()?;
+    let team = team.map(|t| t.id);
     let assignee = input.assignee.as_deref().map(|a| s.user(a)).transpose()?;
+    let assignee = assignee.map(|a| a.id);
     let project = input.project.as_deref().map(|p| s.project(p)).transpose()?;
+    let project = project.map(|p| p.id);
     let service = input
         .service
         .as_deref()
         .map(|sv| s.service(sv))
         .transpose()?;
-    let query = input.query.as_deref().map(str::to_lowercase);
+    let service = service.map(|sv| sv.id);
+    // An empty query finds everything, as every text contains it.
+    let query = input
+        .query
+        .as_deref()
+        .map(str::to_lowercase)
+        .filter(|q| !q.is_empty());
     let include_closed = input.include_closed.unwrap_or(false);
     let triaged = if input.needs_triage.unwrap_or(false) {
         Some(triage::triaged(pool, actor.workspace_id).await?)
@@ -154,57 +176,125 @@ pub async fn search_issues(pool: &PgPool, actor: Actor, input: SearchIssues) -> 
         None
     };
 
-    let mut found: Vec<&Issue> =
-        s.issues
+    let states_where = |keep: &dyn Fn(&forge_domain::WorkflowState) -> bool| -> Vec<Uuid> {
+        s.states
             .iter()
-            .filter(|i| team.is_none_or(|t| i.team_id == t.id))
-            .filter(|i| assignee.is_none_or(|a| i.assignee_id == Some(a.id)))
-            .filter(|i| project.is_none_or(|p| i.project_id == Some(p.id)))
-            .filter(|i| service.is_none_or(|sv| i.service_id == Some(sv.id)))
-            .filter(|i| {
-                let state = s.state_of(i);
-                let closed = state.is_some_and(|st| {
-                    matches!(
-                        st.kind,
-                        forge_domain::StateType::Completed | forge_domain::StateType::Canceled
-                    )
-                });
-                (include_closed || !closed)
-                    && input.status.as_deref().is_none_or(|name| {
-                        state.is_some_and(|st| st.name.eq_ignore_ascii_case(name))
-                    })
-            })
-            .filter(|i| {
-                triaged.as_ref().is_none_or(|triaged| {
-                    s.state_of(i)
-                        .is_some_and(|st| st.kind == forge_domain::StateType::Triage)
-                        && !triaged.contains(&i.id)
-                })
-            })
-            .filter(|i| {
-                query.as_deref().is_none_or(|q| {
-                    s.identifier(i).to_lowercase() == q
-                        || i.title.to_lowercase().contains(q)
-                        || i.description.to_lowercase().contains(q)
-                })
-            })
+            .filter(|st| keep(st))
+            .map(|st| st.id)
+            .collect()
+    };
+    let closed = states_where(&|st| matches!(st.kind, StateType::Completed | StateType::Canceled));
+    let status = input
+        .status
+        .as_deref()
+        .map(|name| states_where(&|st| st.name.eq_ignore_ascii_case(name)));
+    let triage_states = triaged
+        .as_ref()
+        .map(|_| states_where(&|st| st.kind == StateType::Triage));
+    // A query like FOR-12 finds that issue too.
+    let identified = query.as_deref().and_then(|q| {
+        let (key, number) = q.rsplit_once('-')?;
+        let n: i32 = number.parse().ok()?;
+        let teams: Vec<Uuid> = s
+            .teams
+            .iter()
+            .filter(|t| t.key.to_lowercase() == key)
+            .map(|t| t.id)
             .collect();
-    if assignee.is_some() {
-        // The order agents take work in: the assignee's queue first (by
-        // priority, then age), then the rest by the same rules.
-        found.sort_by(|a, b| {
-            let queued = |i: &Issue| s.queue.contains_key(&i.id);
-            queued(b).cmp(&queued(a)).then_with(|| queue_order(a, b))
-        });
+        (n.to_string() == number && !teams.is_empty()).then_some((teams, n))
+    });
+    let (identified_teams, identified_number) = identified.unzip();
+
+    // Each issue waiting in an agent's queue, for its place there.
+    let agents: Vec<Uuid> = s
+        .users
+        .iter()
+        .filter(|u| u.kind == UserKind::Agent)
+        .map(|u| u.id)
+        .collect();
+    let open = states_where(&|st| matches!(st.kind, StateType::Unstarted | StateType::Started));
+    let teams: Vec<Uuid> = s.teams.iter().map(|t| t.id).collect();
+    let queued: Vec<Value> = sqlx::query_scalar(
+        "SELECT to_jsonb(t.*) FROM issues AS t WHERE t.workspace_id = $1 \
+         AND t.team_id = ANY($2) AND t.assignee_id = ANY($3) AND t.state_id = ANY($4) \
+         ORDER BY t.created_at",
+    )
+    .bind(actor.workspace_id)
+    .bind(&teams)
+    .bind(&agents)
+    .bind(&open)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    s.issues = issues_from(queued)?;
+    s.queue = forge_domain::queue_positions(&s.issues, &s.states, &s.users);
+    let in_queue: Vec<Uuid> = s.queue.keys().copied().collect();
+
+    // The order agents take work in when it's someone's: the assignee's
+    // queue first (by priority, then age: `queue_order`), then the rest by
+    // the same rules.
+    // Otherwise the last changed first.
+    let order = if assignee.is_some() {
+        "t.id = ANY($15) DESC, CASE WHEN t.priority = 0 THEN 5 ELSE t.priority END, \
+         t.created_at, t.id"
     } else {
-        found.sort_by_key(|i| std::cmp::Reverse(i.updated_at));
-    }
+        "t.updated_at DESC, t.created_at, t.id"
+    };
     let limit = input.limit.unwrap_or(25).min(200);
-    let total = found.len();
+    // The issues the agent sees (in the teams it sees) that match, counted
+    // in all, and the first `limit` of them. Words are matched as they are,
+    // so `%` and `_` are no wildcards.
+    let (total, found): (i64, Value) = sqlx::query_as(AssertSqlSafe(format!(
+        "WITH found AS ( \
+           SELECT t.* FROM issues AS t WHERE t.workspace_id = $1 AND t.team_id = ANY($2) \
+           AND ($3::uuid IS NULL OR t.team_id = $3) \
+           AND ($4::uuid IS NULL OR t.assignee_id = $4) \
+           AND ($5::uuid IS NULL OR t.project_id = $5) \
+           AND ($6::uuid IS NULL OR t.service_id = $6) \
+           AND ($7 OR NOT t.state_id = ANY($8)) \
+           AND ($9::uuid[] IS NULL OR t.state_id = ANY($9)) \
+           AND ($10::uuid[] IS NULL OR (t.state_id = ANY($10) AND NOT t.id = ANY($11))) \
+           AND ($12::text IS NULL \
+                OR (t.team_id = ANY($13) AND t.number = $14) \
+                OR strpos(lower(t.title), $12) > 0 \
+                OR strpos(lower(t.description), $12) > 0)) \
+         SELECT (SELECT count(*) FROM found), \
+           COALESCE((SELECT jsonb_agg(to_jsonb(t.*) ORDER BY {order}) \
+             FROM (SELECT * FROM found AS t ORDER BY {order} LIMIT $16) AS t), '[]')"
+    )))
+    .bind(actor.workspace_id)
+    .bind(&teams)
+    .bind(team)
+    .bind(assignee)
+    .bind(project)
+    .bind(service)
+    .bind(include_closed)
+    .bind(&closed)
+    .bind(status)
+    .bind(triage_states)
+    .bind(triaged.unwrap_or_default())
+    .bind(query.as_deref())
+    .bind(identified_teams.unwrap_or_default())
+    .bind(identified_number)
+    .bind(&in_queue)
+    .bind(limit as i64)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    let found = match found {
+        Value::Array(rows) => issues_from(rows)?,
+        _ => Vec::new(),
+    };
     pretty(json!({
         "total": total,
-        "issues": found.into_iter().take(limit).map(|i| issue_summary(&s, i)).collect::<Vec<_>>(),
+        "issues": found.iter().map(|i| issue_summary(&s, i)).collect::<Vec<_>>(),
     }))
+}
+
+fn issues_from(rows: Vec<Value>) -> ToolResult<Vec<Issue>> {
+    rows.into_iter()
+        .map(|row| serde_json::from_value(row).map_err(|e| e.to_string()))
+        .collect()
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
