@@ -131,6 +131,10 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
   `config.rs`, and `forge.example.toml`. `serve.rs` runs it on a listener
   until told to stop, for the server binary and the desktop app alike; `local.rs` is the one person of
   the desktop app's own Forge, who signs in to nothing.
+  `runners.rs` POSTs wake-ups to the URL an agent's runner gives: this
+  Mac and private networks on purpose, a link-local or cloud-metadata
+  address never, even through a name that resolves there (`code/kit/net`,
+  `Reach::OwnNetworks`).
 - `crates/ai`: model provider (Claude), agent loop, read-only repository
   access.
 - `packages/types`: generated from Rust. Never edit by hand.

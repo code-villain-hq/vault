@@ -51,6 +51,7 @@ forge-ai = { path = "crates/ai" }
 code-villain-auth = { path = "../../kit/auth" }
 code-villain-claude = { path = "../../kit/claude" }
 code-villain-desktop = { path = "../../kit/desktop" }
+code-villain-net = { path = "../../kit/net" }
 code-villain-notify = { path = "../../kit/notify" }
 code-villain-scim = { path = "../../kit/scim" }
 code-villain-settings = { path = "../../kit/settings" }

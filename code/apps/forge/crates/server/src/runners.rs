@@ -16,6 +16,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
+use code_villain_net::Reach;
 use forge_domain::{RunnerInfo, RunnerSecret, SetRunnerRequest, WakeupInfo};
 use forge_sync::WORK_LEASE_MINUTES;
 use hmac::{Hmac, KeyInit, Mac};
@@ -218,7 +219,9 @@ pub async fn of_workspace(
 /// Delivers wake-ups for the life of the server: whenever a workspace
 /// changes (that's when they're queued), and every few seconds for retries.
 pub async fn worker(state: AppState) {
-    let client = match reqwest::Client::builder()
+    // Runners on this Mac or the company's network are fine; a link-local
+    // or cloud-metadata address never, even through a name (`code/kit/net`).
+    let client = match code_villain_net::client(Reach::OwnNetworks)
         .timeout(TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
         .build()
@@ -300,20 +303,27 @@ async fn deliver_next(pool: &PgPool, client: &reqwest::Client) -> Result<bool, A
         "agent_id": agent,
     })
     .to_string();
-    let result = client
-        .post(&url)
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .header(reqwest::header::USER_AGENT, "Forge")
-        .header(SIGNATURE_HEADER, signature(&secret, body.as_bytes()))
-        .body(body)
-        .send()
-        .await;
-    let error = match result {
-        Ok(response) if response.status().is_success() => None,
-        Ok(response) => Some(format!("HTTP {}", response.status().as_u16())),
-        Err(e) if e.is_timeout() => Some("timed out".to_string()),
-        Err(e) if e.is_connect() => Some("couldn't connect".to_string()),
-        Err(_) => Some("request failed".to_string()),
+    // An address in the URL never reaches the resolver: checked here too,
+    // for a runner saved before the check.
+    let allowed = reqwest::Url::parse(&url).is_ok_and(|url| Reach::OwnNetworks.allows_url(&url));
+    let error = if !allowed {
+        Some("a link-local or metadata address".to_string())
+    } else {
+        let result = client
+            .post(&url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::USER_AGENT, "Forge")
+            .header(SIGNATURE_HEADER, signature(&secret, body.as_bytes()))
+            .body(body)
+            .send()
+            .await;
+        match result {
+            Ok(response) if response.status().is_success() => None,
+            Ok(response) => Some(format!("HTTP {}", response.status().as_u16())),
+            Err(e) if e.is_timeout() => Some("timed out".to_string()),
+            Err(e) if e.is_connect() => Some("couldn't connect".to_string()),
+            Err(_) => Some("request failed".to_string()),
+        }
     };
 
     match error {
@@ -389,9 +399,11 @@ fn new_secret() -> String {
     format!("{SECRET_PREFIX}{}", new_token())
 }
 
-/// An http(s) URL, as given (trimmed). Loopback and ordinary hosts are fine;
+/// An http(s) URL, as given (trimmed). This Mac and private networks are
+/// fine (a runner on the PO's Mac, or on the company's network);
 /// link-local and cloud-metadata addresses are not — Forge would otherwise
-/// POST wake-ups into the server's own cloud or LAN link.
+/// POST wake-ups into the server's own cloud or LAN link. A name that
+/// resolves there is refused as the wake-up connects ([`worker`]'s client).
 fn clean_url(url: &str) -> Result<String, AppError> {
     let url = url.trim();
     let parsed = reqwest::Url::parse(url)
@@ -401,40 +413,12 @@ fn clean_url(url: &str) -> Result<String, AppError> {
             "the runner URL must start with http:// or https://",
         ));
     }
-    if parsed.host_str().is_some_and(|host| !runner_host_ok(host)) {
+    if !Reach::OwnNetworks.allows_url(&parsed) {
         return Err(AppError::invalid(
             "the runner URL can't point at a link-local or metadata address",
         ));
     }
     Ok(url.to_string())
-}
-
-fn runner_host_ok(host: &str) -> bool {
-    let host = host
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .trim_end_matches('.')
-        .to_ascii_lowercase();
-    match host.parse::<std::net::IpAddr>() {
-        Ok(ip) => !link_local_or_metadata(ip),
-        Err(_) => {
-            host != "metadata.google.internal" && !host.ends_with(".metadata.google.internal")
-        }
-    }
-}
-
-fn link_local_or_metadata(ip: std::net::IpAddr) -> bool {
-    match ip {
-        std::net::IpAddr::V4(ip) => {
-            let [a, b, ..] = ip.octets();
-            // 169.254.0.0/16 is link-local; cloud metadata sits in it too.
-            ip.is_link_local() || (a == 169 && b == 254)
-        }
-        std::net::IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
-            Some(v4) => link_local_or_metadata(std::net::IpAddr::V4(v4)),
-            None => ip.is_unicast_link_local(),
-        },
-    }
 }
 
 /// A value stored as its snake_case name, such as an event or status.
@@ -452,5 +436,9 @@ mod tests {
         assert!(clean_url("https://runner.example/wake").is_ok());
         assert!(clean_url("http://169.254.169.254/latest").is_err());
         assert!(clean_url("http://metadata.google.internal/").is_err());
+        assert!(clean_url("http://2852039166/").is_err());
+        assert!(clean_url("http://[::ffff:169.254.169.254]/").is_err());
+        assert!(clean_url("http://[fe80::1]/").is_err());
+        assert!(clean_url("http://192.168.1.20:9876/wake").is_ok());
     }
 }

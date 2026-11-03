@@ -10,6 +10,7 @@
 !kit/auth
 !kit/claude
 !kit/notify
+!kit/net
 **/target
 **/node_modules
 apps/forge/apps/web/dist
