@@ -325,3 +325,77 @@ async fn technical_names_when_errors_and_versions_began(pool: PgPool) {
     assert_eq!(time(&errors[0]["first_seen"]), boom_began);
     assert_eq!(errors[0]["first_version"], "v1");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_big_batch_goes_in_at_once(pool: PgPool) {
+    use raven_server::telemetry::{Batch, LogRecord, SpanRecord, insert};
+
+    let app = App::new(pool.clone());
+    let (ada, workspace) = app.signup("Ada", "Studio").await;
+    let (forge, _) = app_with_key(&app, &ada, &workspace, "forge").await;
+    // More rows than bind parameters would allow one VALUES row each.
+    let started_at = Utc::now();
+    let batch = Batch {
+        app: Some(forge),
+        spans: (0..10_000)
+            .map(|i| SpanRecord {
+                trace_id: format!("t{i}"),
+                span_id: format!("s{i}"),
+                parent_span_id: (i % 2 == 1).then(|| format!("s{}", i - 1)),
+                name: "GET /".into(),
+                kind: "server".into(),
+                started_at,
+                duration_ms: f64::from(i),
+                is_error: i % 7 == 0,
+                error_message: (i % 7 == 0).then(|| "boom".into()),
+                http_status: (i % 3 == 0).then_some(200),
+                version: None,
+                attributes: json!({ "i": i }),
+            })
+            .collect(),
+        logs: (0..10_000)
+            .map(|i| LogRecord {
+                at: started_at,
+                level: "info".into(),
+                message: format!("line {i}"),
+                target: None,
+                trace_id: Some(format!("t{i}")),
+                span_id: None,
+                attributes: json!({}),
+            })
+            .collect(),
+    };
+    insert(&pool, &batch).await.unwrap();
+    let spans: (i64, i64, i64, f64, i64) = sqlx::query_as(
+        "SELECT count(*), count(parent_span_id), count(*) FILTER (WHERE is_error), \
+         sum(duration_ms), count(http_status) FROM spans WHERE app_id = $1",
+    )
+    .bind(forge)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(spans, (10_000, 5_000, 1_429, 49_995_000.0, 3_334));
+    let in_order: Vec<String> =
+        sqlx::query_scalar("SELECT message FROM logs WHERE app_id = $1 ORDER BY id")
+            .bind(forge)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(in_order.len(), 10_000);
+    assert!(
+        in_order
+            .iter()
+            .enumerate()
+            .all(|(i, m)| *m == format!("line {i}"))
+    );
+    // Nothing to store is no work.
+    insert(
+        &pool,
+        &Batch {
+            app: Some(forge),
+            ..Batch::default()
+        },
+    )
+    .await
+    .unwrap();
+}

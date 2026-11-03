@@ -118,46 +118,76 @@ pub async fn write(pool: PgPool, mut rx: mpsc::Receiver<Batch>) {
     }
 }
 
-/// Stores a batch in one transaction.
+/// A batch's spans, one array a column, in one statement.
+const INSERT_SPANS: &str = "INSERT INTO spans (app_id, trace_id, span_id, parent_span_id, name, \
+    kind, started_at, duration_ms, is_error, error_message, http_status, version, attributes) \
+    SELECT $1, trace_id, span_id, parent_span_id, name, kind, started_at, duration_ms, is_error, \
+      error_message, http_status, version, attributes \
+    FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], \
+      $8::float8[], $9::bool[], $10::text[], $11::int4[], $12::text[], $13::jsonb[]) \
+      WITH ORDINALITY AS t(trace_id, span_id, parent_span_id, name, kind, started_at, duration_ms, \
+        is_error, error_message, http_status, version, attributes, n) \
+    ORDER BY n";
+
+/// A batch's log lines in one statement, in the order they came, so lines
+/// with the same time keep it.
+const INSERT_LOGS: &str = "INSERT INTO logs (app_id, at, level, message, target, trace_id, \
+    span_id, attributes) \
+    SELECT $1, at, level, message, target, trace_id, span_id, attributes \
+    FROM unnest($2::timestamptz[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], \
+      $8::jsonb[]) WITH ORDINALITY AS t(at, level, message, target, trace_id, span_id, attributes, n) \
+    ORDER BY n";
+
+/// Stores a batch in one transaction: one statement for its spans and one
+/// for its logs. One record Postgres won't take turns the whole batch away.
 pub async fn insert(pool: &PgPool, batch: &Batch) -> Result<(), sqlx::Error> {
     let Some(app) = batch.app else { return Ok(()) };
+    if batch.spans.is_empty() && batch.logs.is_empty() {
+        return Ok(());
+    }
     let mut db = pool.begin().await?;
-    for span in &batch.spans {
-        sqlx::query(
-            "INSERT INTO spans (app_id, trace_id, span_id, parent_span_id, name, kind, started_at, \
-             duration_ms, is_error, error_message, http_status, version, attributes) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+    if !batch.spans.is_empty() {
+        let spans = &batch.spans;
+        let column = |f: fn(&SpanRecord) -> &str| spans.iter().map(f).collect::<Vec<_>>();
+        let optional = |f: fn(&SpanRecord) -> Option<&str>| spans.iter().map(f).collect::<Vec<_>>();
+        timed(
+            "store spans",
+            INSERT_SPANS,
+            sqlx::query(INSERT_SPANS)
+                .bind(app)
+                .bind(column(|s| &s.trace_id))
+                .bind(column(|s| &s.span_id))
+                .bind(optional(|s| s.parent_span_id.as_deref()))
+                .bind(column(|s| &s.name))
+                .bind(column(|s| &s.kind))
+                .bind(spans.iter().map(|s| s.started_at).collect::<Vec<_>>())
+                .bind(spans.iter().map(|s| s.duration_ms).collect::<Vec<_>>())
+                .bind(spans.iter().map(|s| s.is_error).collect::<Vec<_>>())
+                .bind(optional(|s| s.error_message.as_deref()))
+                .bind(spans.iter().map(|s| s.http_status).collect::<Vec<_>>())
+                .bind(optional(|s| s.version.as_deref()))
+                .bind(spans.iter().map(|s| &s.attributes).collect::<Vec<_>>())
+                .execute(&mut *db),
         )
-        .bind(app)
-        .bind(&span.trace_id)
-        .bind(&span.span_id)
-        .bind(&span.parent_span_id)
-        .bind(&span.name)
-        .bind(&span.kind)
-        .bind(span.started_at)
-        .bind(span.duration_ms)
-        .bind(span.is_error)
-        .bind(&span.error_message)
-        .bind(span.http_status)
-        .bind(&span.version)
-        .bind(&span.attributes)
-        .execute(&mut *db)
         .await?;
     }
-    for log in &batch.logs {
-        sqlx::query(
-            "INSERT INTO logs (app_id, at, level, message, target, trace_id, span_id, attributes) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    if !batch.logs.is_empty() {
+        let logs = &batch.logs;
+        let optional = |f: fn(&LogRecord) -> Option<&str>| logs.iter().map(f).collect::<Vec<_>>();
+        timed(
+            "store logs",
+            INSERT_LOGS,
+            sqlx::query(INSERT_LOGS)
+                .bind(app)
+                .bind(logs.iter().map(|l| l.at).collect::<Vec<_>>())
+                .bind(logs.iter().map(|l| l.level.as_str()).collect::<Vec<_>>())
+                .bind(logs.iter().map(|l| l.message.as_str()).collect::<Vec<_>>())
+                .bind(optional(|l| l.target.as_deref()))
+                .bind(optional(|l| l.trace_id.as_deref()))
+                .bind(optional(|l| l.span_id.as_deref()))
+                .bind(logs.iter().map(|l| &l.attributes).collect::<Vec<_>>())
+                .execute(&mut *db),
         )
-        .bind(app)
-        .bind(log.at)
-        .bind(&log.level)
-        .bind(&log.message)
-        .bind(&log.target)
-        .bind(&log.trace_id)
-        .bind(&log.span_id)
-        .bind(&log.attributes)
-        .execute(&mut *db)
         .await?;
     }
     db.commit().await
