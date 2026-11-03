@@ -2,8 +2,8 @@
 //! change what, the fields only the server sets, and what else a change does,
 //! such as notifying people, waking agents and spec changes taking effect.
 
-use code_villain_sync::{Origin, Rules, apply_operation, insert, log};
-use forge_domain::{Actor, ModelKind, Operation, SyncAction, Write};
+use code_villain_sync::{Origin, Rules, apply_operation};
+use forge_domain::{Actor, ModelKind, Operation, Write};
 use serde_json::{Map, Value, json};
 use sqlx::{AssertSqlSafe, PgConnection};
 use uuid::Uuid;
@@ -465,7 +465,8 @@ async fn newly_mentioned(
 }
 
 /// Creates the notifications for members still in the workspace, and
-/// returns the sync id of the last one.
+/// returns the sync id of the last one. One query for them all: each
+/// recipient's check, the records and their log entries, in the order given.
 async fn finish_notifying(
     db: &mut PgConnection,
     actor: Actor,
@@ -475,40 +476,59 @@ async fn finish_notifying(
     if notifications.is_empty() {
         return Ok(None);
     }
-
-    // Only people still in the workspace, who can see the issue.
-    let mut last = None;
+    let count = notifications.len();
+    let (mut ids, mut users, mut kinds, mut issues, mut comments, mut suggestions) = (
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+        Vec::with_capacity(count),
+    );
     for (user, kind, issue, comment, suggestion) in notifications {
-        if !sees_issue(db, actor.workspace_id, user, issue).await? {
-            continue;
-        }
-        let id = Uuid::now_v7();
-        let row = Map::from_iter([
-            ("id".to_string(), json!(id)),
-            ("workspace_id".to_string(), json!(actor.workspace_id)),
-            ("user_id".to_string(), json!(user)),
-            ("type".to_string(), json!(kind)),
-            ("issue_id".to_string(), json!(issue)),
-            ("comment_id".to_string(), json!(comment)),
-            ("suggestion_id".to_string(), json!(suggestion)),
-            ("actor_id".to_string(), json!(actor.user_id)),
-        ]);
-        let record = insert::<Forge>(db, ModelKind::Notification, row).await?;
-        last = Some(
-            log(
-                db,
-                actor,
-                transaction_id,
-                ModelKind::Notification,
-                id,
-                SyncAction::Insert,
-                Some(record),
-                Some(user),
-            )
-            .await?,
-        );
+        ids.push(Uuid::now_v7());
+        users.push(user);
+        kinds.push(kind);
+        issues.push(issue);
+        comments.push(comment);
+        suggestions.push(suggestion);
     }
-    Ok(last)
+    // Only people still in the workspace, who can see the issue (as
+    // `sees_issue` decides).
+    Ok(sqlx::query_scalar(
+        "WITH wanted AS ( \
+           SELECT * FROM UNNEST($4::uuid[], $5::uuid[], $6::text[], $7::uuid[], $8::uuid[], $9::uuid[]) \
+             WITH ORDINALITY AS w (id, user_id, type, issue_id, comment_id, suggestion_id, n) \
+           WHERE EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace_id = $1 \
+             AND m.user_id = w.user_id AND (m.role <> 'guest' OR w.issue_id IS NULL OR EXISTS ( \
+               SELECT 1 FROM issues i JOIN team_members tm ON tm.team_id = i.team_id \
+               WHERE i.id = w.issue_id AND tm.user_id = w.user_id)))), \
+         inserted AS ( \
+           INSERT INTO notifications \
+             (id, workspace_id, user_id, type, issue_id, comment_id, suggestion_id, actor_id) \
+           SELECT id, $1, user_id, type, issue_id, comment_id, suggestion_id, $2 \
+           FROM wanted ORDER BY n \
+           RETURNING id, user_id, to_jsonb(notifications.*) AS data), \
+         logged AS ( \
+           INSERT INTO sync_log \
+             (workspace_id, transaction_id, actor_id, model, model_id, action, data, visible_to) \
+           SELECT $1, $3, $2, $10, i.id, 'insert', i.data, i.user_id \
+           FROM inserted i JOIN wanted w ON w.id = i.id ORDER BY w.n \
+           RETURNING sync_id) \
+         SELECT MAX(sync_id) FROM logged",
+    )
+    .bind(actor.workspace_id)
+    .bind(actor.user_id)
+    .bind(transaction_id)
+    .bind(&ids)
+    .bind(&users)
+    .bind(&kinds)
+    .bind(&issues)
+    .bind(&comments)
+    .bind(&suggestions)
+    .bind(ModelKind::Notification.name())
+    .fetch_one(&mut *db)
+    .await?)
 }
 
 /// Fills in fields only the server may set when a record is created.

@@ -2744,3 +2744,69 @@ async fn nobody_hears_of_or_takes_an_issue_they_cannot_see(pool: PgPool) {
     comment_on(&pool, f.actor, mine, "What do you think, @Gus?").await;
     assert_eq!(notifications(&pool, gus).await.len(), 1);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_change_notifies_everyone_it_concerns_who_still_sees_the_issue(pool: PgPool) {
+    let f = seed(&pool).await;
+    let bob = add_person(&pool, &f, "Bob").await;
+    let cy = add_person(&pool, &f, "Cy").await;
+    let gus = add_guest(&pool, &f, "Gus", &[f.team]).await;
+    let id = new_issue(&pool, &f, json!({ "assignee_id": bob.user_id })).await;
+    comment_on(&pool, gus, id, "Hi").await;
+    // Gus leaves the team: he no longer sees the issue, so he isn't told.
+    put_in_teams(&pool, &f, gus, &[]).await;
+
+    let transaction = tx(vec![create(
+        ModelKind::Comment,
+        Uuid::now_v7(),
+        json!({ "issue_id": id, "body": "Me too" }),
+    )]);
+    let last = apply_transaction(&pool, cy, &transaction)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let told: Vec<(Uuid, Uuid, String, Uuid)> = sqlx::query_as(
+        "SELECT id, user_id, type, actor_id FROM notifications \
+         WHERE comment_id = (SELECT id FROM comments WHERE body = 'Me too') ORDER BY id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let mut people: Vec<Uuid> = told.iter().map(|(_, user, ..)| *user).collect();
+    people.sort();
+    let mut expected = vec![f.actor.user_id, bob.user_id];
+    expected.sort();
+    assert_eq!(people, expected);
+    assert!(
+        told.iter()
+            .all(|(.., kind, by)| kind == "comment" && *by == cy.user_id)
+    );
+
+    // Each is in the log, for its recipient only, in the order made; the
+    // transaction confirms with the last.
+    let logged: Vec<(i64, Uuid, Option<Uuid>, Value)> = sqlx::query_as(
+        "SELECT sync_id, model_id, visible_to, data FROM sync_log \
+         WHERE transaction_id = $1 AND model = 'Notification' ORDER BY sync_id",
+    )
+    .bind(transaction.id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        logged.iter().map(|(_, id, ..)| *id).collect::<Vec<_>>(),
+        told.iter().map(|(id, ..)| *id).collect::<Vec<_>>()
+    );
+    for ((_, id, visible_to, data), (_, user, ..)) in logged.iter().zip(&told) {
+        assert_eq!(*visible_to, Some(*user));
+        assert_eq!(data["id"], json!(id));
+        assert_eq!(data["user_id"], json!(user));
+        assert_eq!(data["read_at"], Value::Null);
+    }
+    assert_eq!(logged.last().unwrap().0, last);
+    let for_bob = notifications(&pool, bob).await;
+    assert_eq!(
+        for_bob.last().unwrap(),
+        &logged.iter().find(|l| l.2 == Some(bob.user_id)).unwrap().3
+    );
+}
