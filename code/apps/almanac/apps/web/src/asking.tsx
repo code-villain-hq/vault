@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { answerHere, asksHere } from "./here";
 import type { Picked } from "./photos";
@@ -28,7 +29,7 @@ export interface Asking {
   photos: Picked[];
   /** How many questions the talk had before this one. */
   asked: number;
-  text: string;
+  /** The answer's words so far are in `AnswerTexts`, which only the answer reads. */
   answerId: string | null;
   problem: string | null;
   /** Until it's done or has a problem: the topic takes no other question meanwhile. */
@@ -58,11 +59,44 @@ export interface About {
 
 const TalksContext = createContext<Talks | null>(null);
 
+/**
+ * The words of each topic's answer so far, by topic. They change with every
+ * piece Claude writes, so they live apart from `Asking`: only the answer
+ * that shows them re-renders, not the page around it.
+ */
+class AnswerTexts {
+  private texts = new Map<string, string>();
+  private listeners = new Map<string, Set<() => void>>();
+
+  get(topicId: string): string {
+    return this.texts.get(topicId) ?? "";
+  }
+
+  set(topicId: string, text: string) {
+    if (this.get(topicId) === text) return;
+    this.texts.set(topicId, text);
+    for (const listener of this.listeners.get(topicId) ?? []) listener();
+  }
+
+  subscribe(topicId: string, listener: () => void): () => void {
+    let set = this.listeners.get(topicId);
+    if (!set) this.listeners.set(topicId, (set = new Set()));
+    set.add(listener);
+    return () => {
+      set.delete(listener);
+      if (set.size === 0) this.listeners.delete(topicId);
+    };
+  }
+}
+
+const AnswerTextsContext = createContext<AnswerTexts | null>(null);
+
 export function TalksProvider({ children }: { children: ReactNode }) {
   const { workspace, place, sync } = useWorkspace();
   const router = useRouter();
   const [asking, setAsking] = useState<Record<string, Asking>>({});
   const [open, setOpenTalks] = useState<Record<string, string>>({});
+  const [texts] = useState(() => new AnswerTexts());
   // The topics with an answer on its way, which take no other question.
   const arriving = useRef(new Set<string>());
 
@@ -96,6 +130,7 @@ export function TalksProvider({ children }: { children: ReactNode }) {
         arriving.current.delete(topicId);
         update({ ...change, arriving: false });
       };
+      texts.set(topicId, "");
       setAsking((all) => ({
         ...all,
         [topicId]: {
@@ -103,7 +138,6 @@ export function TalksProvider({ children }: { children: ReactNode }) {
           question: text,
           photos,
           asked,
-          text: "",
           answerId: null,
           problem: null,
           arriving: true,
@@ -192,12 +226,12 @@ export function TalksProvider({ children }: { children: ReactNode }) {
             }
           } else if (event === "text") {
             said += body.text ?? "";
-            update({ text: said });
+            texts.set(topicId, said);
           } else if (event === "question") {
             // Claude Code on this Mac answers; the server writes it, then says done.
             void answerHere(place, body as HandedQuestion, (piece) => {
               said += piece;
-              update({ text: said });
+              texts.set(topicId, said);
             });
           } else if (event === "done") {
             finish({ answerId: body.message_id ?? null });
@@ -213,11 +247,26 @@ export function TalksProvider({ children }: { children: ReactNode }) {
         finish({ problem: "The answer stopped arriving. Check your connection, then ask again." });
       }
     },
-    [workspace.id, place, sync, router],
+    [workspace.id, place, sync, router, texts],
   );
 
   const value = useMemo(() => ({ asking, open, setOpen, ask }), [asking, open, setOpen, ask]);
-  return <TalksContext.Provider value={value}>{children}</TalksContext.Provider>;
+  return (
+    <TalksContext.Provider value={value}>
+      <AnswerTextsContext.Provider value={texts}>{children}</AnswerTextsContext.Provider>
+    </TalksContext.Provider>
+  );
+}
+
+/** The words of a topic's answer so far; only what calls this re-renders as they arrive. */
+export function useAnswerText(topicId: string): string {
+  const texts = useContext(AnswerTextsContext);
+  if (!texts) throw new Error("useAnswerText needs a TalksProvider");
+  const subscribe = useCallback(
+    (listener: () => void) => texts.subscribe(topicId, listener),
+    [texts, topicId],
+  );
+  return useSyncExternalStore(subscribe, () => texts.get(topicId));
 }
 
 /** A topic's answer on its way, the talk open in it, and asking there. */

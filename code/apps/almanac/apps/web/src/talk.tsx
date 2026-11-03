@@ -29,9 +29,18 @@ import {
 } from "@code-villain/web";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, Plus, X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "./api";
-import type { Asking } from "./asking";
+import { type Asking, useAnswerText } from "./asking";
 import { cellWords } from "./collection";
 import { ago, dueWords, rhythmWords, timeWords } from "./format";
 import { topicIcon } from "./icons";
@@ -126,7 +135,7 @@ export function TalkPanel({
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, mine?.text, showQuestion]);
+  }, [messages.length, showQuestion]);
 
   const width = useKeptWidth("talk", TALK_WIDTH);
 
@@ -237,16 +246,7 @@ export function TalkPanel({
                 ))}
               />
             )}
-            {showAnswer && (
-              <div className="flex flex-col gap-2">
-                {mine.text ? (
-                  <Prose text={mine.text} />
-                ) : (
-                  !mine.problem && <p className="text-faint">Almanac is thinking…</p>
-                )}
-                {mine.problem && <Problem text={mine.problem} />}
-              </div>
-            )}
+            {showAnswer && <Arriving topicId={topic.id} problem={mine.problem} end={end} />}
             <div ref={end} />
           </div>
         </div>
@@ -295,6 +295,45 @@ export function TalkPanel({
     </>
   );
 }
+
+/**
+ * The answer on its way, as Claude writes it. Only this re-renders with each
+ * piece: the page and the talk's messages stay as they are.
+ */
+function Arriving({
+  topicId,
+  problem,
+  end,
+}: {
+  topicId: string;
+  problem: string | null;
+  /** The talk's end, kept in view as the answer grows. */
+  end: RefObject<HTMLDivElement | null>;
+}) {
+  const text = useAnswerText(topicId);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [text, end]);
+  // The paragraphs already written don't change: only the last one is drawn again.
+  const cut = text.lastIndexOf("\n\n");
+  const written = cut < 0 ? "" : text.slice(0, cut);
+  const writing = cut < 0 ? text : text.slice(cut + 2);
+  return (
+    <div className="flex flex-col gap-2">
+      {text ? (
+        <>
+          {written && <WrittenProse text={written} />}
+          {writing && <Prose text={writing} />}
+        </>
+      ) : (
+        !problem && <p className="text-faint">Almanac is thinking…</p>
+      )}
+      {problem && <Problem text={problem} />}
+    </div>
+  );
+}
+
+const WrittenProse = memo(Prose);
 
 /** The question an answer answered: what was asked just before it. */
 function before(messages: Message[], index: number): string {
