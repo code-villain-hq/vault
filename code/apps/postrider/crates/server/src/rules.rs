@@ -126,15 +126,13 @@ impl When {
         }
     }
 
-    /// Its key in an IMAP SEARCH.
-    fn search(&self) -> String {
-        let quoted =
-            |text: &str| format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""));
-        match self {
-            When::From(who) => format!("FROM {}", quoted(who)),
-            When::To(who) => format!("OR TO {0} CC {0}", quoted(who)),
-            When::Subject(words) => format!("SUBJECT {}", quoted(words)),
-            When::List(list) => format!("HEADER List-Id {}", quoted(list)),
+    /// Its key in an IMAP SEARCH; refused when its text can't be quoted.
+    fn search(&self) -> Result<String, Failure> {
+        Ok(match self {
+            When::From(who) => format!("FROM {}", imap::quoted(who)?),
+            When::To(who) => format!("OR TO {0} CC {0}", imap::quoted(who)?),
+            When::Subject(words) => format!("SUBJECT {}", imap::quoted(words)?),
+            When::List(list) => format!("HEADER List-Id {}", imap::quoted(list)?),
             // An empty string is in every mail that has the header. It finds
             // what offers to unsubscribe; whether that went to many is read
             // in its header after.
@@ -142,7 +140,19 @@ impl When {
                 "OR HEADER List-Unsubscribe \"\" ({})",
                 crate::newsletters::from_a_service_search()
             ),
-        }
+        })
+    }
+
+    /// Why its text can't be in a rule, if it can't: a line break or NUL
+    /// would end an IMAP command early and start one of the mail's own
+    /// ([`imap::quoted`]).
+    pub fn unfit(&self) -> Option<String> {
+        self.text().contains(['\r', '\n', '\0']).then(|| {
+            format!(
+                "“{}” can't be in a rule: it has a line break.",
+                self.text().escape_default()
+            )
+        })
     }
 
     /// Whether it looks for the same as `other`, in any case.
@@ -187,11 +197,21 @@ pub fn script(rules: &[Rule], can_read_bodies: bool) -> String {
 }
 
 /// The rules in Postrider's script, by the comments it wrote them with.
+/// One whose text can't go in a search is left out: whoever wrote it, it
+/// would end the commands Postrider sends for it and run its own, every
+/// time it's read.
 pub fn rules_in(script: &str) -> Vec<Rule> {
     script
         .lines()
         .filter_map(|line| line.strip_prefix("# rule "))
-        .filter_map(|said| serde_json::from_str(said).ok())
+        .filter_map(|said| serde_json::from_str::<Rule>(said).ok())
+        .filter(|rule| {
+            let fits = rule.when.iter().all(|when| when.unfit().is_none());
+            if !fits {
+                tracing::warn!(folder = %rule.folder, "left out a rule with a line break in it");
+            }
+            fits
+        })
         .collect()
 }
 
@@ -216,14 +236,14 @@ pub(crate) fn sieve_string(text: &str) -> String {
 
 /// An IMAP SEARCH for mail that matches any of `when`, with the CHARSET it
 /// needs in front.
-pub(crate) fn search(when: &[When], first: &str) -> String {
-    let keys: Vec<String> = when.iter().map(When::search).collect();
+pub(crate) fn search(when: &[When], first: &str) -> Result<String, Failure> {
+    let keys: Vec<String> = when.iter().map(When::search).collect::<Result<_, _>>()?;
     let query = format!("{first}{}", any(&keys));
-    if when.iter().all(|w| w.text().is_ascii()) {
+    Ok(if when.iter().all(|w| w.text().is_ascii()) {
         query
     } else {
         format!("CHARSET UTF-8 {query}")
-    }
+    })
 }
 
 /// An IMAP SEARCH key that any of `keys` matches; every mail for none.
@@ -406,7 +426,7 @@ impl Mail {
         when: &[When],
         path: &str,
     ) -> Result<Moved, Failure> {
-        let query = search(when, "");
+        let query = search(when, "")?;
         let (since, count) = self
             .on_server(account, |session| {
                 let (query, path) = (query.clone(), path.to_string());
@@ -510,7 +530,7 @@ impl Mail {
             return Ok(moved);
         }
         let query = if uids.is_empty() {
-            search(when, "")
+            search(when, "")?
         } else {
             format!("UID {}", uid_set(uids))
         };
@@ -571,7 +591,7 @@ impl Mail {
             Some(until) => format!("UID {since}:{} ", until.saturating_sub(1).max(since)),
             None => format!("UID {since}:* "),
         };
-        let query = search(&moved.when, &range);
+        let query = search(&moved.when, &range)?;
         self.on_server(account, |session| {
             let (query, path, back) = (query.clone(), moved.path.clone(), moved.back.clone());
             Box::pin(async move {
@@ -793,13 +813,37 @@ mod tests {
     #[test]
     fn a_search_finds_any_of_them() {
         assert_eq!(
-            search(&code().when, ""),
-            "OR FROM \"notifications@github.com\" (OR FROM \"codevillain.eu\" (SUBJECT \"\\\"PR\\\"\"))"
+            search(&code().when, "").ok().as_deref(),
+            Some(
+                "OR FROM \"notifications@github.com\" (OR FROM \"codevillain.eu\" (SUBJECT \"\\\"PR\\\"\"))"
+            )
         );
         assert_eq!(
-            search(&[When::Subject("Grüße".into())], "UID 5:* "),
-            "CHARSET UTF-8 UID 5:* SUBJECT \"Grüße\""
+            search(&[When::Subject("Grüße".into())], "UID 5:* ")
+                .ok()
+                .as_deref(),
+            Some("CHARSET UTF-8 UID 5:* SUBJECT \"Grüße\"")
         );
+    }
+
+    #[test]
+    fn a_rule_with_a_line_break_is_never_searched_for() {
+        let deleting =
+            When::Subject("x\"\r\nA1 UID STORE 1:* +FLAGS (\\Deleted)\r\nA2 EXPUNGE".into());
+        assert!(deleting.unfit().is_some());
+        assert!(When::From("a\0b@c.test".into()).unfit().is_some());
+        assert!(code().when.iter().all(|when| when.unfit().is_none()));
+        assert!(search(&[When::From("bank.test".into()), deleting.clone()], "").is_err());
+        // Written to the server by someone else, it isn't read back, so no
+        // move, Undo or newsletter search sends it.
+        let planted = Rule {
+            folder: "Trash".into(),
+            path: "Trash".into(),
+            when: vec![deleting],
+            senders: Vec::new(),
+        };
+        let script = script(&[code(), planted], false);
+        assert_eq!(rules_in(&script), vec![code()]);
     }
 
     #[test]
@@ -854,7 +898,7 @@ mod tests {
             "not exists \"x-mandrill-user\"), address :is \"from\" [\"no-reply@m.coursera.test\"])"
         ));
         assert_eq!(rules_in(&script), vec![named]);
-        let found = search(&[When::Unsubscribe], "");
+        let found = search(&[When::Unsubscribe], "").unwrap_or_default();
         assert!(found.starts_with(
             "OR HEADER List-Unsubscribe \"\" (OR HEADER X-MSFBL \"\" (OR HEADER X-SG-EID \"\" ("
         ));

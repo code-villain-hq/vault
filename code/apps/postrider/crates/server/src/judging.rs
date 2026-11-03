@@ -281,8 +281,9 @@ impl Judge<'_> {
         let offers = rules::search(
             &[When::Unsubscribe],
             &format!("UID {} ", rules::uid_set(&uids)),
-        );
-        let query = but_yours(self.rules, "INBOX", &offers);
+        )
+        .map_err(|f| f.message())?;
+        let query = but_yours(self.rules, "INBOX", &offers).map_err(|f| f.message())?;
         let told = self
             .mail
             .told_in(self.account, "INBOX", &query, self.senders)
@@ -334,7 +335,7 @@ impl Judge<'_> {
     async fn newsletters(&self, place: &Place, since: Option<String>) -> Result<(), String> {
         let lately = since.is_some();
         let what = since.map_or_else(|| "ALL".to_string(), |date| format!("SINCE {date}"));
-        let query = but_yours(self.rules, &place.path, &what);
+        let query = but_yours(self.rules, &place.path, &what).map_err(|f| f.message())?;
         let there = self
             .mail
             .told_in(self.account, &place.path, &query, self.senders)

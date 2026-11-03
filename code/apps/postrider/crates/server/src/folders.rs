@@ -226,7 +226,8 @@ impl Mail {
         }
         let accounts = self.accounts(workspace_id).await?;
         let here = self.found_here(&accounts, &words).await?;
-        let query = &imap::words_query(&words);
+        let query =
+            &imap::words_query(&words).map_err(|failure| AppError::invalid(failure.message()))?;
         let read = join_all(accounts.iter().map(|account| async move {
             let mut places = vec![Place::inbox()];
             places.extend(self.places(account).await?.into_iter().filter(searched));

@@ -377,10 +377,12 @@ impl Asking {
 
     async fn move_mail(&self, arguments: &Value) -> Result<String, String> {
         let to = text(arguments, "to")?;
-        let from: Vec<When> = strings(arguments, "from")
-            .into_iter()
-            .map(|who| When::From(who.trim_start_matches('@').to_lowercase()))
-            .collect();
+        let from: Vec<When> = fitting(
+            strings(arguments, "from")
+                .into_iter()
+                .map(|who| When::From(who.trim_start_matches('@').to_lowercase()))
+                .collect(),
+        )?;
         let folder = arguments["folder"]
             .as_str()
             .map(str::trim)
@@ -509,7 +511,7 @@ impl Asking {
 
     async fn sort_into(&self, arguments: &Value) -> Result<String, String> {
         let folder = text(arguments, "folder")?;
-        let when = whens(arguments);
+        let when = whens(arguments)?;
         if when.is_empty() {
             return Err("Say what goes there: from, to, subject or list.".into());
         }
@@ -756,7 +758,7 @@ impl Asking {
 
     async fn stop_sorting(&self, arguments: &Value) -> Result<String, String> {
         let folder = text(arguments, "folder")?;
-        let when = whens(arguments);
+        let when = whens(arguments)?;
         let reading = arguments["reading"].as_bool().unwrap_or(false);
         let mut done = self.done.lock().await;
         let mut stopped = Vec::new();
@@ -1059,7 +1061,7 @@ pub(crate) fn as_read(raw: &[u8], account_id: Uuid, at_most: usize) -> String {
 }
 
 /// What a sort_into or stop_sorting looks for.
-fn whens(arguments: &Value) -> Vec<When> {
+fn whens(arguments: &Value) -> Result<Vec<When>, String> {
     let mut when = Vec::new();
     let senders = |who: String| who.trim_start_matches('@').to_lowercase();
     when.extend(
@@ -1076,7 +1078,15 @@ fn whens(arguments: &Value) -> Vec<When> {
     );
     when.extend(strings(arguments, "list").into_iter().map(When::List));
     when.extend(strings(arguments, "subject").into_iter().map(When::Subject));
-    when
+    fitting(when)
+}
+
+/// These, unless one can't be searched for or written in a rule.
+fn fitting(when: Vec<When>) -> Result<Vec<When>, String> {
+    match when.iter().find_map(When::unfit) {
+        Some(why) => Err(why),
+        None => Ok(when),
+    }
 }
 
 fn and(names: &[String]) -> String {
@@ -1354,12 +1364,21 @@ mod tests {
         }));
         assert_eq!(
             when,
-            vec![
+            Ok(vec![
                 When::From("notifications@github.com".into()),
                 When::From("codevillain.eu".into()),
                 When::Subject("Invoice".into()),
-            ]
+            ])
         );
+    }
+
+    #[test]
+    fn what_to_sort_with_a_line_break_is_refused() {
+        let deleting = "x\"\r\nA1 UID STORE 1:* +FLAGS (\\Deleted)\r\nA2 EXPUNGE";
+        for name in ["from", "to", "subject", "list"] {
+            let said = whens(&json!({ "folder": "Trash", name: [deleting] }));
+            assert!(said.is_err_and(|why| why.contains("line break")), "{name}");
+        }
     }
 
     #[test]

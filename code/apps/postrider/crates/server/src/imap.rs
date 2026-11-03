@@ -887,31 +887,43 @@ pub async fn filed(
 
 /// The mails with every one of `words` in them, in a header or the text:
 /// `TEXT "word"` for each word, quoted; in UTF-8 when one needs it.
-pub fn words_query(words: &[String]) -> String {
+pub fn words_query(words: &[String]) -> Result<String, Failure> {
     let terms = words
         .iter()
-        .map(|word| format!("TEXT {}", quoted(word)))
-        .collect::<Vec<_>>()
+        .map(|word| Ok(format!("TEXT {}", quoted(word)?)))
+        .collect::<Result<Vec<_>, Failure>>()?
         .join(" ");
-    if words.iter().all(|word| word.is_ascii()) {
+    Ok(if words.iter().all(|word| word.is_ascii()) {
         terms
     } else {
         format!("CHARSET UTF-8 {terms}")
-    }
+    })
 }
 
 /// The mails from `address`: `FROM "address"`, in UTF-8 when it needs it.
-pub fn from_query(address: &str) -> String {
-    let term = format!("FROM {}", quoted(address));
-    if address.is_ascii() {
+pub fn from_query(address: &str) -> Result<String, Failure> {
+    let term = format!("FROM {}", quoted(address)?);
+    Ok(if address.is_ascii() {
         term
     } else {
         format!("CHARSET UTF-8 {term}")
-    }
+    })
 }
 
-fn quoted(text: &str) -> String {
-    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+/// A string as an IMAP command quotes it. A quoted string can't hold a
+/// line break or NUL (RFC 3501): the server would end the command there
+/// and run what follows as commands of its own, as a subject written to
+/// delete mail would. So text with one is refused, never sent.
+pub(crate) fn quoted(text: &str) -> Result<String, Failure> {
+    if text.contains(['\r', '\n', '\0']) {
+        return Err(Failure::Refused(
+            "Postrider can't look for text with a line break in it.".into(),
+        ));
+    }
+    Ok(format!(
+        "\"{}\"",
+        text.replace('\\', "\\\\").replace('"', "\\\"")
+    ))
 }
 
 /// What the list shows of these mails in the open folder: read or not from
@@ -1423,26 +1435,41 @@ mod tests {
                 .map(str::to_string)
                 .collect::<Vec<_>>()
         };
+        let query = |text: &str| words_query(&words(text)).ok();
         assert_eq!(
-            words_query(&words("contract anna")),
-            "TEXT \"contract\" TEXT \"anna\""
+            query("contract anna").as_deref(),
+            Some("TEXT \"contract\" TEXT \"anna\"")
         );
         assert_eq!(
-            words_query(&words(r#"say "hi"\"#)),
-            r#"TEXT "say" TEXT "\"hi\"\\""#
+            query(r#"say "hi"\"#).as_deref(),
+            Some(r#"TEXT "say" TEXT "\"hi\"\\""#)
         );
         assert_eq!(
-            words_query(&words("Entwürfe")),
-            "CHARSET UTF-8 TEXT \"Entwürfe\""
+            query("Entwürfe").as_deref(),
+            Some("CHARSET UTF-8 TEXT \"Entwürfe\"")
         );
     }
 
     #[test]
     fn a_sender_is_asked_for_quoted() {
-        assert_eq!(from_query("news@coop.se"), "FROM \"news@coop.se\"");
         assert_eq!(
-            from_query("nyheter@förening.se"),
-            "CHARSET UTF-8 FROM \"nyheter@förening.se\""
+            from_query("news@coop.se").ok().as_deref(),
+            Some("FROM \"news@coop.se\"")
         );
+        assert_eq!(
+            from_query("nyheter@förening.se").ok().as_deref(),
+            Some("CHARSET UTF-8 FROM \"nyheter@förening.se\"")
+        );
+    }
+
+    #[test]
+    fn a_line_break_never_reaches_a_command() {
+        let deleting = "x\"\r\nA1 UID STORE 1:* +FLAGS (\\Deleted)\r\nA2 EXPUNGE\r\n";
+        for text in [deleting, "a\nb", "a\rb", "a\0b"] {
+            assert!(matches!(quoted(text), Err(Failure::Refused(_))), "{text:?}");
+            assert!(from_query(text).is_err());
+            assert!(words_query(&[text.to_string()]).is_err());
+        }
+        assert_eq!(quoted("tab\there").ok().as_deref(), Some("\"tab\there\""));
     }
 }

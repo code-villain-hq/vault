@@ -270,7 +270,7 @@ impl Mail {
                 .told_in(
                     account,
                     &place.path,
-                    &but_yours(&rules, &place.path, "ALL"),
+                    &but_yours(&rules, &place.path, "ALL")?,
                     &named(&rules),
                 )
                 .await?;
@@ -320,7 +320,7 @@ impl Mail {
         rules: &[Rule],
         place: &Place,
     ) -> Result<usize, Failure> {
-        let query = but_yours(rules, "INBOX", &rules::search(&[When::Unsubscribe], ""));
+        let query = but_yours(rules, "INBOX", &rules::search(&[When::Unsubscribe], "")?)?;
         let told = self
             .told_in(account, "INBOX", &query, &named(rules))
             .await?;
@@ -415,7 +415,8 @@ impl Mail {
         address: &str,
     ) -> Result<Listing, AppError> {
         let accounts = self.accounts(workspace_id).await?;
-        let query = &imap::from_query(address);
+        let query =
+            &imap::from_query(address).map_err(|failure| AppError::invalid(failure.message()))?;
         let read = join_all(accounts.iter().map(|account| async move {
             match self.newsletters_folder(account).await? {
                 Some(place) => self.read(account, &place, Some(query)).await,
@@ -472,7 +473,7 @@ impl Mail {
         addresses: &[String],
     ) -> Result<HashMap<String, Theirs>, Failure> {
         let when: Vec<When> = addresses.iter().cloned().map(When::From).collect();
-        let query = rules::search(&when, "");
+        let query = rules::search(&when, "")?;
         let headed = self
             .on_server(account, |session| {
                 let (path, query) = (place.path.clone(), query.clone());
@@ -751,14 +752,14 @@ pub(crate) fn from_a_service_search() -> String {
 /// The mail that `what` finds in the folder at `path`, but not what a rule
 /// of yours sorts there: from senders kept in the Inbox, or sorted into
 /// Newsletters.
-pub(crate) fn but_yours(rules: &[Rule], path: &str, what: &str) -> String {
+pub(crate) fn but_yours(rules: &[Rule], path: &str, what: &str) -> Result<String, Failure> {
     let yours: Vec<When> = rules
         .iter()
         .filter(|rule| rule.path == path && !rule.is_newsletters())
         .flat_map(|rule| rule.when.clone())
         .collect();
     if yours.is_empty() {
-        what.to_string()
+        Ok(what.to_string())
     } else {
         rules::search(&yours, &format!("{what} NOT "))
     }
@@ -1505,6 +1506,9 @@ mod tests {
             rule("INBOX.Newsletters", "shop.test"),
             Rule::newsletters(&newsletters),
         ];
+        let but_yours = |rules: &[Rule], path: &str, what: &str| {
+            but_yours(rules, path, what).unwrap_or_default()
+        };
         assert_eq!(
             but_yours(&rules, "INBOX.Newsletters", "ALL"),
             "ALL NOT FROM \"shop.test\""
