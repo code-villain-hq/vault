@@ -1,7 +1,7 @@
 import { shortcutFree } from "@code-villain/web";
 import type { Issue, Service, WorkflowState } from "@forge/types";
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BulkBar } from "./bulk";
 import {
   byId,
@@ -188,8 +188,12 @@ export function IssueList({
   const current = useRef({ ordered, focused });
   current.current = { ordered, focused };
 
+  // The handlers rows get stay the same from render to render, so moving
+  // the focus re-renders only the two rows it moves between (`IssueRow` is
+  // memoized).
+
   /** Selects or unselects an issue; with `range`, everything since the last one. */
-  const toggle = (index: number, range = false) => {
+  const toggle = useCallback((index: number, range = false) => {
     const list = current.current.ordered;
     const issue = list[index];
     if (!issue) return;
@@ -206,24 +210,30 @@ export function IssueList({
       }
       return next;
     });
-  };
+  }, []);
 
   /** Opens or closes a parent's sub-issues. */
-  const fold = (id: string, open: boolean) =>
-    setExpanded((previous) => {
-      const next = new Set(previous);
-      if (open) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  const fold = useCallback(
+    (id: string, open: boolean) =>
+      setExpanded((previous) => {
+        const next = new Set(previous);
+        if (open) next.add(id);
+        else next.delete(id);
+        return next;
+      }),
+    [],
+  );
 
-  const open = (issue: Issue | undefined) => {
-    if (!issue?.number) return;
-    void navigate({
-      to: "/$workspace/issue/$identifier",
-      params: { workspace: workspace.url_key, identifier: identifier(issue, teamsById) },
-    });
-  };
+  const open = useCallback(
+    (issue: Issue | undefined) => {
+      if (!issue?.number) return;
+      void navigate({
+        to: "/$workspace/issue/$identifier",
+        params: { workspace: workspace.url_key, identifier: identifier(issue, teamsById) },
+      });
+    },
+    [navigate, workspace.url_key, teamsById],
+  );
 
   // Keyboard navigation, while no field or menu has focus.
   useEffect(() => {
@@ -308,19 +318,13 @@ export function IssueList({
                     showService={serviceChips}
                     sharedLabels={shared.labels}
                     subIssues={subIssues.get(issue.id)}
-                    fold={
-                      children
-                        ? {
-                            open: expanded.has(issue.id),
-                            toggle: () => fold(issue.id, !expanded.has(issue.id)),
-                          }
-                        : undefined
-                    }
-                    onOpen={() => open(issue)}
-                    onFocus={() => setFocused(position)}
+                    folded={children ? expanded.has(issue.id) : undefined}
+                    onFold={fold}
+                    onOpen={open}
+                    onFocus={setFocused}
                     selected={picked.has(issue.id)}
                     selecting={selected.length > 0}
-                    onSelect={(range) => toggle(position, range)}
+                    onSelect={toggle}
                   />
                 );
               })}
@@ -344,7 +348,7 @@ function ServiceHeading({ service }: { service: Service | undefined }) {
   );
 }
 
-function IssueRow({
+const IssueRow = memo(function IssueRow({
   issue,
   index,
   depth,
@@ -354,7 +358,8 @@ function IssueRow({
   showService,
   sharedLabels,
   subIssues,
-  fold,
+  folded,
+  onFold,
   onOpen,
   onFocus,
   selected,
@@ -372,15 +377,21 @@ function IssueRow({
   /** Labels every issue in the list has, shown by the title instead. */
   sharedLabels: string[];
   subIssues: { done: number; total: number } | undefined;
-  /** For a parent whose sub-issues are in the list, folded under it. */
-  fold: { open: boolean; toggle: () => void } | undefined;
-  onOpen: () => void;
-  onFocus: () => void;
+  /**
+   * For a parent whose sub-issues are in the list, folded under it: whether
+   * they show. `undefined` for other rows.
+   */
+  folded: boolean | undefined;
+  /** Shows or hides the sub-issues of the issue with this id. */
+  onFold: (id: string, open: boolean) => void;
+  onOpen: (issue: Issue) => void;
+  /** Moves the list's focus to the row at this index. */
+  onFocus: (index: number) => void;
   selected: boolean;
   /** Whether any issue is selected, which shows every row's checkbox. */
   selecting: boolean;
-  /** `range`: select everything since the last one (shift-click). */
-  onSelect: (range: boolean) => void;
+  /** Selects the row at this index; `range`: everything since the last one (shift-click). */
+  onSelect: (index: number, range: boolean) => void;
 }) {
   const pending = useIsPending("Issue", issue.id);
   const labels = useRecords("Label");
@@ -393,8 +404,8 @@ function IssueRow({
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- rows are reached with j/k and opened with Enter
     <li
       data-index={index}
-      onClick={onOpen}
-      onMouseMove={onFocus}
+      onClick={() => onOpen(issue)}
+      onMouseMove={() => onFocus(index)}
       style={depth > 0 ? { paddingLeft: `${0.5 + depth * 1.5}rem` } : undefined}
       className={`group flex h-10 cursor-default items-center gap-2 rounded-md pr-4 pl-2 ${selected ? "bg-selected" : focused ? "bg-hover" : ""}`}
     >
@@ -404,7 +415,7 @@ function IssueRow({
         checked={selected}
         onClick={(e) => {
           e.stopPropagation();
-          onSelect(e.shiftKey);
+          onSelect(index, e.shiftKey);
         }}
         onChange={() => {}}
         className={`size-3.5 shrink-0 accent-(--fg) ${selected || selecting ? "" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
@@ -418,18 +429,18 @@ function IssueRow({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onOpen();
+            onOpen(issue);
           }}
           className="outline-none focus-visible:underline"
         >
           {issue.title}
         </a>
       </span>
-      {fold ? (
+      {folded !== undefined ? (
         <Disclosure
-          open={fold.open}
-          onToggle={fold.toggle}
-          title={fold.open ? "Hide sub-issues (←)" : "Show sub-issues (→)"}
+          open={folded}
+          onToggle={() => onFold(issue.id, !folded)}
+          title={folded ? "Hide sub-issues (←)" : "Show sub-issues (→)"}
           className="h-7 shrink-0"
         >
           <span className="sr-only">Sub-issues done:</span>
@@ -462,7 +473,7 @@ function IssueRow({
       </span>
     </li>
   );
-}
+});
 
 /**
  * What every issue in a list has in common (its one service, its one
