@@ -429,6 +429,10 @@ is the asker's: the app sends its time zone (`time_zone`) with each question.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Almanac on Postgres for
   the workspaces on this Mac, with `code/kit/desktop`, and shows due
   reminders as notifications, a server's too (`ring`).
+  Its window's Content-Security-Policy is in `tauri.conf.json`: a new kind
+  of load (another host, a frame, a worker, wasm, eval) needs its directive
+  there, or the installed app blocks it. `dev:desktop` shows Vite's page,
+  which gets no policy, so try a built app.
 - `migrations`: SQL schema, applied by the server on start.
 
 ## Rules
