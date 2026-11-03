@@ -10,8 +10,16 @@ use crate::{parse, prompt};
 
 /// Local models are slow; a long text on a small machine takes minutes.
 const TIMEOUT: Duration = Duration::from_secs(10 * 60);
-/// The most tokens a reply may have.
-const MAX_TOKENS: u32 = 256;
+/// The fewest tokens a reply may have: enough for a short text's JSON and
+/// the prose small models put around it.
+const MIN_TOKENS: u32 = 256;
+/// Tokens a reply may have per character of the source text, besides
+/// [`JSON_TOKENS`]. English is about four characters a token, but Greek,
+/// Thai or Japanese can be one on a small model's vocabulary, and a
+/// translation runs longer than its source, with JSON escapes on top.
+const TOKENS_PER_CHAR: f64 = 1.5;
+/// The JSON around a translation: its key, quotes and confidence.
+const JSON_TOKENS: u32 = 64;
 /// Extra tries when the text breaks a rule. Beyond two the model hardly
 /// ever recovers, and each try takes seconds.
 pub const RETRIES: usize = 2;
@@ -30,6 +38,10 @@ pub enum LlmError {
     Status { status: u16, body: String },
     #[error("the model's reply wasn't understood: {0}")]
     Reply(String),
+    /// The reply ran out of tokens: what came is part of a text, and saving
+    /// it would lose the rest.
+    #[error("the model's reply was cut off after {0} tokens")]
+    CutOff(u32),
 }
 
 /// What to translate.
@@ -60,6 +72,8 @@ pub struct Client {
     endpoint: String,
     model: String,
     chat: bool,
+    /// The context size the model is started with, when its arguments say.
+    context: Option<u32>,
     http: reqwest::Client,
 }
 
@@ -82,12 +96,36 @@ pub fn normalize_endpoint(endpoint: &str) -> String {
     format!("{scheme}://127.0.0.1:{port}{path}")
 }
 
+/// The `-c` / `--ctx-size` in llama-server's arguments; 0 there means the
+/// model's own, which only the server knows.
+fn context_size(args: &[String]) -> Option<u32> {
+    let mut args = args.iter();
+    while let Some(arg) = args.next() {
+        let value = match arg.split_once('=') {
+            Some(("-c" | "--ctx-size", value)) => value,
+            None if arg == "-c" || arg == "--ctx-size" => args.next()?,
+            _ => continue,
+        };
+        return value.parse().ok().filter(|&n| n > 0);
+    }
+    None
+}
+
+/// How many tokens a reply to `text` may have: room for the longest fair
+/// translation, but no more than the model's context holds.
+fn max_tokens(text: &str, context: Option<u32>) -> u32 {
+    let wanted = (text.chars().count() as f64 * TOKENS_PER_CHAR) as u32 + JSON_TOKENS;
+    let tokens = wanted.max(MIN_TOKENS);
+    context.map_or(tokens, |c| tokens.min(c))
+}
+
 impl Client {
     pub fn new(model: &Model) -> Client {
         Client {
             endpoint: normalize_endpoint(&model.endpoint),
             model: model.name.clone(),
             chat: model.chat_mode,
+            context: context_size(&model.extra_args),
             http: reqwest::Client::builder()
                 .timeout(TIMEOUT)
                 .build()
@@ -130,12 +168,14 @@ impl Client {
             context: request.context,
         };
 
+        let max_tokens = max_tokens(request.text, self.context);
         let mut prompt = prompt::translate(&job, self.chat);
         let mut attempt = 0;
         loop {
-            let reply = self.call(&prompt, temperature).await?;
+            let reply = self.call(&prompt, temperature, max_tokens).await?;
             tracing::debug!(attempt, reply, "model replied");
-            let (text, confidence) = parse::translation(&reply);
+            let (text, confidence) = parse::translation(&reply)
+                .ok_or_else(|| LlmError::Reply("no translation in it".into()))?;
             let kept = placeholders_kept(request.text, &text);
             let violations = glossary_violations(&text, &glossary);
             let clean = kept && violations.is_empty();
@@ -170,11 +210,16 @@ impl Client {
         target_term: &str,
     ) -> Result<Vec<String>, LlmError> {
         let prompt = prompt::variants(source_lang, target_lang, source_term, target_term);
-        let reply = self.call(&prompt, 0.1).await?;
+        let reply = self.call(&prompt, 0.1, MIN_TOKENS).await?;
         Ok(parse::variants(&reply, target_term))
     }
 
-    async fn call(&self, prompt: &str, temperature: f64) -> Result<String, LlmError> {
+    async fn call(
+        &self,
+        prompt: &str,
+        temperature: f64,
+        max_tokens: u32,
+    ) -> Result<String, LlmError> {
         let (path, body) = if self.chat {
             (
                 "/v1/chat/completions",
@@ -182,7 +227,7 @@ impl Client {
                     "model": self.model,
                     "stream": false,
                     "temperature": temperature,
-                    "max_tokens": MAX_TOKENS,
+                    "max_tokens": max_tokens,
                     "messages": [
                         { "role": "system", "content": prompt::SYSTEM },
                         { "role": "user", "content": format!("{prompt}\n\nRespond with ONLY JSON. No explanation.") },
@@ -196,7 +241,7 @@ impl Client {
                     "prompt": prompt,
                     "stream": false,
                     "temperature": temperature,
-                    "n_predict": MAX_TOKENS,
+                    "n_predict": max_tokens,
                     "stop": ["###", "Source:", "Translate from", "Text to translate:"],
                 }),
             )
@@ -224,6 +269,9 @@ impl Client {
             .json()
             .await
             .map_err(|e| LlmError::Reply(e.to_string()))?;
+        if parse::cut_off(&reply) {
+            return Err(LlmError::CutOff(max_tokens));
+        }
         parse::generated_text(&reply)
             .map(str::to_string)
             .ok_or_else(|| LlmError::Reply("no text in it".into()))
@@ -370,6 +418,82 @@ mod tests {
             .unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 2);
         assert_eq!(out.text, "Ankunftsortname fehlt.");
+    }
+
+    /// A model that cuts every reply off at a few tokens, as llama-server
+    /// does at `max_tokens`; returns the `max_tokens` it was asked for.
+    async fn cutting_model(chat: bool, extra_args: &[&str]) -> (Client, Arc<AtomicUsize>) {
+        let asked = Arc::new(AtomicUsize::new(0));
+        let seen = asked.clone();
+        let reply = move |Json(body): Json<Value>| {
+            let seen = seen.clone();
+            async move {
+                let limit = body.get("max_tokens").or(body.get("n_predict"));
+                seen.store(
+                    limit.and_then(Value::as_u64).unwrap() as usize,
+                    Ordering::SeqCst,
+                );
+                let text = r#"{"translation":"Lorem ipsum dolor"#;
+                Json(json!({
+                    "content": text,
+                    "stop_type": "limit",
+                    "choices": [{ "message": { "content": text }, "finish_reason": "length" }],
+                }))
+            }
+        };
+        let app = Router::new()
+            .route("/completion", post(reply.clone()))
+            .route("/v1/chat/completions", post(reply));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let model = Model {
+            name: "test-model".into(),
+            endpoint: format!("http://localhost:{}", address.port()),
+            chat_mode: chat,
+            extra_args: extra_args.iter().map(|a| a.to_string()).collect(),
+            ..Model::default()
+        };
+        (Client::new(&model), asked)
+    }
+
+    #[tokio::test]
+    async fn a_cut_off_reply_is_a_failure_not_a_text() {
+        let long = "Lorem ipsum dolor sit amet. ".repeat(100);
+        for chat in [true, false] {
+            let (client, asked) = cutting_model(chat, &[]).await;
+            let out = client.translate(&request(&long, &[])).await;
+            let limit = asked.load(Ordering::SeqCst) as u32;
+            assert!(
+                matches!(out, Err(LlmError::CutOff(n)) if n == limit),
+                "{out:?}"
+            );
+            assert_eq!(limit, 2800 * 3 / 2 + JSON_TOKENS);
+        }
+    }
+
+    #[tokio::test]
+    async fn the_reply_gets_no_more_tokens_than_the_context_holds() {
+        let long = "Lorem ipsum dolor sit amet. ".repeat(1000);
+        let (client, asked) = cutting_model(true, &["-c", "4096"]).await;
+        let _ = client.translate(&request(&long, &[])).await;
+        assert_eq!(asked.load(Ordering::SeqCst), 4096);
+
+        let (client, asked) = cutting_model(true, &[]).await;
+        let _ = client.translate(&request("Hello", &[])).await;
+        assert_eq!(asked.load(Ordering::SeqCst), MIN_TOKENS as usize);
+    }
+
+    #[test]
+    fn the_context_size_comes_from_the_arguments() {
+        let args = |a: &[&str]| a.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+        assert_eq!(context_size(&args(&["-c", "4096"])), Some(4096));
+        assert_eq!(
+            context_size(&args(&["--port", "8080", "--ctx-size=8192"])),
+            Some(8192)
+        );
+        assert_eq!(context_size(&args(&["-c", "0"])), None);
+        assert_eq!(context_size(&args(&["-m", "a.gguf"])), None);
     }
 
     #[test]

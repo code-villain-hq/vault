@@ -33,6 +33,21 @@ pub fn generated_text(reply: &Value) -> Option<&str> {
         .or_else(|| first.get("message")?.get("content")?.as_str())
 }
 
+/// Whether the model stopped because it ran out of tokens, not because it
+/// was done: `finish_reason` in the OpenAI shape, `stop_type` (or the older
+/// `stopped_limit`) in llama-server's own, and `truncated` when the context
+/// filled up.
+pub fn cut_off(reply: &Value) -> bool {
+    let first = reply.get("choices").and_then(|c| c.get(0));
+    first
+        .and_then(|c| c.get("finish_reason"))
+        .and_then(Value::as_str)
+        == Some("length")
+        || reply.get("stop_type").and_then(Value::as_str) == Some("limit")
+        || reply.get("stopped_limit").and_then(Value::as_bool) == Some(true)
+        || reply.get("truncated").and_then(Value::as_bool) == Some(true)
+}
+
 /// The first JSON value starting at `at`, ignoring what follows it.
 fn value_at(text: &str, at: usize) -> Option<Value> {
     serde_json::Deserializer::from_str(&text[at..])
@@ -94,8 +109,10 @@ fn clean_line(s: &str) -> String {
     s.trim_end_matches(['"', '\'']).trim().to_string()
 }
 
-/// The translation and how sure the model was.
-pub fn translation(reply: &str) -> (String, f64) {
+/// The translation and how sure the model was, or `None` when the reply
+/// holds none: a JSON object that never closes is a text cut off, and its
+/// scraps would be saved as the translation.
+pub fn translation(reply: &str) -> Option<(String, f64)> {
     // 1. The last {"translation": …} object that parses: models often echo
     // the example first.
     let last = TRANSLATION_OBJECT
@@ -106,8 +123,8 @@ pub fn translation(reply: &str) -> (String, f64) {
             (!is_placeholder(text)).then(|| (unwrap_quotes(text), confidence(v.get("confidence"))))
         })
         .last();
-    if let Some(found) = last {
-        return found;
+    if last.is_some() {
+        return last;
     }
 
     // 2. The outermost { … }.
@@ -117,7 +134,17 @@ pub fn translation(reply: &str) -> (String, f64) {
         && let Some(text) = v.get("translation").and_then(Value::as_str)
         && !is_placeholder(text)
     {
-        return (unwrap_quotes(text), confidence(v.get("confidence")));
+        return Some((unwrap_quotes(text), confidence(v.get("confidence"))));
+    }
+
+    // A {"translation": … that doesn't parse was cut off or garbled; the
+    // steps below would pick a scrap of it.
+    if TRANSLATION_OBJECT
+        .find_iter(reply)
+        .any(|m| value_at(reply, m.start()).is_none())
+    {
+        tracing::debug!(reply, "the model's JSON doesn't parse");
+        return None;
     }
 
     // 3. "text | 0.95".
@@ -130,14 +157,14 @@ pub fn translation(reply: &str) -> (String, f64) {
             continue;
         }
         let sure = leading_number(sure.trim()).unwrap_or(UNSAID);
-        return (text, confidence(Some(&Value::from(sure))));
+        return Some((text, confidence(Some(&Value::from(sure)))));
     }
 
     // 4. "Translation: text".
     if let Some(found) = LABELLED.captures(reply) {
         let text = clean_line(&found[1]);
         if !is_placeholder(&text) {
-            return (text, UNSAID);
+            return Some((text, UNSAID));
         }
     }
 
@@ -166,11 +193,14 @@ pub fn translation(reply: &str) -> (String, f64) {
         {
             continue;
         }
-        return (text, UNSAID);
+        return Some((text, UNSAID));
     }
 
+    // Nothing but labels and JSON left: plain prose is the text, but JSON
+    // that got this far is broken, and an empty reply says nothing.
     tracing::debug!(reply, "no translation found in the model's reply");
-    (reply.trim().to_string(), 0.5)
+    let reply = reply.trim();
+    (!reply.is_empty() && !reply.starts_with('{')).then(|| (reply.to_string(), 0.5))
 }
 
 /// The number a string starts with, like C's `%f`.
@@ -253,31 +283,65 @@ Text to translate: "hello"
 JSON Response:
 {"translation": "{{count}} ok", "confidence": 0.95}
 more noise {"translation": "final", "confidence": 0.88}"#;
-        assert_eq!(translation(reply), ("final".into(), 0.88));
+        assert_eq!(translation(reply), Some(("final".into(), 0.88)));
     }
 
     #[test]
     fn quotes_inside_a_translation_stay() {
         let reply = r#"{"translation": "Click \"Save\"", "confidence": 0.9}"#;
-        assert_eq!(translation(reply).0, r#"Click "Save""#);
+        assert_eq!(translation(reply).unwrap().0, r#"Click "Save""#);
         let wrapped = r#"{"translation": "\"Hej\"", "confidence": 0.9}"#;
-        assert_eq!(translation(wrapped).0, "Hej");
+        assert_eq!(translation(wrapped).unwrap().0, "Hej");
     }
 
     #[test]
     fn replies_without_json_still_count() {
         assert_eq!(
             translation("Hej världen | 0.9"),
-            ("Hej världen".into(), 0.9)
+            Some(("Hej världen".into(), 0.9))
         );
         assert_eq!(
             translation("### Translation:\n\"Hej\""),
-            ("Hej".into(), UNSAID)
+            Some(("Hej".into(), UNSAID))
         );
         assert_eq!(
             translation("Translate:\n\"Hej då\"\n"),
-            ("Hej då".into(), UNSAID)
+            Some(("Hej då".into(), UNSAID))
         );
+    }
+
+    #[test]
+    fn a_cut_off_reply_has_no_translation() {
+        assert_eq!(
+            translation(r#"{"translation":"Lorem ipsum dolor sit"#),
+            None
+        );
+        assert_eq!(
+            translation("```json\n{\n  \"translation\": \"Lorem | ipsum dolor"),
+            None
+        );
+        assert_eq!(
+            translation(r#"{"translation": "Your translation here"} {"translation":"Hej"#),
+            None
+        );
+        assert_eq!(translation(r#"{"transl"#), None);
+        assert_eq!(translation("  "), None);
+    }
+
+    #[test]
+    fn running_out_of_tokens_is_cut_off() {
+        assert!(cut_off(
+            &json!({ "choices": [{ "finish_reason": "length", "message": { "content": "{" } }] })
+        ));
+        assert!(cut_off(&json!({ "content": "{", "stop_type": "limit" })));
+        assert!(cut_off(&json!({ "content": "{", "stopped_limit": true })));
+        assert!(cut_off(&json!({ "content": "{", "truncated": true })));
+        assert!(!cut_off(
+            &json!({ "choices": [{ "finish_reason": "stop", "message": { "content": "Hej" } }] })
+        ));
+        assert!(!cut_off(
+            &json!({ "content": "Hej", "stop_type": "eos", "truncated": false })
+        ));
     }
 
     #[test]

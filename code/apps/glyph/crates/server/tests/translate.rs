@@ -251,6 +251,64 @@ async fn a_fill_run_writes_translations_and_keeps_what_people_wrote(pool: PgPool
     );
 }
 
+/// A model that translates as [`fake_model`] does, but runs out of tokens
+/// on "Goodbye", as llama-server does at `max_tokens`.
+async fn cutting_model() -> String {
+    let reply = |Json(body): Json<Value>| async move {
+        let prompt = body["messages"][1]["content"].as_str().unwrap_or_default();
+        let (answer, finish) = if prompt.contains("Text to translate: \"Goodbye\"") {
+            (r#"{"translation":"sv:Good"#.to_string(), "length")
+        } else {
+            let text = if prompt.contains("\"Hello\"") {
+                "Hello"
+            } else {
+                "Thanks"
+            };
+            let answer = json!({ "translation": format!("sv:{text}"), "confidence": 0.9 });
+            (answer.to_string(), "stop")
+        };
+        Json(json!({ "choices": [{ "message": { "content": answer }, "finish_reason": finish }] }))
+    };
+    let app = axum::Router::new().route("/v1/chat/completions", post(reply));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    format!("http://localhost:{port}")
+}
+
+#[sqlx::test(migrator = "glyph_sync::MIGRATOR")]
+async fn a_fill_run_counts_a_cut_off_reply_as_failed_and_writes_nothing(pool: PgPool) {
+    let app = app_with(pool.clone(), &cutting_model().await).await;
+    let (session, ws) = workspace(&app).await;
+    let started = app
+        .post(
+            &format!("/api/w/{ws}/runs"),
+            Some(&session),
+            json!({ "kind": "fill", "source_lang": "en", "target_lang": "sv", "namespace": "common" }),
+        )
+        .await;
+    let run = finished(&pool, started.body["id"].as_str().unwrap()).await;
+    assert_eq!(run["status"], "done", "{run}");
+    assert_eq!(
+        (run["done"].clone(), run["failed"].clone()),
+        (json!(2), json!(1))
+    );
+
+    let sv = rows(
+        &pool,
+        "SELECT jsonb_build_object('key', key, 'value', value) FROM translations \
+         WHERE lang = 'sv' ORDER BY key",
+    )
+    .await;
+    assert_eq!(
+        sv,
+        [
+            json!({ "key": "hello", "value": "sv:Hello" }),
+            json!({ "key": "thanks", "value": "sv:Thanks" }),
+        ]
+    );
+}
+
 #[sqlx::test(migrator = "glyph_sync::MIGRATOR")]
 async fn a_run_without_its_model_fails_and_says_why(pool: PgPool) {
     // Nothing listens on port 9 here.
