@@ -71,6 +71,10 @@ docker run -d --name raven -p 7580:7580 \
 ```
 
 Put it behind https at `public_url`; the image serves the web app too.
+The server runs as `code-villain` (uid and gid 10001), not root, and keeps
+everything in Postgres, so it needs no volume; it must be able to read the
+settings file (`chown 10001 raven.toml`). Upgrading from an image that ran
+as root needs nothing more.
 
 A workspace is a team's apps. Its admins add the apps it watches in
 Settings → Apps, with each one's health address, and make the key the app

@@ -7,6 +7,7 @@
 !kit/desktop
 !kit/scim
 !kit/settings
+!kit/auth
 **/target
 **/node_modules
 apps/raven/apps/web/dist
