@@ -254,7 +254,11 @@ other way round: V moves a mail, a folder's name renames it, and
 `move_mail` deletes, archives and moves as ⌫, E and V do, a sender's mail
 or the mails `find_mail` found. It asks nothing first: the Trash keeps
 what's deleted, and Undo moves back only what it moved (the UIDs it got
-in their new folder), to the folder each came from. The prompt names the accounts,
+in their new folder), to the folder each came from. But a mail is a
+stranger's words: what the tools return of mail comes inside a fence the
+question makes up, and once `read_mail` has read one, every tool that
+changes something refuses for the rest of that question, so the answer
+says what it would do and you ask again to have it done. The prompt names the accounts,
 their folders and their rules, so "Dependabot too" adds to the rule it
 means. One question at a time; there's no talk to scroll back.
 Not installed or signed out, the answer says what to do.
