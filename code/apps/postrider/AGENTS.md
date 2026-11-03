@@ -114,7 +114,11 @@ the server. Only you opening a mail marks it read: every other fetch, the
 lists, snippets, conversations, judging, sorting and search, uses
 `BODY.PEEK`, and Postrider opens no mail by itself. `message.rs` reads the source: who it went to, its text, its
 HTML with inline pictures written in, its attachments. The page shows the
-HTML in a frame where no script runs and pictures load without a referrer.
+HTML in a frame where no script of the mail's runs and pictures load
+without a referrer. A `<meta http-equiv="refresh">` and `<noscript>` are
+taken out first, read as the browser reads them, and the page hears only
+what carries the token the frame's own script was given, so a page the
+frame is sent to can't press keys or open links.
 The frame is as tall as the mail says it is; a last style sets the mail's
 `html` and `body` to `height: auto`, since newsletters that make them 100%
 tall would otherwise fold the frame to nothing. The frame's script adds that

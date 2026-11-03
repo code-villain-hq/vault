@@ -632,7 +632,7 @@ function MailHtml({ html, instead }: { html: string; instead: ReactNode }) {
   const [height, setHeight] = useState<number>();
   const [silent, setSilent] = useState(false);
   const [emptyOne, setEmptyOne] = useState<string>();
-  const srcDoc = useMemo(() => paper(html), [html]);
+  const { srcDoc, token } = useMemo(() => paper(html), [html]);
 
   useEffect(() => {
     setSilent(false);
@@ -643,7 +643,8 @@ function MailHtml({ html, instead }: { html: string; instead: ReactNode }) {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (!frame.current || event.source !== frame.current.contentWindow) return;
-      const said = event.data as FrameMessage;
+      const said = fromFrame(event.data, token);
+      if (!said) return;
       if (typeof said.height === "number") {
         setHeight(said.height);
       } else if (said.empty === true) {
@@ -670,7 +671,7 @@ function MailHtml({ html, instead }: { html: string; instead: ReactNode }) {
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [token]);
 
   if (emptyOne === srcDoc) return instead;
   return (
@@ -691,6 +692,7 @@ const SILENT_AFTER = 2000;
 
 /** What the frame's script tells the page. */
 type FrameMessage = {
+  token?: unknown;
   height?: unknown;
   empty?: unknown;
   link?: unknown;
@@ -700,6 +702,17 @@ type FrameMessage = {
   altKey?: unknown;
   shiftKey?: unknown;
 };
+
+/**
+ * What the frame says, if Postrider's script said it: a page the frame was
+ * sent to, which could post a key that deletes the mail or a link to open,
+ * doesn't know the render's token.
+ */
+export function fromFrame(data: unknown, token: string): FrameMessage | undefined {
+  if (typeof data !== "object" || data === null) return undefined;
+  const said = data as FrameMessage;
+  return said.token === token ? said : undefined;
+}
 
 /**
  * The rules that keep the paper light and the mail as tall as it is, after
@@ -720,10 +733,14 @@ html:root, html:root > body { height: auto !important; min-height: 0 !important;
  * as what that box holds, if the box grows with the frame: one that didn't
  * is the mail's own size, and its height stays. Nothing is said before the
  * mail is read, so a 0 is the mail's. Loaded with no text and no picture
- * to show, it says it's empty.
+ * to show, it says it's empty. Everything it says carries the render's
+ * token, which lives only in its own text: it takes itself out of the
+ * document before the mail is read, so the mail's styles can't read it.
  */
 const REPORTER = `
-const say = (message) => parent.postMessage(message, "*");
+const token = TOKEN;
+document.currentScript.remove();
+const say = (message) => parent.postMessage({ ...message, token }, "*");
 const boxes = new Map();
 const reach = (height) => {
   let most = height;
@@ -785,10 +802,10 @@ addEventListener("load", () => {
   if (!shows()) say({ empty: true });
 });
 document.addEventListener("click", (event) => {
-  const link = event.target instanceof Element && event.target.closest("a[href]");
+  const link = event.target instanceof Element && event.target.closest("a[*|href], area[href]");
   if (!link) return;
   event.preventDefault();
-  say({ link: link.getAttribute("href") });
+  say({ link: link.getAttribute("href") ?? link.getAttributeNS("http://www.w3.org/1999/xlink", "href") });
 });
 document.addEventListener("keydown", (event) => {
   const target = event.target;
@@ -809,20 +826,42 @@ document.addEventListener("keydown", (event) => {
  * Newsletters often make html and body 100% tall, `!important`: in a frame
  * that grows to its content that is no height at all, so a rule after the
  * mail's, and surer than theirs, keeps them as tall as what they hold.
+ * `token` is what the frame's script signs what it says with.
  */
-function paper(html: string): string {
+function paper(html: string): { srcDoc: string; token: string } {
   const nonce = crypto.randomUUID();
-  const body = html.replace(/<meta[^>]+http-equiv\s*=\s*["']?refresh[^>]*>/gi, "");
-  return `<!doctype html><html><head><meta charset="utf-8">
+  const token = crypto.randomUUID();
+  const body = withoutRefresh(html);
+  const srcDoc = `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; img-src https: http: data:; style-src 'unsafe-inline' https:; font-src https: data:">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="light">
 <base target="_blank">
-<script nonce="${nonce}">${REPORTER}</script>
+<script nonce="${nonce}">${REPORTER.replace("TOKEN", JSON.stringify(token))}</script>
 <style>
 html { background: Canvas; color: CanvasText; height: auto !important; min-height: 0 !important; }
 body { margin: 0; padding: 20px 24px; font: 14px/1.5 -apple-system, system-ui, sans-serif; overflow-wrap: break-word; height: auto !important; min-height: 0 !important; }
 img { max-width: 100%; height: auto; }
 </style></head><body>${body}
 <style>${LAST_RULES}</style></body></html>`;
+  return { srcDoc, token };
+}
+
+/**
+ * The mail without a `<meta http-equiv="refresh">`, which would send the
+ * frame to a page of the sender's. It's found as the browser reads the
+ * mail, entities and quoted `>` and all. A `noscript` goes too: the frame
+ * runs a script, so it shows none, but DOMParser reads as if scripts were
+ * off, and could find only text in one where the frame finds a meta. A
+ * mail with neither is left as it came.
+ */
+function withoutRefresh(html: string): string {
+  const mail = new DOMParser().parseFromString(html, "text/html");
+  const refreshes = [...mail.querySelectorAll("meta[http-equiv]")].filter(
+    (meta) => meta.getAttribute("http-equiv")?.trim().toLowerCase() === "refresh",
+  );
+  const unseen = [...mail.querySelectorAll("noscript")];
+  if (refreshes.length === 0 && unseen.length === 0) return html;
+  for (const element of [...refreshes, ...unseen]) element.remove();
+  return mail.documentElement.outerHTML;
 }
