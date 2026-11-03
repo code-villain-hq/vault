@@ -2541,6 +2541,34 @@ async fn a_guest_syncs_only_their_teams(pool: PgPool) {
     // Everyone else still syncs the whole workspace.
     assert_eq!(ids(&pool, bob, ModelKind::Issue).await.len(), 2);
     assert_eq!(ids(&pool, f.actor, ModelKind::Comment).await.len(), 2);
+
+    // Reading only some kinds (the MCP tools do) gives each viewer what
+    // their bootstrap has, their own notifications included.
+    for assignee in [gus, bob] {
+        apply(
+            &pool,
+            f.actor,
+            vec![update(
+                ModelKind::Issue,
+                mine,
+                json!({ "assignee_id": assignee.user_id }),
+            )],
+        )
+        .await
+        .unwrap();
+    }
+    for (viewer, notified) in [(gus, 1), (bob, 1), (f.actor, 0)] {
+        let all = bootstrap(&pool, viewer).await.unwrap().records;
+        let some = forge_sync::records(&pool, viewer, ModelKind::ALL)
+            .await
+            .unwrap();
+        assert_eq!(some, all);
+        assert_eq!(some[&ModelKind::Notification].len(), notified);
+    }
+    let only = forge_sync::records(&pool, gus, &[ModelKind::Issue])
+        .await
+        .unwrap();
+    assert_eq!(only.keys().collect::<Vec<_>>(), [&ModelKind::Issue]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -16,9 +16,12 @@ mod spec_change;
 mod team_members;
 mod work;
 
+use std::collections::BTreeMap;
+
+use code_villain_sync::GuestView;
 use forge_domain::{Actor, Bootstrap, ModelKind, SyncAction, SyncEntry, Transaction};
 use serde_json::Value;
-use sqlx::{PgConnection, PgPool};
+use sqlx::{AssertSqlSafe, PgConnection, PgPool};
 use uuid::Uuid;
 
 pub use code_villain_sync::{Origin, SyncError, current_sync_id, lock_workspace, workspace_epoch};
@@ -80,6 +83,65 @@ pub async fn guest_access(db: &mut PgConnection, viewer: Actor) -> Result<Option
 /// A consistent snapshot of every record the viewer syncs in the workspace.
 pub async fn bootstrap(pool: &PgPool, viewer: Actor) -> Result<Bootstrap, SyncError> {
     code_villain_sync::bootstrap::<Forge>(pool, viewer).await
+}
+
+/// The records of some kinds that the viewer syncs, as [`bootstrap`] has
+/// them (oldest first), from one consistent snapshot. For server code that
+/// needs a few kinds, not the whole workspace.
+pub async fn records(
+    pool: &PgPool,
+    viewer: Actor,
+    models: &[ModelKind],
+) -> Result<BTreeMap<ModelKind, Vec<Value>>, SyncError> {
+    let mut db = pool.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .execute(&mut *db)
+        .await?;
+    let guest = guest_access(&mut db, viewer).await?.is_some();
+    let mut records = BTreeMap::new();
+    for model in models {
+        let Some(visible) = visible(*model, guest, "$2") else {
+            records.insert(*model, Vec::new());
+            continue;
+        };
+        let sql = format!(
+            "SELECT to_jsonb(t.*) FROM {} AS t WHERE t.workspace_id = $1 AND {visible} \
+             ORDER BY t.created_at",
+            model.table()
+        );
+        // Safe: the table name and the conditions are constants from `ModelKind`.
+        let rows: Vec<Value> = sqlx::query_scalar(AssertSqlSafe(sql))
+            .bind(viewer.workspace_id)
+            .bind(viewer.user_id)
+            .fetch_all(&mut *db)
+            .await?;
+        records.insert(*model, rows);
+    }
+    db.commit().await?;
+    Ok(records)
+}
+
+/// The condition on `t`, a record of `model`, that keeps a read to what the
+/// viewer syncs of it, as [`bootstrap`] does: their own notifications and,
+/// for a guest, their teams' records. The viewer's user id is bound as
+/// `viewer` (such as `"$2"`). `None` when they see none of it.
+pub fn visible(model: ModelKind, guest: bool, viewer: &str) -> Option<String> {
+    let mut only = Vec::new();
+    if model.private_to_user() {
+        only.push(format!("t.user_id = {viewer}"));
+    }
+    if guest {
+        match model.guest_view() {
+            GuestView::All => {}
+            GuestView::Where(sql) => only.push(format!("({})", sql.replace("$viewer", viewer))),
+            GuestView::Hidden => return None,
+        }
+    }
+    Some(if only.is_empty() {
+        "TRUE".into()
+    } else {
+        only.join(" AND ")
+    })
 }
 
 /// Up to `limit` log entries after `after` that the viewer may see, and the

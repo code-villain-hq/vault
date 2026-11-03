@@ -288,7 +288,7 @@ pub fn knowledge<'a>(
 /// fields, discussion, sub-issues, relations, and the specs and decisions it
 /// follows (see [`issue_knowledge`]).
 pub async fn get_issue(pool: &PgPool, actor: Actor, input: IssueRef) -> ToolResult<String> {
-    let s = Snapshot::load(pool, actor).await?;
+    let s = Snapshot::load_with_comments(pool, actor).await?;
     let issue = s.issue(&input.identifier)?;
     let mut summary = issue_summary(&s, issue);
     let service = issue
@@ -671,7 +671,7 @@ fn similar_open_issues<'a>(s: &'a Snapshot, title: &str) -> Vec<&'a Issue> {
 /// issues have similar titles nothing is created yet: the agent gets them,
 /// and has to say it's really new with `confirm_new`.
 pub async fn create_issue(pool: &PgPool, actor: Actor, input: CreateIssue) -> ToolResult<String> {
-    let s = Snapshot::load(pool, actor).await?;
+    let mut s = Snapshot::load(pool, actor).await?;
     let team = s.team(&input.team)?;
     if input.confirm_new != Some(true) {
         let similar = similar_open_issues(&s, &input.title);
@@ -750,7 +750,7 @@ pub async fn create_issue(pool: &PgPool, actor: Actor, input: CreateIssue) -> To
         }],
     )
     .await?;
-    let s = Snapshot::load(pool, actor).await?;
+    s.reload_issue(pool, id).await?;
     let issue = s
         .issues
         .iter()
@@ -787,7 +787,7 @@ pub struct UpdateIssue {
 }
 
 pub async fn update_issue(pool: &PgPool, actor: Actor, input: UpdateIssue) -> ToolResult<String> {
-    let s = Snapshot::load(pool, actor).await?;
+    let mut s = Snapshot::load(pool, actor).await?;
     let issue = s.issue(&input.identifier)?;
     let team = s.team_of(issue).ok_or("the issue has no team")?;
     let mut data = Map::new();
@@ -875,7 +875,7 @@ pub async fn update_issue(pool: &PgPool, actor: Actor, input: UpdateIssue) -> To
         }],
     )
     .await?;
-    let s = Snapshot::load(pool, actor).await?;
+    s.reload_issue(pool, id).await?;
     let issue = s
         .issues
         .iter()

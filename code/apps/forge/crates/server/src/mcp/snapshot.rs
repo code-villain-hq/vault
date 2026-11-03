@@ -1,9 +1,9 @@
 //! A consistent view of a workspace for the MCP tools, with lookups by the
 //! names agents use: issue identifiers, team keys, people's names, titles.
 //!
-//! It loads the same snapshot clients download. That keeps tools simple and
-//! exactly in step with the app; targeted queries can replace it when
-//! workspaces grow large.
+//! It loads the records clients download that the tools read, as the
+//! viewer sees them. That keeps tools simple and exactly in step with the
+//! app; tools that need less (`search_issues`) load less.
 
 use std::collections::HashMap;
 
@@ -36,12 +36,48 @@ pub struct Snapshot {
 
 pub type ToolResult<T> = Result<T, String>;
 
+/// What a snapshot holds: the records the tools read, not comments (only
+/// `get_issue` shows them) nor what no tool reads (notifications, AI runs,
+/// suggestions, links, verdicts, team members).
+const MODELS: &[ModelKind] = &[
+    ModelKind::Team,
+    ModelKind::WorkflowState,
+    ModelKind::Label,
+    ModelKind::Issue,
+    ModelKind::IssueRelation,
+    ModelKind::Project,
+    ModelKind::Initiative,
+    ModelKind::User,
+    ModelKind::Service,
+    ModelKind::Domain,
+    ModelKind::Spec,
+    ModelKind::Decision,
+    ModelKind::SpecChange,
+];
+
 impl Snapshot {
+    /// Everything the tools read, without comments.
     pub async fn load(pool: &PgPool, actor: Actor) -> ToolResult<Snapshot> {
-        let mut bootstrap = forge_sync::bootstrap(pool, actor)
+        Self::load_models(pool, actor, MODELS).await
+    }
+
+    /// Everything the tools read, with comments.
+    pub async fn load_with_comments(pool: &PgPool, actor: Actor) -> ToolResult<Snapshot> {
+        let mut models = MODELS.to_vec();
+        models.push(ModelKind::Comment);
+        Self::load_models(pool, actor, &models).await
+    }
+
+    /// Only the records of `models`; the snapshot's other lists stay empty.
+    pub async fn load_models(
+        pool: &PgPool,
+        actor: Actor,
+        models: &[ModelKind],
+    ) -> ToolResult<Snapshot> {
+        let mut records = forge_sync::records(pool, actor, models)
             .await
             .map_err(|e| e.to_string())?;
-        let mut take = |model: ModelKind| bootstrap.records.remove(&model).unwrap_or_default();
+        let mut take = |model: ModelKind| records.remove(&model).unwrap_or_default();
         let mut snapshot = Snapshot {
             actor,
             teams: parse(take(ModelKind::Team))?,
@@ -62,6 +98,45 @@ impl Snapshot {
         };
         snapshot.queue = queue_positions(&snapshot.issues, &snapshot.states, &snapshot.users);
         Ok(snapshot)
+    }
+
+    /// Reads one issue again after a write to it, and the queue with it,
+    /// instead of loading the whole snapshot again.
+    pub async fn reload_issue(&mut self, pool: &PgPool, id: uuid::Uuid) -> ToolResult<&Issue> {
+        let row: Option<serde_json::Value> = sqlx::query_scalar(
+            "SELECT to_jsonb(t.*) FROM issues AS t WHERE t.id = $1 AND t.workspace_id = $2",
+        )
+        .bind(id)
+        .bind(self.actor.workspace_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+        let issue: Option<Issue> = row
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|e| e.to_string())?;
+        // Only in a team the agent sees, as the snapshot would have it.
+        let issue = issue.filter(|i| self.teams.iter().any(|t| t.id == i.team_id));
+        let at = self.issues.iter().position(|i| i.id == id);
+        let at = match (issue, at) {
+            (Some(issue), Some(at)) => {
+                self.issues[at] = issue;
+                at
+            }
+            (Some(issue), None) => {
+                self.issues.push(issue);
+                self.issues.len() - 1
+            }
+            (None, at) => {
+                if let Some(at) = at {
+                    self.issues.remove(at);
+                }
+                self.queue = queue_positions(&self.issues, &self.states, &self.users);
+                return Err("the issue vanished".into());
+            }
+        };
+        self.queue = queue_positions(&self.issues, &self.states, &self.users);
+        Ok(&self.issues[at])
     }
 
     pub fn team(&self, key_or_name: &str) -> ToolResult<&Team> {
