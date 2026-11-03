@@ -1,0 +1,20 @@
+[package]
+name = "code-villain-net"
+description = "Requests that only reach the addresses they may: public ones, or never a link-local or cloud-metadata one, after DNS and redirects too"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+reqwest = { version = "0.13", default-features = false }
+tokio = { version = "1", features = ["net"] }
+url = "2.5"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net", "io-util", "macros", "rt-multi-thread"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

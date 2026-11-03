@@ -97,6 +97,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "code-villain-auth",
+ "code-villain-net",
  "code-villain-scim",
  "code-villain-settings",
  "code-villain-sync",
@@ -784,6 +785,15 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "code-villain-net"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "tokio",
+ "url",
 ]
 
 [[package]]

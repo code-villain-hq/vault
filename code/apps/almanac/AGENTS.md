@@ -95,7 +95,8 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   /api/w/{id}/photos/{photo}` has it (`sending.ts`), offline too; sent
   again, it's kept once. Another device asks a while for one not sent
   yet (`usePhoto`). `POST /api/w/{id}/photos` stays for older apps. A talk keeps one from the web with
-  `fetch_picture` (public https only, the page's og:image, 5 MB at most;
+  `fetch_picture` (public https only, checked by `code/kit/net` on the
+  address the name resolves to and on every redirect; the page's og:image, 5 MB at most;
   six an answer, the address without its query or fragment, and none
   after `read_topic` of another topic: an address goes out of Almanac)
   and sets the cover with `set_cover`. Rows with a photo show it small on

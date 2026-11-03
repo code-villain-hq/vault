@@ -12,6 +12,7 @@ base64.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
 code-villain-auth.workspace = true
+code-villain-net.workspace = true
 code-villain-scim.workspace = true
 code-villain-settings.workspace = true
 code-villain-sync.workspace = true

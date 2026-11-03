@@ -9,6 +9,7 @@
 !kit/settings
 !kit/auth
 !kit/notify
+!kit/net
 **/target
 **/node_modules
 apps/almanac/apps/web/dist
