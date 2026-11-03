@@ -5,7 +5,19 @@ export type PointPatch = { block_id?: string, theme?: string, text?: string, hap
 /**
  * Null takes the number away.
  */
-amount?: number, note?: string, done?: boolean, cells?: { [key in string]: Cell }, source?: string, source_url?: string, 
+amount?: number, note?: string, done?: boolean, 
+/**
+ * The row's cells, whole, as they are from now on.
+ */
+cells?: { [key in string]: Cell }, 
+/**
+ * Only the cells that change, by field name, null taking one out. The
+ * server merges them into the row's cells as they are when the change
+ * arrives, so two devices changing different cells of a row keep both.
+ * With it, `cells` is only how the app shows the row meanwhile, and the
+ * server leaves it.
+ */
+changed_cells?: { [key in string]: Cell | null }, source?: string, source_url?: string, 
 /**
  * The talk it now comes from, when a talk changed it.
  */

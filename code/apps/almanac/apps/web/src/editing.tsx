@@ -7,7 +7,7 @@
 import type { Block, Cell, Field, Point, Reminder } from "@almanac/types";
 import { Plus } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
-import { cellOf } from "./collection";
+import { cellOf, cellsPatch } from "./collection";
 import { doneFor, isDue, markDone, markNotDone } from "./reminders";
 import { Button } from "./ui";
 import { useIsGuest, useRecords, useWorkspace } from "./workspace";
@@ -42,10 +42,7 @@ function cellFrom(field: Field, typed: string | boolean): Cell | undefined | nul
 export function useSetCell() {
   const { sync } = useWorkspace();
   return (row: Point, field: Field, cell: Cell | undefined) => {
-    const cells = { ...row.cells };
-    if (cell === undefined) delete cells[field.name];
-    else cells[field.name] = cell;
-    sync.update("Point", row.id, { cells });
+    sync.update("Point", row.id, cellsPatch(row, { [field.name]: cell }));
   };
 }
 
@@ -83,7 +80,7 @@ export function useTick() {
     const reminder = rings.get(row.id);
     const done = itemDone(row, check, reminder);
     if (reminder) return done ? markNotDone(sync, reminder) : markDone(sync, reminder);
-    sync.update("Point", row.id, { cells: { ...row.cells, [check.name]: !done } });
+    sync.update("Point", row.id, cellsPatch(row, { [check.name]: !done }));
   };
 }
 

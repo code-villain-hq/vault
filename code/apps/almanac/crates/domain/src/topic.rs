@@ -454,7 +454,14 @@ pub struct PointPatch {
     pub amount: Option<f64>,
     pub note: Option<String>,
     pub done: Option<bool>,
+    /// The row's cells, whole, as they are from now on.
     pub cells: Option<BTreeMap<String, Cell>>,
+    /// Only the cells that change, by field name, null taking one out. The
+    /// server merges them into the row's cells as they are when the change
+    /// arrives, so two devices changing different cells of a row keep both.
+    /// With it, `cells` is only how the app shows the row meanwhile, and the
+    /// server leaves it.
+    pub changed_cells: Option<BTreeMap<String, Option<Cell>>>,
     pub source: Option<String>,
     pub source_url: Option<String>,
     /// The talk it now comes from, when a talk changed it.
@@ -705,6 +712,15 @@ impl Validate for PointPatch {
             self.note.as_deref(),
         )?;
         self.cells.as_ref().map(cells).transpose()?;
+        if let Some(changed) = &self.changed_cells {
+            // Renaming every field takes each cell out and puts it back.
+            if changed.len() > 2 * MOST_FIELDS {
+                return invalid(format!("A row has at most {MOST_FIELDS} cells."));
+            }
+            changed
+                .iter()
+                .try_for_each(|(name, c)| cell(name, c.as_ref()))?;
+        }
         // A picture's caption may be taken off, with its photo given again.
         let picture = self
             .cells
@@ -833,20 +849,22 @@ fn cells(cells: &BTreeMap<String, Cell>) -> Result<(), ValidationError> {
     if cells.len() > MOST_FIELDS {
         return invalid(format!("A row has at most {MOST_FIELDS} cells."));
     }
-    for (name, cell) in cells {
-        if name.trim().is_empty() || name.chars().count() > 40 {
-            return invalid("A cell is named by its field, at most 40 characters.");
-        }
-        match cell {
-            Cell::Number(n) if !n.is_finite() => return invalid("A number cell is a number."),
-            // As much as a point's words: what a term means may be a paragraph.
-            Cell::Text(t) if t.chars().count() > 2000 => {
-                return invalid("A cell is at most 2000 characters.");
-            }
-            _ => {}
-        }
+    cells.iter().try_for_each(|(name, c)| cell(name, Some(c)))
+}
+
+/// One cell by its field's name; none is a cell taken out.
+fn cell(name: &str, cell: Option<&Cell>) -> Result<(), ValidationError> {
+    if name.trim().is_empty() || name.chars().count() > 40 {
+        return invalid("A cell is named by its field, at most 40 characters.");
     }
-    Ok(())
+    match cell {
+        Some(Cell::Number(n)) if !n.is_finite() => invalid("A number cell is a number."),
+        // As much as a point's words: what a term means may be a paragraph.
+        Some(Cell::Text(t)) if t.chars().count() > 2000 => {
+            invalid("A cell is at most 2000 characters.")
+        }
+        _ => Ok(()),
+    }
 }
 
 /// What a card's face, a bar or a question shows besides a point's text.
@@ -964,6 +982,19 @@ mod tests {
         assert!(patch("", Some(photo.clone())).validate().is_ok());
         assert!(patch("A sketch", Some(photo)).validate().is_ok());
         assert!(patch("", None).validate().is_err());
+    }
+
+    #[test]
+    fn a_change_to_some_cells_may_take_one_out() {
+        let patch: PointPatch =
+            serde_json::from_str(r#"{"changed_cells": {"Done": true, "Notes": null}}"#).unwrap();
+        let changed = patch.changed_cells.as_ref().unwrap();
+        assert_eq!(changed["Done"], Some(Cell::Check(true)));
+        assert_eq!(changed["Notes"], None);
+        assert!(patch.validate().is_ok());
+        let unnamed: PointPatch =
+            serde_json::from_str(r#"{"changed_cells": {" ": null}}"#).unwrap();
+        assert!(unnamed.validate().is_err());
     }
 
     #[test]

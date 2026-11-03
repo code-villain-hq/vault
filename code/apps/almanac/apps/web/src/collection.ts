@@ -2,7 +2,7 @@
 // and its cells the rest, by field name. Its fields pick its picture, by
 // the same rules on every page; nobody designs one.
 
-import type { Block, Cell, Field, Point } from "@almanac/types";
+import type { Block, Cell, Field, Point, PointPatch } from "@almanac/types";
 import { amountWords, dateWords, today } from "./format";
 import { when } from "./timeline";
 
@@ -27,6 +27,23 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export function cellOf(row: Point, field: Field): Cell | undefined {
   const cell = row.cells[field.name];
   return cell === undefined || cell === "" ? undefined : cell;
+}
+
+/**
+ * A patch for some of a row's cells, `undefined` taking one out. The
+ * server merges `changed_cells` into the row as it is then, so a device
+ * that was offline keeps what another changed meanwhile; `cells` is the
+ * row as this device shows it until the server's answer comes.
+ */
+export function cellsPatch(row: Point, changes: Record<string, Cell | undefined>): PointPatch {
+  const cells = { ...row.cells };
+  const changed: Record<string, Cell | null> = {};
+  for (const [name, cell] of Object.entries(changes)) {
+    if (cell === undefined) delete cells[name];
+    else cells[name] = cell;
+    changed[name] = cell ?? null;
+  }
+  return { cells, changed_cells: changed };
 }
 
 /** The collection's fields its rows fill, in its order. */

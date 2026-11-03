@@ -8,6 +8,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { type Confirmation, ConfirmDialog, CreateDialog } from "@code-villain/web";
 import { GripVertical, Plus, X } from "lucide-react";
 import { useState } from "react";
+import { cellsPatch } from "./collection";
 import { Button } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -124,24 +125,28 @@ export function FieldsDialog({
     }));
     // Each row's cells by the fields' new names, without the removed ones'.
     const named = new Map(fields.flatMap((f) => (f.was ? [[f.was, f.name.trim()]] : [])));
+    // Only the cells that move or go, so what another device wrote in the
+    // other cells meanwhile stays: first what leaves its name, then what
+    // comes to one, so two fields that swap names both keep theirs.
     const cells = rows.flatMap((row) => {
-      const now: Record<string, Cell> = {};
+      const changes: Record<string, Cell | undefined> = {};
+      for (const name of Object.keys(row.cells)) {
+        const to = named.get(name);
+        const went = !to && block.fields.some((f) => f.name === name);
+        if (went || (to && to !== name)) changes[name] = undefined;
+      }
       for (const [name, cell] of Object.entries(row.cells)) {
         const to = named.get(name);
-        if (to) now[to] = cell;
-        else if (!block.fields.some((f) => f.name === name)) now[name] = cell;
+        if (to && to !== name) changes[to] = cell;
       }
-      const same =
-        Object.keys(now).length === Object.keys(row.cells).length &&
-        Object.entries(now).every(([name, cell]) => row.cells[name] === cell);
-      return same
+      return Object.keys(changes).length === 0
         ? []
         : [
             {
               action: "update" as const,
               model: "Point" as const,
               id: row.id,
-              data: { cells: now },
+              data: cellsPatch(row, changes),
             },
           ];
     });

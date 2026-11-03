@@ -8,6 +8,7 @@
 import type { Block, Field, Point, Topic } from "@almanac/types";
 import { ImagePlus, X } from "lucide-react";
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
+import { cellsPatch } from "./collection";
 import { holdsPhoto, MOST_PHOTOS, photosIn, pick } from "./photos";
 import { keepHere } from "./sending";
 import { Photo } from "./set";
@@ -197,7 +198,7 @@ export function RowPhoto({ block, row }: { block: Block; row: Point }) {
   const setting = useSetting((photo) => {
     const into = field ?? PHOTO_FIELD;
     if (!field) sync.update("Block", block.id, { fields: [...block.fields, into] });
-    sync.update("Point", row.id, { cells: { ...row.cells, [into.name]: photo } });
+    sync.update("Point", row.id, cellsPatch(row, { [into.name]: photo }));
   });
   if (typeof id === "string") {
     return (

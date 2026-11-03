@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Block, Cell, Field, Point } from "@almanac/types";
 import {
   byDay,
+  cellsPatch,
   cellWords,
   lanesOf,
   pictureOf,
@@ -253,5 +254,16 @@ describe("sumOf", () => {
   });
   test("counts a row whose name only has the word inside", () => {
     expect(sumOf([row("Kosten davon", { Menge: 2 }), row("Rest", { Menge: 3 })], amount)).toBe(5);
+  });
+});
+
+describe("cellsPatch", () => {
+  test("sends only the cells that change and shows the row whole meanwhile", () => {
+    const patch = cellsPatch(row("Küche", { Notiz: "Herd", Gepackt: false }), {
+      Gepackt: true,
+      Notiz: undefined,
+    });
+    expect(patch.changed_cells).toEqual({ Gepackt: true, Notiz: null });
+    expect(patch.cells).toEqual({ Gepackt: true });
   });
 });

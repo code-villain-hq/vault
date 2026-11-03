@@ -1,6 +1,7 @@
 //! Almanac's rules for the shared sync engine ([`code_villain_sync`]): what
 //! a talk said is the server's, a topic's records go with it, a block's
-//! points with the block, and only the server marks a reminder as told.
+//! points with the block, only the server marks a reminder as told, and a
+//! row's changed cells merge into the ones it has.
 
 use almanac_domain::{Actor, ModelKind, Operation};
 use code_villain_sync::Rules;
@@ -160,6 +161,26 @@ impl Rules for Almanac {
         Ok(())
     }
 
+    async fn prepare_update(
+        _db: &mut PgConnection,
+        _actor: Actor,
+        model: ModelKind,
+        _id: Uuid,
+        before: Option<&Value>,
+        data: &mut Map<String, Value>,
+    ) -> Result<(), SyncError> {
+        // Merged into the row as it is now, under the workspace's lock: a
+        // device that was offline, or a talk that took minutes, changes
+        // only the cells it changed and keeps what others did meanwhile.
+        if model == ModelKind::Point
+            && let Some(changed) = data.remove("changed_cells")
+        {
+            let had = before.and_then(|b| b.get("cells"));
+            data.insert("cells".into(), merge_cells(had, &changed));
+        }
+        Ok(())
+    }
+
     async fn cascade(
         db: &mut PgConnection,
         actor: Actor,
@@ -218,6 +239,20 @@ impl Rules for Almanac {
     }
 }
 
+/// A row's cells with `changed` merged in, as jsonb's `||` would, a null
+/// taking a cell out.
+fn merge_cells(had: Option<&Value>, changed: &Value) -> Value {
+    let mut cells = had.and_then(Value::as_object).cloned().unwrap_or_default();
+    for (name, cell) in changed.as_object().into_iter().flatten() {
+        if cell.is_null() {
+            cells.remove(name);
+        } else {
+            cells.insert(name.clone(), cell.clone());
+        }
+    }
+    Value::Object(cells)
+}
+
 /// Whether `topic` may sit under `parent`: one level deep, never under
 /// itself or the workspace's own topic, and never the workspace's own
 /// topic under another.
@@ -250,4 +285,20 @@ pub async fn may_sit_under(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn changed_cells_merge_into_the_rows_and_null_takes_one_out() {
+        let had = json!({"Done": false, "Notes": "Erst gießen", "Menge": 2});
+        let merged = merge_cells(Some(&had), &json!({"Done": true, "Notes": null}));
+        assert_eq!(merged, json!({"Done": true, "Menge": 2}));
+        assert_eq!(
+            merge_cells(None, &json!({"Done": true})),
+            json!({"Done": true})
+        );
+    }
 }

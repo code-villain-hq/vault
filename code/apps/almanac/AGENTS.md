@@ -109,7 +109,12 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
 - A collection is changed by hand too (`editing.tsx`): a click on a row's
   value changes it in place (in the table, on cards, on the row's page),
   and "+ New" under the collection adds a row. Both write the row's
-  `cells` through the sync engine; guests and samples get neither.
+  `cells` through the sync engine; guests and samples get neither. A
+  change sends only the cells it changes (`changed_cells`, null taking one
+  out, `cellsPatch`), which the sync rules merge into the row as it is
+  then (`prepare_update`), so an offline device or a talk keeps what
+  others changed meanwhile; `cells` beside them is only the row as this
+  device shows it until the server answers.
   "Fields…" in its ⋯ (`fields.tsx`) changes its fields as change_block
   does: name, kind, a number's unit, a choice's or status's words, eight
   at most, in order. A renamed field takes its cells along; removing one
