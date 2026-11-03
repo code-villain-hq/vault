@@ -77,6 +77,14 @@ Nobody signs up, and there are no invites or passwords: someone in none of
 the groups is told to ask the company's admin. A guest's languages are
 still added in Members.
 
+With Docker, build the image from `code/` (`docker build -f
+apps/glyph/Dockerfile -t glyph .`) and mount the settings and models files
+read-only (`GLYPH_CONFIG`, `GLYPH_MODELS`). The server runs as
+`code-villain` (uid and gid 10001), not root, and keeps everything in
+Postgres, so it needs no volume; it must be able to read both files
+(`chown 10001 glyph.toml models.toml`). Upgrading from an image that ran
+as root needs nothing more.
+
 See [AGENTS.md](AGENTS.md) for the commands, the layout and the rules.
 
 ## License

@@ -38,9 +38,16 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# The server runs as code-villain (10001:10001, the same in every Code Villain
+# image). It writes no files: everything it keeps is in Postgres, so it owns
+# nothing here, and the binary and web app stay root's.
+RUN groupadd --gid 10001 code-villain \
+    && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent \
+       --shell /usr/sbin/nologin code-villain
 COPY --from=server /usr/local/bin/glyph-server /usr/local/bin/glyph-server
 COPY --from=web /code/apps/glyph/apps/web/dist /srv/glyph/web
 ENV GLYPH_ADDR=0.0.0.0:7480 \
     GLYPH_WEB_DIR=/srv/glyph/web
+USER 10001:10001
 EXPOSE 7480
 CMD ["glyph-server"]
