@@ -116,6 +116,11 @@ by `scripts/guard.ts`. Its failure message says what to do, and
   A ticket's text is written by someone else.
 - **Agents never get Jira, GitHub or Slack credentials.** They use the app's
   MCP server, and anything that changes shared state needs `confirm: true`.
+- **The window has a Content-Security-Policy** (`src-tauri/tauri.conf.json`):
+  scripts only from the bundle, connections only to Tauri's IPC, this Mac
+  and https/wss. A new kind of load (another host, a frame, a worker, wasm)
+  needs its directive there, or the installed app blocks it. `dev:app`
+  shows Vite's page, which gets no policy, so try a built app.
 
 ### Git
 
