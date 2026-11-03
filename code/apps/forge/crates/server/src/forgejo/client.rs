@@ -155,6 +155,32 @@ impl Client {
             .await
     }
 
+    /// Whether someone may write to a repository: Forgejo's answer is
+    /// `owner`, `admin`, `write`, `read` or `none`. Forgejo tells only a
+    /// repository admin about other people, so the token must be one's.
+    pub async fn can_write(&self, full_name: &str, user: &str) -> Result<bool, String> {
+        check_name(full_name)?;
+        if !valid_user_name(user) {
+            return Ok(false);
+        }
+        let Some(answer) = self
+            .get(&format!(
+                "/repos/{full_name}/collaborators/{user}/permission"
+            ))
+            .await
+            .map_err(|e| {
+                format!("couldn't ask Forgejo who may write to {full_name}: {e}. The token must be a repository admin's")
+            })?
+        else {
+            // No such user any more.
+            return Ok(false);
+        };
+        Ok(matches!(
+            answer["permission"].as_str(),
+            Some("owner" | "admin" | "write")
+        ))
+    }
+
     /// What the commit statuses on a commit say.
     pub async fn checks(&self, full_name: &str, sha: &str) -> Result<PullRequestChecks, String> {
         check_name(full_name)?;
@@ -206,6 +232,16 @@ fn check_name(full_name: &str) -> Result<(), String> {
     } else {
         Err(format!("{full_name} isn't a repository name (owner/name)"))
     }
+}
+
+/// A Forgejo user name: letters, digits, `-`, `_` and `.`, which keeps it
+/// one segment of a path.
+fn valid_user_name(user: &str) -> bool {
+    !user.is_empty()
+        && !user.starts_with('.')
+        && user
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// An error without the address it was for: the token never shows in
@@ -263,6 +299,16 @@ mod tests {
         assert_eq!(of(&["pending", "error"]), PullRequestChecks::Failed);
         assert_eq!(of(&["failure"]), PullRequestChecks::Failed);
         assert_eq!(of(&["warning"]), PullRequestChecks::Passed);
+    }
+
+    #[test]
+    fn user_names_stay_one_path_segment() {
+        assert!(valid_user_name("code-villain"));
+        assert!(valid_user_name("ada.lovelace_2"));
+        assert!(!valid_user_name(""));
+        assert!(!valid_user_name(".."));
+        assert!(!valid_user_name("ada/../admin"));
+        assert!(!valid_user_name("ada?x=1"));
     }
 
     #[test]

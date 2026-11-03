@@ -204,7 +204,7 @@ function ConnectForm({
         type="password"
         autoComplete="off"
         placeholder={keepsToken ? "Leave empty to keep the saved one" : ""}
-        hint="A token that can read the repositories (read:repository). It stays on the server."
+        hint="A repository admin's token that can read the repositories (read:repository), so Forge can tell who may write to them. It stays on the server."
         value={token}
         onChange={(e) => setToken(e.target.value)}
         required={!keepsToken}

@@ -11,7 +11,9 @@
 //! conflicts or failing checks. Merging it completes them; closing it without
 //! merging, or turning it back into a draft, sends an issue waiting in review
 //! back to work. A commit only links: work reaches Done through a pull
-//! request's review, not by pushing "Fixes FOR-12".
+//! request's review, not by pushing "Fixes FOR-12". Only a pull request by
+//! someone who may work on the repository (`trusted_author`) works on an
+//! issue: one from anyone else, on a public repository, only links.
 
 use std::collections::BTreeSet;
 use std::sync::LazyLock;
@@ -261,6 +263,11 @@ async fn pull_request(
     let mut works_on = identifiers(branch, &IDENTIFIER);
     works_on.extend(identifiers(title, &CLOSING));
     works_on.extend(identifiers(body, &CLOSING));
+    if !trusted_author(pr) {
+        // Anyone may open a pull request on a public repository: theirs
+        // only mention issues, so they can't move one or wake its agent.
+        named.append(&mut works_on);
+    }
     let issues = mentioned(pool, workspace_id, named, &works_on).await?;
     if issues.is_empty() {
         return Ok(());
@@ -322,6 +329,15 @@ async fn pull_request(
     }
     db.commit().await?;
     Ok(())
+}
+
+/// Whether GitHub says a pull request's author may work on the repository:
+/// its owner, a member of the organization that owns it, or a collaborator.
+fn trusted_author(pr: &Value) -> bool {
+    matches!(
+        pr["author_association"].as_str(),
+        Some("OWNER" | "MEMBER" | "COLLABORATOR")
+    )
 }
 
 async fn push(
@@ -620,7 +636,8 @@ struct PullRequestLink {
 ///   if it wasn't started yet, held there.
 ///
 /// Checks still running hold an issue back from review, but don't send one
-/// already there back.
+/// already there back. Only links that work on an issue move it, and only a
+/// pull request by someone who may work on the repository makes one.
 pub async fn settle(
     pool: &PgPool,
     workspace_id: Uuid,

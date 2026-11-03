@@ -29,6 +29,14 @@ struct Forgejo {
     pull_requests: Vec<Value>,
     /// Commit statuses per commit.
     statuses: HashMap<String, Vec<&'static str>>,
+    /// Who may do what on code-villain/vault: `owner`, `admin`, `write`,
+    /// `read` or `none`. Anyone else doesn't exist.
+    permissions: HashMap<String, &'static str>,
+    /// Times someone's permission was asked, per user.
+    permission_asks: HashMap<String, usize>,
+    /// The token isn't a repository admin's: Forgejo won't say who may
+    /// write.
+    permissions_refused: bool,
     /// Answers 503 to everything.
     down: bool,
     /// Holds the next answer to a list of pull requests: says it was asked
@@ -71,6 +79,7 @@ async fn fake_forgejo(shared: Shared) -> String {
     let list = shared.clone();
     let one = shared.clone();
     let status = shared.clone();
+    let permission = shared.clone();
     let app = axum::Router::new()
         .route(
             "/api/v1/repos/{owner}/{name}",
@@ -150,6 +159,33 @@ async fn fake_forgejo(shared: Shared) -> String {
                 },
             ),
         )
+        .route(
+            "/api/v1/repos/{owner}/{name}/collaborators/{user}/permission",
+            get(
+                move |headers: HeaderMap, Path((_, _, user)): Path<(String, String, String)>| async move {
+                    let mut forgejo = permission.lock().unwrap();
+                    if let Some(refused) = refuse(&headers, &forgejo) {
+                        return refused;
+                    }
+                    if forgejo.permissions_refused {
+                        return (
+                            StatusCode::FORBIDDEN,
+                            Json(json!({ "message": "Only admins can query all permissions" })),
+                        )
+                            .into_response();
+                    }
+                    *forgejo.permission_asks.entry(user.clone()).or_default() += 1;
+                    match forgejo.permissions.get(&user) {
+                        Some(permission) => Json(json!({
+                            "permission": permission,
+                            "user": { "login": user },
+                        }))
+                        .into_response(),
+                        None => not_found(),
+                    }
+                },
+            ),
+        )
         .fallback(|| async { not_found() });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -166,9 +202,14 @@ struct Setup {
 }
 
 /// A workspace with FOR-1 in Backlog and FOR-2 in Todo, and a stand-in
-/// Forgejo, not yet connected.
+/// Forgejo, not yet connected, whose repository code-villain owns.
 async fn setup(pool: PgPool) -> Setup {
     let forgejo = Shared::default();
+    forgejo
+        .lock()
+        .unwrap()
+        .permissions
+        .insert("code-villain".into(), "owner");
     let server = fake_forgejo(forgejo.clone()).await;
     let app = App::with_state(AppState::new(pool, false));
     let (admin, workspace) = app.signup("Ada", "Forge").await;
@@ -489,6 +530,98 @@ async fn an_agit_pull_request_works_on_issues_only_after_a_closing_word(pool: Pg
     let status = s.status(&s.admin).await;
     assert_eq!(status["up_to_date"], true);
     assert!(status["checked_at"].is_string());
+}
+
+/// A pull request by someone else.
+fn pull_request_by(number: i64, author: &str, title: &str, body: &str) -> Value {
+    let mut pr = pull_request(number, title, body);
+    pr["user"] = json!({ "login": author });
+    pr
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn only_pull_requests_by_people_who_may_write_work_on_issues(pool: PgPool) {
+    let s = setup(pool).await;
+    {
+        let mut forgejo = s.forgejo.lock().unwrap();
+        forgejo.permissions.insert("mallory".into(), "read");
+        forgejo.permissions.insert("grace".into(), "write");
+    }
+    // Anyone registered can push an AGit pull request.
+    s.add(pull_request_by(10, "mallory", "Fixes FOR-1", ""));
+    let mut draft = pull_request_by(11, "mallory", "Fixes FOR-2", "");
+    draft["draft"] = json!(true);
+    s.add(draft);
+    s.add(pull_request_by(12, "ghost", "Fixes FOR-1", ""));
+    s.connect().await;
+    s.check().await;
+
+    let links = s.links().await;
+    assert_eq!(links.len(), 3);
+    assert!(links.iter().all(|(_, _, l)| l["works_on"] == false));
+    assert_eq!(
+        s.statuses().await,
+        [(1, "Backlog".into()), (2, "Todo".into())]
+    );
+    // Asked about once per person, not per pull request or per check.
+    s.check().await;
+    assert_eq!(s.forgejo.lock().unwrap().permission_asks["mallory"], 2);
+
+    // Closing one can't send an issue in review back to work.
+    let review = state_id(&s.snapshot().await, "In Review");
+    let issue = s.snapshot().await["records"]["Issue"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["number"] == 1)
+        .unwrap()["id"]
+        .clone();
+    let tx = json!({ "id": Uuid::now_v7(), "operations": [
+        { "action": "update", "model": "Issue", "id": issue, "data": { "state_id": review } },
+    ]});
+    let moved = s
+        .app
+        .post(
+            &format!("/api/w/{}/sync/transactions", s.workspace),
+            Some(&s.admin),
+            tx,
+        )
+        .await;
+    assert_eq!(moved.status, StatusCode::OK, "{}", moved.body);
+    s.close(10);
+    s.check().await;
+    assert_eq!(
+        s.statuses().await,
+        [(1, "In Review".into()), (2, "Todo".into())]
+    );
+
+    // Someone who may write does.
+    s.add(pull_request_by(13, "grace", "Fixes FOR-2", ""));
+    s.check().await;
+    assert_eq!(
+        s.statuses().await,
+        [(1, "In Review".into()), (2, "In Review".into())]
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_that_cannot_say_who_may_write_fails_the_check(pool: PgPool) {
+    let s = setup(pool).await;
+    s.forgejo.lock().unwrap().permissions_refused = true;
+    s.add(pull_request(10, "Rate limits", "Fixes FOR-1"));
+    s.connect().await;
+    s.check().await;
+
+    assert!(s.links().await.is_empty());
+    let status = s.status(&s.admin).await;
+    assert_eq!(status["up_to_date"], false);
+    assert!(
+        status["check_error"]
+            .as_str()
+            .unwrap()
+            .contains("repository admin"),
+        "{status}"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

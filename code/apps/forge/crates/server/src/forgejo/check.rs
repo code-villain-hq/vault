@@ -2,12 +2,16 @@
 //! watched repositories' pull requests, then link them to the issues they
 //! name and move the issues they work on.
 //!
+//! Only a pull request by someone who may write to its repository works on
+//! an issue: on a public repository anyone can open one, and theirs only
+//! link.
+//!
 //! Everything is asked first; if any of it fails, nothing changes and the
 //! connection records why. Moves only follow what changed since the last
 //! check (a pull request opened, marked ready, turned back into a draft,
 //! merged or closed), so seeing the same merge twice changes nothing.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use chrono::{DateTime, Duration, Utc};
 use forge_domain::{LinkProvider, PullRequestBlocker, PullRequestChecks};
@@ -48,6 +52,8 @@ struct PullRequest {
     closed_at: Option<DateTime<Utc>>,
     /// Asked for open ones only.
     checks: Option<PullRequestChecks>,
+    /// Its author may write to the repository, so it may work on issues.
+    trusted: bool,
 }
 
 impl PullRequest {
@@ -74,6 +80,7 @@ impl PullRequest {
             mergeable: pr["mergeable"] != false,
             closed_at: client::time(&pr["merged_at"]).or(client::time(&pr["closed_at"])),
             checks: None,
+            trusted: false,
         })
     }
 
@@ -217,6 +224,24 @@ async fn ask(
             found.push(pull_request);
         }
     }
+
+    // Asked once per author and repository in a check, however many pull
+    // requests they have.
+    let mut can_write: HashMap<(String, String), bool> = HashMap::new();
+    for pull_request in &mut found {
+        let Some(author) = &pull_request.author else {
+            continue;
+        };
+        let key = (pull_request.repository.clone(), author.clone());
+        pull_request.trusted = match can_write.get(&key) {
+            Some(&trusted) => trusted,
+            None => {
+                let trusted = client.can_write(&key.0, author).await?;
+                can_write.insert(key, trusted);
+                trusted
+            }
+        };
+    }
     Ok(found)
 }
 
@@ -252,6 +277,10 @@ async fn apply(
             .unwrap_or_default();
         works_on.extend(identifiers(&pr.title, &CLOSING));
         works_on.extend(identifiers(&pr.body, &CLOSING));
+        if !pr.trusted {
+            // Only mentions: it can't move an issue or wake its agent.
+            named.append(&mut works_on);
+        }
         let mentions = mentioned(pool, workspace_id, named, &works_on).await?;
         let open = pr.state == "open";
         // Closed or merged before Forgejo was connected: only linked.

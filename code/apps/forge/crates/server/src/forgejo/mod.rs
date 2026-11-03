@@ -1,9 +1,10 @@
 //! The Forgejo connection: an admin gives a Forgejo server, the
-//! repositories to watch and a token that can read them. Forge then asks
-//! Forgejo about their pull requests about once a minute (Forgejo can't
-//! reach a Forge that runs on someone's own machine), links them to the
-//! issues they name and moves the issues they work on, as with GitHub.
-//! See the "Forgejo connection" spec.
+//! repositories to watch and a token that can read them, a repository
+//! admin's so Forgejo says who may write to them. Forge then asks Forgejo
+//! about their pull requests about once a minute (Forgejo can't reach a
+//! Forge that runs on someone's own machine), links them to the issues they
+//! name and moves the issues they work on, as with GitHub, for pull
+//! requests by people who may write. See the "Forgejo connection" spec.
 
 mod check;
 pub mod client;

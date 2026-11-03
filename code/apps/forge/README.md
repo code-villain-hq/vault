@@ -34,10 +34,12 @@ is and why" and "Architecture overview".
 - **GitHub** (needs a GitHub App, see Settings → GitHub). Pull requests and
   commits link to the issues they mention; a pull request moves the issues
   it works on to review once it could be merged, and merging it completes
-  them; repositories are cloned for drift checks.
+  them; repositories are cloned for drift checks. Only pull requests by
+  people who may work on the repository move issues; anyone else's link.
 - **Forgejo** (Settings → Forgejo: a server, the repositories to watch and a
-  token). Forge asks Forgejo about their pull requests about once a minute,
-  links them to the issues they name and moves those issues, as with GitHub.
+  repository admin's token). Forge asks Forgejo about their pull requests
+  about once a minute, links them to the issues they name and moves those
+  issues, as with GitHub: only those by people who may write to it.
 - **People.** A server runs for one company: its account signs people in
   and its groups say who's in, as admin, member or guest (see below).
 - **Apps.** The web app, and a desktop app with native notifications and the

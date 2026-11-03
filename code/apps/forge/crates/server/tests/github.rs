@@ -299,6 +299,7 @@ fn pull_request(action: &str, state: &str, merged: bool) -> Value {
             "merged": merged,
             "head": { "ref": "for-1-rate-limits" },
             "user": { "login": "ada" },
+            "author_association": "MEMBER",
         },
     })
 }
@@ -447,6 +448,77 @@ async fn a_pull_request_that_only_mentions_an_issue_links_it_but_leaves_it_alone
     .await;
     assert_eq!(statuses(&s).await, [(1, "Done".into()), (2, "Todo".into())]);
     assert!(links(&s).await.iter().all(|l| l["state"] == "merged"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_pull_request_from_outside_the_repository_only_links(pool: PgPool) {
+    let s = setup(pool).await;
+    let agent = agent_on_issue_1(&s).await;
+    let outsider = |action: &str, state: &str, merged: bool| {
+        let mut pr = pull_request(action, state, merged);
+        pr["pull_request"]["user"] = json!({ "login": "mallory" });
+        pr["pull_request"]["author_association"] = json!("CONTRIBUTOR");
+        pr
+    };
+
+    // Named in its branch and after "Fixes", from someone who can't write
+    // to the repository: linked, nothing moves.
+    deliver(
+        &s,
+        "pull_request",
+        outsider("opened", "open", false),
+        SECRET,
+    )
+    .await;
+    assert_eq!(works_on(&s).await, [(1, false), (2, false)]);
+    assert_eq!(
+        statuses(&s).await,
+        [(1, "Backlog".into()), (2, "Todo".into())]
+    );
+    deliver(&s, "check_suite", checks_finished("check_suite"), SECRET).await;
+    assert_eq!(
+        statuses(&s).await,
+        [(1, "Backlog".into()), (2, "Todo".into())]
+    );
+
+    // Closing it can't send an issue in review back to its agent either.
+    update_issue(
+        &s,
+        1,
+        json!({ "state_id": state_id(&s, "In Review").await }),
+    )
+    .await;
+    deliver(
+        &s,
+        "pull_request",
+        outsider("closed", "closed", false),
+        SECRET,
+    )
+    .await;
+    assert_eq!(
+        statuses(&s).await,
+        [(1, "In Review".into()), (2, "Todo".into())]
+    );
+    let mut draft = outsider("converted_to_draft", "open", false);
+    draft["pull_request"]["draft"] = json!(true);
+    deliver(&s, "pull_request", draft, SECRET).await;
+    deliver(
+        &s,
+        "pull_request",
+        outsider("closed", "closed", true),
+        SECRET,
+    )
+    .await;
+    assert_eq!(
+        statuses(&s).await,
+        [(1, "In Review".into()), (2, "Todo".into())]
+    );
+    assert!(
+        wakeups(&s, agent)
+            .await
+            .iter()
+            .all(|(event, _)| event == "assigned")
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
