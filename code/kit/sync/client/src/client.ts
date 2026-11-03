@@ -73,6 +73,12 @@ export class SyncClient<S extends SchemaShape> {
   #notifyQueued = false;
 
   #closeFeed?: () => void;
+  /**
+   * True while downloading a snapshot before the feed opens. Coming back
+   * online (`retryNow`) or a reconnect timer in that time would open a
+   * second feed, and the first one's could never be closed.
+   */
+  #opening = false;
   #flushing = false;
   #flushTimer?: ReturnType<typeof setTimeout>;
   #flushDelay: number;
@@ -156,7 +162,7 @@ export class SyncClient<S extends SchemaShape> {
       return;
     }
     this.#saveWrites();
-    if (!this.#closeFeed) {
+    if (!this.#closeFeed && !this.#opening) {
       clearTimeout(this.#reconnectTimer);
       this.#reconnectDelay = this.#backoff.min;
       void this.#open();
@@ -236,14 +242,17 @@ export class SyncClient<S extends SchemaShape> {
   }
 
   async #open(): Promise<void> {
-    if (this.#stopped || !this.#loaded || this.#closeFeed) return;
+    if (this.#stopped || !this.#loaded || this.#closeFeed || this.#opening) return;
     // Trying again is still offline until the server answers.
     if (this.#status.connection !== "offline") this.#setStatus({ connection: "connecting" });
+    this.#opening = true;
     try {
       if (this.#epoch === null) await this.#bootstrap();
     } catch {
       this.#scheduleReconnect();
       return;
+    } finally {
+      this.#opening = false;
     }
     if (this.#stopped || this.#epoch === null) return;
 
@@ -286,12 +295,15 @@ export class SyncClient<S extends SchemaShape> {
 
   async #resync(): Promise<void> {
     this.#setStatus({ connection: "connecting" });
+    this.#opening = true;
     try {
       await this.#bootstrap();
     } catch {
       // Reconnecting will ask for a resync again.
       this.#scheduleReconnect();
       return;
+    } finally {
+      this.#opening = false;
     }
     await this.#open();
   }

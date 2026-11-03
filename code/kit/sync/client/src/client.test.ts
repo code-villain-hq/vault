@@ -3,7 +3,7 @@ import { SyncClient } from "./client";
 import { FakeServer } from "./fake-server";
 import type { Transaction } from "./protocol";
 import { MemoryStore } from "./store";
-import type { RejectedError } from "./transport";
+import type { RejectedError, Transport } from "./transport";
 
 // The client doesn't care what models look like; tests use a small task.
 type Task = { id: string; title: string; number: number; status: string; priority: number };
@@ -349,4 +349,44 @@ test("stopping while the local copy is loading never starts a connection", async
   release();
   await started;
   expect(server.bootstraps).toBe(0);
+});
+
+test("coming back online while the first snapshot downloads opens one feed", async () => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const server = new FakeServer();
+  const real = server.transport();
+  let asked = 0;
+  let feeds = 0;
+  const transport: Transport = {
+    ...real,
+    bootstrap: async () => {
+      asked++;
+      await held;
+      return real.bootstrap();
+    },
+    connect: (after, epoch, handlers) => {
+      feeds++;
+      return real.connect(after, epoch, handlers);
+    },
+  };
+  const client = new SyncClient<Schema>({
+    store: new MemoryStore(),
+    transport,
+    backoff: { min: 5, max: 20 },
+  });
+  clients.push(client);
+  const started = client.start();
+  await until(() => asked === 1, "first bootstrap");
+  // The browser's `online` event, twice, while the snapshot is on its way.
+  client.retryNow();
+  client.retryNow();
+  release();
+  await started;
+  await until(() => client.status().connection === "online", "feed");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(feeds).toBe(1);
+  expect(server.bootstraps).toBe(1);
 });
