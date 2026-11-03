@@ -293,6 +293,7 @@ mod tests {
                 store: None,
                 update_by: None,
                 check: None,
+                check_approved: None,
                 spec_folder: None,
                 specs_in_app: false,
                 remote: Some(remote.to_string()),

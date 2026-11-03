@@ -29,6 +29,11 @@ pub struct Project {
     /// worktree by a loop (LOOP-1). Set only by the user.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub check: Option<String>,
+    /// The check command this Mac's user typed or confirmed here. `check`
+    /// may come from the workspace, which any member could once write; a
+    /// loop runs only a command that is this, word for word (LOOP-1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub check_approved: Option<String>,
     /// Where specs are committed here (SPEC-1), from its root. None: `specs`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spec_folder: Option<String>,
@@ -53,5 +58,12 @@ impl Project {
     /// already exists, ask it (`commands::owner_of`) instead.
     pub fn repo(&self) -> PathBuf {
         PathBuf::from(self.store.as_deref().unwrap_or(&self.path))
+    }
+
+    /// The check command, when there is one and this Mac's user confirmed
+    /// that very text (LOOP-1). A loop runs only this, and only this is
+    /// named to agents as the command to run (LOOP-10).
+    pub fn confirmed_check(&self) -> Option<&str> {
+        self.check.as_deref().filter(|c| !c.trim().is_empty() && self.check_approved.as_deref() == Some(*c))
     }
 }

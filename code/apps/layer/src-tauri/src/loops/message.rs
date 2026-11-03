@@ -1,11 +1,21 @@
 //! What an agent on a loop is sent when its checks fail (LOOP-6), and how
-//! its rounds are said.
+//! its rounds, and a check it will not run (LOOP-1), are said.
 
 use super::{CheckResult, Target};
 
 /// The end of a failed check's output the agent is sent (LOOP-6).
 const TAIL_LINES: usize = 150;
 const TAIL_BYTES: usize = 12 * 1024;
+
+/// Why a loop does not run `target`'s check, which this Mac's user has not
+/// confirmed (LOOP-1).
+pub(super) fn unconfirmed(target: &Target) -> String {
+    format!(
+        "the check command for {} came from the workspace and is not confirmed on this Mac: \
+         confirm it in the repository's settings in Repos (Enter in its check field)",
+        target.repo
+    )
+}
 
 pub(super) fn count(rounds: u32) -> String {
     format!("{rounds} round{}", if rounds == 1 { "" } else { "s" })
@@ -96,8 +106,18 @@ mod tests {
     #[test]
     fn the_failures_name_the_round_each_command_where_it_ran_and_a_fence_no_log_can_close() {
         let targets = vec![
-            Target { repo: "api".into(), dir: "/tasks/ACME-1/api".into(), command: "cargo test".into() },
-            Target { repo: "web".into(), dir: "/tasks/ACME-1/web".into(), command: "bun run check".into() },
+            Target {
+                repo: "api".into(),
+                dir: "/tasks/ACME-1/api".into(),
+                command: "cargo test".into(),
+                confirmed: true,
+            },
+            Target {
+                repo: "web".into(),
+                dir: "/tasks/ACME-1/web".into(),
+                command: "bun run check".into(),
+                confirmed: true,
+            },
         ];
         let results = vec![
             CheckResult {

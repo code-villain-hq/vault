@@ -1,6 +1,7 @@
 //! Layer's rules for the shared sync engine ([`code_villain_sync`]):
 //! everyone works on the repositories and their notes, and admins say
-//! where the workspace's Jira, GitHub, Slack, Grafana and logs are.
+//! where the workspace's Jira, GitHub, Slack, Grafana and logs are, and
+//! what a repository's check command is.
 
 use code_villain_sync::Rules;
 use layer_domain::{Actor, ConnectionKind, ModelKind, NOTES_PER_REPO, Operation, remote_key};
@@ -41,6 +42,11 @@ impl Rules for Layer {
         let message = match model {
             ModelKind::Connection => "Only admins can change the workspace's connections.",
             ModelKind::LogSource => "Only admins can change the workspace's log sources.",
+            // A loop runs it on every member's Mac, as them (LOOP-1). Before,
+            // any member could make everyone's Mac run a command of theirs.
+            ModelKind::Repository if sets_check(db, actor, operation).await? => {
+                "Only admins can change a repository's check command."
+            }
             _ => return Ok(()),
         };
         if is_admin(db, actor).await? {
@@ -126,6 +132,33 @@ impl Rules for Layer {
     fn constraint_words(constraint: &str) -> Option<&'static str> {
         plain_words(constraint)
     }
+}
+
+/// Whether `operation` gives a repository a check command it hasn't got.
+/// Clearing one is anyone's, and so is sending it unchanged, as the web
+/// app's settings form does with every save.
+async fn sets_check(
+    db: &mut PgConnection,
+    actor: Actor,
+    operation: &Operation,
+) -> Result<bool, SyncError> {
+    let (id, data) = match operation {
+        Operation::Create { data, .. } => (None, data),
+        Operation::Update { id, data, .. } => (Some(*id), data),
+        Operation::Delete { .. } => return Ok(false),
+    };
+    let Some(check) = data.get("check_command").filter(|c| !c.is_null()) else {
+        return Ok(false);
+    };
+    let Some(id) = id else { return Ok(true) };
+    let now: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT check_command FROM repositories WHERE workspace_id = $1 AND id = $2",
+    )
+    .bind(actor.workspace_id)
+    .bind(id)
+    .fetch_optional(&mut *db)
+    .await?;
+    Ok(now.flatten().as_deref() != check.as_str())
 }
 
 /// Whether the actor is an admin of the workspace.

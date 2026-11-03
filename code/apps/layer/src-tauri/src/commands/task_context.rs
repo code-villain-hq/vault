@@ -111,13 +111,15 @@ fn task_notes(state: &AppState, task: &Task) -> Vec<FolderNotes> {
 }
 
 /// Each repository's check command, by the folder it is checked out as.
+/// Only one this Mac's user confirmed (LOOP-1): an agent runs what it is
+/// told is the check, and the workspace's may be anyone's.
 fn task_checks(state: &AppState, task: &Task) -> Vec<(String, String)> {
     state
         .config
         .checkouts_of(&task.id)
         .iter()
         .filter_map(|c| {
-            let command = state.config.project(&c.project_id).ok()?.check?;
+            let command = state.config.project(&c.project_id).ok()?.confirmed_check()?.to_string();
             let folder = Path::new(&c.path).file_name()?.to_string_lossy().to_string();
             Some((folder, command))
         })

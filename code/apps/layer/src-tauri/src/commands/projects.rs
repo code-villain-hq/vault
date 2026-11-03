@@ -234,6 +234,7 @@ pub(super) fn describe_project(path: &str, group: Option<&str>) -> Result<Projec
         store: None,
         update_by: None,
         check: None,
+        check_approved: None,
         spec_folder: None,
         specs_in_app: false,
         remote: git::origin_url(&root_path).map(|url| git::remote_key(&url)),

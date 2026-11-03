@@ -24,6 +24,9 @@ export interface Project {
   update_by?: UpdateBy | null;
   /** What says the work here is done, run by a loop (LOOP-1). */
   check?: string | null;
+  /** The check as this Mac's user typed or confirmed it. A loop runs
+   *  `check` only when it is this, word for word (LOOP-1). */
+  check_approved?: string | null;
   /** Where specs are committed here (SPEC-1). Absent: `specs`. */
   spec_folder?: string | null;
   /** Specs are kept by the app instead of committed here (SPEC-3). */

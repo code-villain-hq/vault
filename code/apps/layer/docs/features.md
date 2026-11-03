@@ -134,7 +134,8 @@ a loop runs (LOOP-1).
   fetches from the same repository. Either makes it a repository here
   with the workspace's name, group and settings, sends the workspace
   nothing, and gets the app's own copy as an added one does (REPO-4). A
-  clone added by Add repositories that fetches from it does the same.
+  clone added by Add repositories that fetches from it does the same. Its
+  check command comes with it but is not run until confirmed here (LOOP-1).
 
 Code: `commands/projects.rs`, `commands/repos.rs`, `commands/cleanup.rs`,
 `commands/cleanup_folders.rs`, `commands/cleanup_remote.rs`, `git/store.rs`,
@@ -2296,7 +2297,17 @@ agent pane in front; the bar under the pane bar shows how it is going.
   login shell's environment (PANE-4) with `NO_COLOR` set, standard error
   folded into standard output and nothing on standard input, and passes
   when it exits 0. It is set only by the user: never from a ticket, a spec
-  or an agent, since it is run as the user, unattended.
+  or an agent, since it is run as the user, unattended. In a workspace
+  (§25) only an admin gives a repository a check command or changes it
+  (clearing one, or sending it unchanged, is anyone's), and each Mac runs
+  only the very text its own user typed or confirmed there: one set in the
+  Repos view or the loop's dialog on this Mac is confirmed, and one that
+  came from the workspace is confirmed by pressing Enter in the
+  repository's check field in the Repos view, whose tooltip says it waits.
+  Until then a loop does not run it: one being started is refused, and one
+  running stops at its next round, each saying to confirm it there.
+  The checks a Mac had before confirming came in were confirmed once, as
+  they stood.
 - **LOOP-2** A loop MUST be started by the user on one running agent pane,
   with the most rounds it may take (5 unless changed, at most 20). It
   checks the repositories the pane works in: its own, for a pane started in
@@ -2361,9 +2372,10 @@ agent pane in front; the bar under the pane bar shows how it is going.
   repository's result and output. Stop while it runs; Start again once it
   has ended. The window is told of a change (`loop:changed`), never polls.
 - **LOOP-10** A task's context file (PANE-13) MUST name each repository's
-  check command, and tell agents to run it before they end a turn, so an
-  agent checks its work by the measure the loop will, loop or not. Setting
-  a command rewrites the context files of the tasks that repository is in.
+  check command confirmed on this Mac (LOOP-1), and tell agents to run it
+  before they end a turn, so an agent checks its work by the measure the
+  loop will, loop or not. One not confirmed is not named. Setting a command
+  rewrites the context files of the tasks that repository is in.
 - **LOOP-11** A loop MUST come back with its agent when the app reopens
   (PANE-7). It is kept with the saved pane, as it goes: its rounds, the
   rounds used, what the worktrees were when its checks last failed, and
@@ -2874,7 +2886,7 @@ The studio's is `layer.codevillain.eu`, for Code Villain. It is the same
 workspace in the browser and in each member's Layer, where their
 tasks and agents stay on their own Mac. Every member changes the
 repositories, their notes and the agents' models; only admins change the
-connections and the log sources. A guest works only in the repositories an
+connections, the log sources and a repository's check command (LOOP-1). A guest works only in the repositories an
 admin adds them to, as `studio/design/behaviour.md` ("Who gets in") says
 of every app.
 

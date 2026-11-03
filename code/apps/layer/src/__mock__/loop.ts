@@ -117,7 +117,7 @@ export function loopAnswers(
     loop_view: (a) => structuredClone(loops.get(a.paneId as string) ?? null),
     set_project_check: (a) => {
       const p = projects.find((x) => x.id === a.projectId);
-      if (p) p.check = (a.command as string | null) ?? null;
+      if (p) p.check = p.check_approved = (a.command as string | null) ?? null;
       return null;
     },
     start_loop: (a) => {

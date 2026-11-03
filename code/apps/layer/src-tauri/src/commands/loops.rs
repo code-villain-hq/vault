@@ -84,13 +84,15 @@ pub fn loop_view(state: State<AppState>, pane_id: String) -> Option<LoopView> {
 
 /// Set the command a loop runs in a repository (LOOP-1), or clear it with
 /// nothing, and rewrite the context files of the tasks it is in, which
-/// name it (LOOP-10).
+/// name it (LOOP-10). Set here, by this Mac's user, it is confirmed: the
+/// same text sent again confirms one the workspace sent.
 #[tauri::command]
 pub async fn set_project_check(app: AppHandle, project_id: String, command: Option<String>) -> Result<()> {
     super::blocking(app, move |state| {
         let command = command.map(|c| c.trim().to_string()).filter(|c| !c.is_empty());
         let found = state.config.update(|c| match c.projects.iter_mut().find(|p| p.id == project_id) {
             Some(p) => {
+                p.check_approved = command.clone();
                 p.check = command;
                 true
             }
@@ -121,9 +123,10 @@ pub(crate) fn loop_targets(state: &AppState, pane: &PaneInfo) -> Result<Vec<Targ
             continue;
         }
         let project = state.config.project(&c.project_id)?;
+        let confirmed = project.confirmed_check().is_some();
         let Some(command) = project.check.filter(|c| !c.trim().is_empty()) else { continue };
         let repo = Path::new(&c.path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or(project.name);
-        targets.push(Target { repo, dir: PathBuf::from(&c.path), command });
+        targets.push(Target { repo, dir: PathBuf::from(&c.path), command, confirmed });
     }
     Ok(targets)
 }

@@ -596,6 +596,7 @@ mod tests {
                 remote: None,
                 repository_id: None,
                 check: None,
+                check_approved: None,
             },
             folder: folder.into(),
             dir,

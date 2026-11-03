@@ -24,7 +24,7 @@ use tokio::sync::{Notify, Semaphore};
 use crate::config::SavedLoop;
 use crate::error::{Error, Result};
 use crate::pty::PtyManager;
-use message::{count, failures, tail};
+use message::{count, failures, tail, unconfirmed};
 
 pub const DEFAULT_ROUNDS: u32 = 5;
 /// A ceiling, not a preference: each round is a turn of an agent and a run
@@ -111,6 +111,10 @@ pub struct Target {
     pub repo: String,
     pub dir: PathBuf,
     pub command: String,
+    /// This Mac's user typed or confirmed `command` (LOOP-1). One the
+    /// workspace sent is not run until they have: any member could write it,
+    /// and it runs here as the user, unattended.
+    pub confirmed: bool,
 }
 
 /// What a loop needs of the app, so a test can stand in for it.
@@ -182,6 +186,11 @@ impl Loops {
             return Err(Error::Other(
                 "None of the repositories this agent works in has a check command. Set one first.".into(),
             ));
+        }
+        // One put back after a restart is let start, and stops at its first
+        // round saying so, where the pane shows it (LOOP-11).
+        if let Some(t) = targets.iter().find(|t| !t.confirmed).filter(|_| from.is_none()) {
+            return Err(Error::Other(format!("Not started: {}.", unconfirmed(t))));
         }
         let info = host.ptys().info(pane)?;
         if info.kind != crate::pty::PaneKind::Agent || !info.running {
@@ -402,6 +411,13 @@ async fn go_round<H: Host>(
             }
         }
         check_now = false;
+
+        // Never run unconfirmed: it would run as the user, with nobody
+        // watching, a command any member of the workspace could have set.
+        if let Some(t) = targets.iter().find(|t| !t.confirmed) {
+            let why = unconfirmed(t);
+            return End::stopped(&format!("Stopped: {why}."), Some(format!("its loop stopped: {why}")));
+        }
 
         let turn = match host.ptys().turn(pane) {
             Ok(turn) if !turn.running => return exited(),
@@ -675,7 +691,7 @@ done
     }
 
     fn checks(dir: &std::path::Path, command: &str) -> Vec<Target> {
-        vec![Target { repo: "web".into(), dir: dir.to_path_buf(), command: command.into() }]
+        vec![Target { repo: "web".into(), dir: dir.to_path_buf(), command: command.into(), confirmed: true }]
     }
 
     fn until_ended(loops: &Loops, pane: &str) -> LoopView {
@@ -990,6 +1006,32 @@ done
         // Ended, it can start again.
         loops.start(host.clone(), &pane, checks(&dir, "true"), 5, None).unwrap();
         assert_eq!(until_ended(&loops, &pane).phase, Phase::Passed);
+        host.ptys.close(&pane).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_check_the_workspace_sent_and_nobody_here_confirmed_is_never_run() {
+        let (_app, host, pane, dir) = world(":");
+        let loops = Loops::default();
+        let mut targets = checks(&dir, "touch ran");
+        targets[0].confirmed = false;
+
+        let refused = loops.start(host.clone(), &pane, targets.clone(), 5, None).unwrap_err().to_string();
+        assert!(refused.contains("not confirmed on this Mac"), "{refused}");
+        assert!(refused.contains("repository's settings"), "{refused}");
+
+        // Put back after a restart, it stops where the pane shows why.
+        let from = SavedLoop { rounds: 5, round: 0, failed_at: None, held: false };
+        loops.start(host.clone(), &pane, targets, 5, Some(from)).unwrap();
+        let view = until_ended(&loops, &pane);
+        assert_eq!(view.phase, Phase::Stopped, "{view:?}");
+        assert!(
+            view.note.as_deref().is_some_and(|n| n.contains("confirm it in the repository's settings")),
+            "{view:?}"
+        );
+        assert!(view.runs.is_empty());
+        assert!(!dir.join("ran").exists(), "the check ran");
         host.ptys.close(&pane).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
     }

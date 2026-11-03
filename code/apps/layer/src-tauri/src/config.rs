@@ -30,7 +30,9 @@ pub use project::Project;
 pub use shared::Shared;
 
 /// 3: the shared setup is kept in a workspace (§25), `shared` says which.
-pub const SCHEMA_VERSION: u32 = 3;
+/// 4: a repository's check command runs only once confirmed on this Mac
+/// (`Project::check_approved`, LOOP-1).
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// One ticket's worth of work, spanning one or more repositories.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -354,7 +356,8 @@ pub struct AppConfig {
 
 impl AppConfig {
     /// Fold v1 workspaces into single-checkout tasks, keeping their ids so
-    /// selection and any running panes survive the upgrade.
+    /// selection and any running panes survive the upgrade; and confirm the
+    /// check commands set before version 4.
     fn migrate(&mut self) -> bool {
         // Written by a newer build. Nothing here knows how to read it back
         // down; the version is left as it is, so going back to that build
@@ -362,9 +365,17 @@ impl AppConfig {
         if self.version > SCHEMA_VERSION {
             return false;
         }
+        let from = self.version;
+        let bumped = from != SCHEMA_VERSION;
+        self.version = SCHEMA_VERSION;
+        if from < 4 {
+            // Each ran in loops before anything asked; it goes on doing so,
+            // once. Only a check that changes after this waits for the user.
+            for p in &mut self.projects {
+                p.check_approved = p.check.clone();
+            }
+        }
         if self.workspaces.is_empty() {
-            let bumped = self.version != SCHEMA_VERSION;
-            self.version = SCHEMA_VERSION;
             return bumped;
         }
 
@@ -403,7 +414,6 @@ impl AppConfig {
                 last_head: None,
             });
         }
-        self.version = SCHEMA_VERSION;
         true
     }
 }
@@ -754,6 +764,19 @@ mod tests {
         assert!(!round_tripped.migrate());
         assert_eq!(round_tripped.tasks.len(), 1);
         assert_eq!(round_tripped.checkouts.len(), 1);
+    }
+
+    #[test]
+    fn a_check_command_set_before_version_4_is_confirmed_once_and_a_later_one_is_not() {
+        let project = r#"{"id":"p","name":"api","path":"/code/api","default_branch":"main","check":"bun run check"}"#;
+        let mut cfg: AppConfig = serde_json::from_str(&format!(r#"{{"version":3,"projects":[{project}]}}"#)).unwrap();
+        assert!(cfg.migrate());
+        assert_eq!(cfg.projects[0].confirmed_check(), Some("bun run check"));
+
+        let mut cfg: AppConfig =
+            serde_json::from_str(&format!(r#"{{"version":{SCHEMA_VERSION},"projects":[{project}]}}"#)).unwrap();
+        assert!(!cfg.migrate());
+        assert_eq!(cfg.projects[0].confirmed_check(), None);
     }
 
     #[test]

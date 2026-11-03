@@ -210,6 +210,7 @@ const projects: Project[] = [
     group: "platform",
     store: `${copies}/web.git`,
     check: "bun run check",
+    check_approved: "bun run check",
   },
   {
     id: "p-infra",

