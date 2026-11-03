@@ -764,6 +764,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-villain-net"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "code-villain-notify"
 version = "0.1.0"
 dependencies = [
@@ -3711,6 +3720,7 @@ dependencies = [
  "chrono-tz",
  "code-villain-auth",
  "code-villain-claude",
+ "code-villain-net",
  "code-villain-sync",
  "futures",
  "keyring",

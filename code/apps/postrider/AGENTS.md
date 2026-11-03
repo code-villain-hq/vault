@@ -457,7 +457,9 @@ the page does (`pageName`), else as its mail does.
 - Unsubscribe (`POST /newsletters/unsubscribe`, U) asks nothing. It
   archives what the sender sent at once, and the request goes 10 seconds
   later, so Undo (`POST /newsletters/undo/{id}`) really undoes it: the
-  one-click POST of RFC 8058 (no redirects followed), else a mail to its
+  one-click POST of RFC 8058 (no redirects followed; only to a public
+  address, checked by `code/kit/net` on the address the name resolves to,
+  or from the stand-ins on this Mac to it too, never to cloud metadata), else a mail to its
   `mailto:` over the account's SMTP. A sender with only a page to
   unsubscribe on gets its page opened when it's the one unsubscribed, and
   a link to it when it's among several. `GET /newsletters/unsubscribed/{id}`

@@ -53,6 +53,7 @@ uuid = { version = "1.28", features = ["v7", "serde"] }
 
 code-villain-desktop = { path = "../../kit/desktop" }
 code-villain-auth = { path = "../../kit/auth" }
+code-villain-net = { path = "../../kit/net" }
 code-villain-sync = { path = "../../kit/sync" }
 code-villain-notify = { path = "../../kit/notify" }
 code-villain-claude = { path = "../../kit/claude" }

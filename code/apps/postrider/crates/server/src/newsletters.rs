@@ -38,7 +38,6 @@
 //! mail there, ahead of the newsletters' rule, and moves its mail back.
 
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -46,6 +45,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use chrono::{DateTime, TimeDelta, Utc};
+use code_villain_net::Reach;
 use futures::future::join_all;
 use lettre::message::Mailbox;
 use lettre::message::header::ContentType;
@@ -594,7 +594,15 @@ impl Mail {
     ) -> Result<(), String> {
         match way {
             Way::OneClick(url) => {
-                let client = reqwest::Client::builder()
+                // The address the sender's name resolves to is checked too,
+                // so a public name that leads to this Mac goes nowhere.
+                let local = is_this_mac(&account.host);
+                if !reachable(url, local) {
+                    return Err(format!(
+                        "{name}'s way to unsubscribe isn't on the internet."
+                    ));
+                }
+                let client = code_villain_net::client(reach(local))
                     .redirect(reqwest::redirect::Policy::none())
                     .timeout(TIMEOUT)
                     .build()
@@ -978,31 +986,22 @@ fn way(links: &str, post: Option<&str>, local: bool) -> Option<Way> {
         .map(|url| Way::Page(url.clone()))
 }
 
-/// Whether a request may go there: not to this Mac or a network of its
-/// own, where no newsletter lives, but from the stand-ins on this Mac.
+/// Whether a request may go there: only to the internet, where newsletters
+/// live, not this Mac or a network of its own; from the stand-ins on this
+/// Mac, there too, but never to a link-local or cloud-metadata address. A
+/// name is checked again on the addresses it resolves to, as the request
+/// connects ([`reach`]).
 fn reachable(url: &Url, local: bool) -> bool {
-    let Some(host) = url.host_str() else {
-        return false;
-    };
+    reach(local).allows_url(url)
+}
+
+/// Where one-click requests may go: the internet only, unless the account
+/// is this Mac's stand-ins (`code/kit/net`).
+fn reach(local: bool) -> Reach {
     if local {
-        return true;
-    }
-    let host = host
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .to_ascii_lowercase();
-    match host.parse::<IpAddr>() {
-        Ok(IpAddr::V4(ip)) => {
-            !(ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified())
-        }
-        Ok(IpAddr::V6(ip)) => {
-            let first = ip.segments()[0];
-            !(ip.is_loopback()
-                || ip.is_unspecified()
-                || first & 0xfe00 == 0xfc00
-                || first & 0xffc0 == 0xfe80)
-        }
-        Err(_) => host != "localhost" && !host.ends_with(".localhost") && !host.ends_with(".local"),
+        Reach::OwnNetworks
+    } else {
+        Reach::Public
     }
 }
 
@@ -1702,6 +1701,23 @@ mod tests {
         assert_eq!(
             way("<http://127.0.0.1:7899/u>", post, true),
             Some(Way::OneClick(url("http://127.0.0.1:7899/u")))
+        );
+        for not in [
+            "https://localhost/u",
+            "https://100.100.1.2/u",
+            "https://[::ffff:10.0.0.1]/u",
+            "https://2852039166/u",
+        ] {
+            assert_eq!(
+                way(&format!("<{not}>"), post, false),
+                Some(Way::Page(url(not))),
+                "{not}"
+            );
+        }
+        // The stand-ins on this Mac reach it, never cloud metadata.
+        assert_eq!(
+            way("<http://169.254.169.254/u>", post, true),
+            Some(Way::Page(url("http://169.254.169.254/u")))
         );
     }
 
