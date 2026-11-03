@@ -2,27 +2,32 @@
 // reading pane leads with unsubscribing from it, and Keep in Inbox beside.
 // U and I do the same from its list, a mail open or not. Both work as on
 // the Newsletters page: Unsubscribe archives its mail at once and the
-// request waits 10 seconds on the server, so Undo really undoes it.
+// request waits 10 seconds on the server, so Undo really undoes it. Once
+// its mail has left, the list goes back to the page, where its row says
+// what was done, with Undo.
 
 import { messageOf, shortcutFree } from "@code-villain/web";
-import type { KeptInInbox, UnsubscribeSent, Unsubscribed } from "@postrider/types";
+import type { KeptInInbox, Newsletter, UnsubscribeSent, Unsubscribed } from "@postrider/types";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { api, RequestError } from "./api";
 import { useListed } from "./folders";
 import { PageBody } from "./layout";
 import { useFolders } from "./mail";
-import { type Done, DoneWords, openPage } from "./newsletters";
+import { type Done, DoneWords, openPage, pageName, pageRows } from "./newsletters";
+import type { Place } from "./server";
 import { Button, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 /** What was done to a sender here, kept while the app runs, by its address. */
-type Doing = {
+export type Doing = {
   busy: boolean;
   problem: string;
   /** Its name when it was done: its mail, and its name with it, leave the list. */
   name: string;
   done?: Done;
+  /** Its rows on the Newsletters page when it was done, which show it there. */
+  rows: Newsletter[];
   /** Its request waits to go. */
   waiting: boolean;
   /** Why its request failed. */
@@ -34,31 +39,52 @@ const IDLE: Doing = {
   busy: false,
   problem: "",
   name: "",
+  rows: [],
   waiting: false,
   failed: "",
   undoing: false,
 };
 
-const doings = new Map<string, Doing>();
+/** A new map at each change, for what watches it. */
+let doings = new Map<string, Doing>();
 const watchers = new Set<() => void>();
-let version = 0;
 
 function change(sender: string, to: Partial<Doing>) {
   const key = sender.toLowerCase();
-  doings.set(key, { ...(doings.get(key) ?? IDLE), ...to });
-  version += 1;
+  doings = new Map(doings).set(key, { ...(doings.get(key) ?? IDLE), ...to });
   for (const watcher of watchers) watcher();
 }
 
 function forget(sender: string) {
+  doings = new Map(doings);
   doings.delete(sender.toLowerCase());
-  version += 1;
   for (const watcher of watchers) watcher();
 }
 
 function watch(watcher: () => void) {
   watchers.add(watcher);
   return () => void watchers.delete(watcher);
+}
+
+/** What was done to each sender in its own view, by its address. */
+export function useDoings(): ReadonlyMap<string, Doing> {
+  return useSyncExternalStore(watch, () => doings);
+}
+
+/** Undoes what was done to a sender in its own view: whether it did. */
+export async function undoSender(sender: string, base: string, place: Place): Promise<boolean> {
+  const doing = doings.get(sender.toLowerCase());
+  const done = doing?.done;
+  if (!done || doing.undoing) return false;
+  change(sender, { undoing: true, problem: "" });
+  try {
+    await api("POST", `${base}/undo/${done.batch}`, undefined, place);
+    forget(sender);
+    return true;
+  } catch (problem) {
+    change(sender, { undoing: false, problem: messageOf(problem) });
+    return false;
+  }
 }
 
 /**
@@ -69,11 +95,12 @@ export function useSender(sender: string) {
   const { workspace, place } = useWorkspace();
   const { moved } = useFolders();
   const listing = useListed({ folder: "newsletters", sender });
-  useSyncExternalStore(watch, () => version);
-  const doing = doings.get(sender.toLowerCase()) ?? IDLE;
+  const doing = useDoings().get(sender.toLowerCase()) ?? IDLE;
   const base = `/api/w/${workspace.id}/newsletters`;
   const mails = listing?.mails ?? [];
-  const name = doing.done ? doing.name : mails[0]?.from_name || sender;
+  // Named as the Newsletters page names it, else as its mail does.
+  const name =
+    pageName(workspace.id, sender) ?? (doing.done ? doing.name : mails[0]?.from_name || sender);
   const senders = [...new Set(mails.map((mail) => mail.account_id))].map((account_id) => ({
     account_id,
     address: sender,
@@ -115,6 +142,7 @@ export function useSender(sender: string) {
       change(sender, {
         busy: false,
         name,
+        rows: pageRows(workspace.id, sender),
         done: {
           kind: "unsubscribed",
           batch: gone.id,
@@ -141,6 +169,7 @@ export function useSender(sender: string) {
       change(sender, {
         busy: false,
         name,
+        rows: pageRows(workspace.id, sender),
         done: { kind: "kept", batch: kept.id, moved: kept.moved },
         waiting: false,
         failed: "",
@@ -152,16 +181,7 @@ export function useSender(sender: string) {
   };
 
   const undo = () => {
-    const done = doing.done;
-    if (!done || doing.undoing) return;
-    change(sender, { undoing: true, problem: "" });
-    api("POST", `${base}/undo/${done.batch}`, undefined, place).then(
-      () => {
-        forget(sender);
-        moved();
-      },
-      (problem) => change(sender, { undoing: false, problem: messageOf(problem) }),
-    );
+    void undoSender(sender, base, place).then((undone) => undone && moved());
   };
 
   // Undo undoes something while the request waits, after it failed, and

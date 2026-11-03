@@ -7,6 +7,7 @@ import { api, messageOf } from "./api";
 import { AccountProblems, type From, MailList, mailKey, useNow } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
 import { useAccounts, useFolders, useInbox } from "./mail";
+import { cameBack } from "./newsletters";
 import { useSenderKeys } from "./sender";
 import { Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -161,7 +162,8 @@ export function FolderList({ folder, open }: { folder: string; open: string | un
  * What one sender sent, in Newsletters, every account's: where its name on
  * the Newsletters page leads, and back. Esc with no mail open goes back to
  * the Newsletters page; U and I unsubscribe and keep it in the Inbox
- * (`sender.tsx`).
+ * (`sender.tsx`). Once its mail has left, kept, unsubscribed from, or the
+ * last of it filed away, it goes back to the page by itself.
  */
 export function SenderList({ sender, open }: { sender: string; open: string | undefined }) {
   const { workspace } = useWorkspace();
@@ -175,7 +177,27 @@ export function SenderList({ sender, open }: { sender: string; open: string | un
   );
   const reading = open !== undefined;
   // Unsubscribed or kept, its mail leaves, and the name it had stays.
-  const { name } = useSenderKeys(sender, reading);
+  const { name, doing } = useSenderKeys(sender, reading);
+  // Empty as read since it showed, not as it was left the last time; and
+  // what was done to it has its row on the page to show it, with Undo.
+  const [first, setFirst] = useState({ sender, listing });
+  if (first.sender !== sender) setFirst({ sender, listing });
+  const emptied =
+    listing !== undefined &&
+    first.sender === sender &&
+    listing !== first.listing &&
+    listing.mails.length === 0 &&
+    !error &&
+    !(doing.done && doing.rows.length === 0);
+  useEffect(() => {
+    if (!emptied || reading) return;
+    cameBack(sender);
+    void navigate({
+      to: "/$workspace/newsletters",
+      params: { workspace: workspace.url_key },
+      replace: true,
+    });
+  }, [emptied, reading, sender, navigate, workspace.url_key]);
   useEffect(() => {
     if (reading) return;
     const onKeyDown = (event: KeyboardEvent) => {

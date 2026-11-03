@@ -28,6 +28,7 @@ import {
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
 import { MoveDialog } from "./move";
+import { pageName } from "./newsletters";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
 import { ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -463,7 +464,7 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
   if (from.sender !== undefined) {
     const sender = from.sender;
     return {
-      name: listed[0]?.from_name || sender,
+      name: pageName(workspace.id, sender) ?? (listed[0]?.from_name || sender),
       href: `/${workspace.url_key}/newsletters/${encodeURIComponent(sender)}`,
       go: () =>
         void navigate({ to: "/$workspace/newsletters/$sender", params: { ...params, sender } }),

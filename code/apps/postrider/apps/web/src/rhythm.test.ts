@@ -1,6 +1,15 @@
 import { expect, test } from "bun:test";
 import type { Newsletter } from "@postrider/types";
-import { finds, leastReadFirst, neverOpened, opened, rhythm, sorted, unread } from "./rhythm";
+import {
+  finds,
+  leastReadFirst,
+  nearest,
+  neverOpened,
+  opened,
+  rhythm,
+  sorted,
+  unread,
+} from "./rhythm";
 
 function sender(
   name: string,
@@ -99,4 +108,18 @@ test("a sender is found by any name it wrote as, or its address", () => {
   expect(finds(linkedin, "dimitrios berlin")).toBe(false);
   expect(finds(sender("Zoë Café", 1, 0), "zoe cafe")).toBe(true);
   expect(finds(sender("Zalando", 1, 0), "")).toBe(true);
+});
+
+test("the page goes on below a sender that left, else above", () => {
+  const rows = [
+    sender("Babylon", 4, 0),
+    sender("heise", 22, 0),
+    { ...sender("heise", 3, 0), account_id: "b", address: "HEISE@news.test" },
+    sender("Kino", 1, 0),
+  ];
+  expect(nearest(rows, "babylon@news.test")?.name).toBe("heise");
+  expect(nearest(rows, "heise@news.test")?.name).toBe("Kino");
+  expect(nearest(rows, "kino@news.test")?.name).toBe("heise");
+  expect(nearest(rows, "zalando@news.test")).toBeUndefined();
+  expect(nearest([sender("Kino", 1, 0)], "kino@news.test")).toBeUndefined();
 });

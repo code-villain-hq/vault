@@ -400,9 +400,17 @@ column. A mail opened from it keeps `sender` in its search, so Esc goes
 back to the sender's list, and Esc there back to the page. With none of
 its mail open, the reading pane (`SenderPane`, `sender.tsx`) says how much
 of the list you opened and leads with Unsubscribe, Keep in Inbox beside
-it; U and I do the same from the list, a mail open or not, and the pane
-then shows what it did, with Undo. What was done to a sender is kept in
-memory by its address, with the name it had, since its mail leaves.
+it; U and I do the same from the list, a mail open or not. What was done
+to a sender is kept in memory by its address, with the name it had and
+its rows on the page, since its mail leaves. Once the list is empty as
+read since it showed (kept, unsubscribed, or its last mail archived,
+deleted or moved), it goes back to the page by itself (`cameBack`): the
+page is scrolled where it was, the sender's rows say what was done, with
+Undo, and J/K are on the row below them (`nearest`). Should the page not
+have read that sender yet, the pane shows what it did, with Undo, as
+before. The page shows what it read last at once (`lastRead`), and the
+sender's list, its pane and an open mail's back link name the sender as
+the page does (`pageName`), else as its mail does.
 
 - Unsubscribe (`POST /newsletters/unsubscribe`, U) asks nothing. It
   archives what the sender sent at once, and the request goes 10 seconds

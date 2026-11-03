@@ -102,3 +102,15 @@ export function finds(sender: Newsletter, text: string): boolean {
 export function senderKey(n: { account_id: string; address: string }): string {
   return `${n.account_id}:${n.address}`;
 }
+
+/**
+ * Where the page goes on from a sender whose view emptied: the row below
+ * its own, another sender's, else the one above. Its rows in each account
+ * count as one.
+ */
+export function nearest(rows: Newsletter[], address: string): Newsletter | undefined {
+  const its = (n: Newsletter) => n.address.toLowerCase() === address.toLowerCase();
+  const at = rows.findIndex(its);
+  if (at < 0) return undefined;
+  return rows.slice(at).find((n) => !its(n)) ?? rows.slice(0, at).findLast((n) => !its(n));
+}

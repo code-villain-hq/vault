@@ -6,7 +6,8 @@
 // wrote as. Unsubscribing asks nothing: it archives what the sender sent,
 // and the request waits 10 seconds on the server, so Undo really undoes it.
 // A sender that takes unsubscribing only on its page gets the page opened,
-// or among several, a link to it.
+// or among several, a link to it. A sender's own view whose mail has left
+// comes back here, where it was, to the row below it.
 
 import { messageOf, shortcutFree } from "@code-villain/web";
 import type {
@@ -22,7 +23,7 @@ import type {
 } from "@postrider/types";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, RequestError } from "./api";
 import { AccountProblems, initial, useNow } from "./inbox";
 import { PageBody, PageHeader, Unread } from "./layout";
@@ -31,6 +32,7 @@ import { isDesktop, openInBrowser } from "./platform";
 import {
   FIRST_SORT,
   finds,
+  nearest,
   neverOpened,
   opened,
   rhythm,
@@ -40,6 +42,7 @@ import {
   sorted,
   unread,
 } from "./rhythm";
+import { undoSender, useDoings } from "./sender";
 import { Button, Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -51,6 +54,8 @@ export type Done =
 /** One click's senders: Undo takes them back together. */
 type Batch = {
   keys: string[];
+  /** The sender it was done to in its own view, each of its rows with Undo. */
+  sender?: string;
   /** Its requests wait to go. */
   waiting: boolean;
   /** Those whose request failed, by sender. */
@@ -58,6 +63,33 @@ type Batch = {
   undoing: boolean;
   problem: string;
 };
+
+/** The page as each workspace read it last, shown at once when it opens
+ * again: its senders' views name them, and keep their rows, by it. */
+const lastRead = new Map<string, Newsletters>();
+
+/** A sender's name as the page shows it, by its address. */
+export function pageName(workspace: string, address: string): string | undefined {
+  return pageRows(workspace, address)[0]?.name;
+}
+
+/** A sender's rows on the page, one per account it wrote to. */
+export function pageRows(workspace: string, address: string): Newsletter[] {
+  const its = address.toLowerCase();
+  return (lastRead.get(workspace)?.newsletters ?? []).filter(
+    (n) => n.address.toLowerCase() === its,
+  );
+}
+
+/** The sender whose view emptied and came back here, by its address. */
+let cameBackFrom: string | undefined;
+/** Where the page was scrolled to when it was left. */
+let scrolledTo = 0;
+
+/** Goes back to the page from a sender's view, once its mail has left. */
+export function cameBack(address: string) {
+  cameBackFrom = address.toLowerCase();
+}
 
 export function NewslettersPage() {
   const { workspace, place } = useWorkspace();
@@ -73,18 +105,19 @@ export function NewslettersPage() {
   // server reads only what came since its last read. The first time an
   // account comes online, its Inbox newsletters move here: until they have,
   // read every 5 seconds.
-  const [data, setData] = useState<Newsletters>();
+  const [data, setData] = useState(() => lastRead.get(workspace.id));
   const [error, setError] = useState("");
   const load = useCallback(() => {
     api<Newsletters>("GET", base, undefined, place).then(
       (read) => {
+        lastRead.set(workspace.id, read);
         setData(read);
         setError("");
         refresh();
       },
       (problem) => setError(messageOf(problem)),
     );
-  }, [base, place, refresh]);
+  }, [workspace.id, base, place, refresh]);
   useEffect(load, [load]);
   const moving = data?.setting_aside.some((s) => s.problem === null) ?? false;
   useEffect(() => {
@@ -113,11 +146,37 @@ export function NewslettersPage() {
   const [find, setFind] = useState("");
 
   // The senders this page unsubscribed from or kept stay in their place,
-  // with what happened, though their mail has left Newsletters.
-  const [done, setDone] = useState(new Map<string, { row: Newsletter; done: Done }>());
-  const [batches, setBatches] = useState(new Map<string, Batch>());
+  // with what happened, though their mail has left Newsletters; so does
+  // the one whose own view came back here, as that did it.
+  const [doneHere, setDone] = useState(new Map<string, { row: Newsletter; done: Done }>());
+  const [batchesHere, setBatches] = useState(new Map<string, Batch>());
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
+  const [back] = useState(() => cameBackFrom);
+  useEffect(() => {
+    cameBackFrom = undefined;
+  }, []);
+  const doing = useDoings().get(back ?? "");
+  const { done, batches } = useMemo(() => {
+    if (!back || !doing?.done) return { done: doneHere, batches: batchesHere };
+    const what = doing.done;
+    const keys = doing.rows.map(senderKey);
+    const failed = new Map(doing.failed ? keys.map((key) => [key, doing.failed]) : []);
+    return {
+      done: new Map([
+        ...doing.rows.map((row) => [senderKey(row), { row, done: what }] as const),
+        ...doneHere,
+      ]),
+      batches: new Map(batchesHere).set(what.batch, {
+        keys,
+        sender: back,
+        waiting: doing.waiting,
+        failed,
+        undoing: doing.undoing,
+        problem: doing.problem,
+      }),
+    };
+  }, [back, doing, doneHere, batchesHere]);
 
   const all = useMemo(() => {
     const read = (data?.newsletters ?? []).filter((n) => !done.has(senderKey(n)));
@@ -251,6 +310,14 @@ export function NewslettersPage() {
   const undo = (id: string) => {
     const batch = batches.get(id);
     if (!batch || batch.undoing) return;
+    if (batch.sender) {
+      void undoSender(batch.sender, base, place).then((undone) => {
+        if (!undone) return;
+        moved();
+        load();
+      });
+      return;
+    }
     updateBatch(id, { undoing: true, problem: "" });
     api("POST", `${base}/undo/${id}`, undefined, place).then(
       () => {
@@ -305,14 +372,39 @@ export function NewslettersPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
+  // The page's place shows at once: it moves to a sender only as you do.
+  const shown = useRef(focused);
   useEffect(() => {
+    if (shown.current === focused) return;
+    shown.current = focused;
     listRef.current
       ?.querySelector(`[data-index="${focused}"]`)
       ?.scrollIntoView({ block: "nearest" });
   }, [focused]);
 
+  // Back from a sender's view, the page is where it was, at the row below
+  // the sender's.
+  const pageRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const body = pageRef.current?.closest(".page-content");
+    if (!body) return;
+    if (back) body.scrollTop = scrolledTo;
+    const onScroll = () => {
+      scrolledTo = body.scrollTop;
+    };
+    body.addEventListener("scroll", onScroll, { passive: true });
+    return () => body.removeEventListener("scroll", onScroll);
+  }, [back]);
+  const placed = useRef(false);
+  useEffect(() => {
+    if (!back || placed.current || rows.length === 0) return;
+    placed.current = true;
+    const next = nearest(rows, back);
+    if (next) setFocusedKey(senderKey(next));
+  }, [back, rows]);
+
   // The last click that unsubscribed from more than one says so in the lead.
-  const bulk = [...batches.entries()].reverse().find(([, b]) => b.keys.length > 1);
+  const bulk = [...batches.entries()].reverse().find(([, b]) => b.keys.length > 1 && !b.sender);
 
   return (
     <>
@@ -320,7 +412,7 @@ export function NewslettersPage() {
         <FindSender text={find} onChange={setFind} />
       </PageHeader>
       <PageBody>
-        <div className="newsletters">
+        <div ref={pageRef} className="newsletters">
           {data && data.problems.length > 0 && (
             <AccountProblems accounts={accounts} statuses={data.problems} />
           )}
@@ -583,7 +675,7 @@ function SenderRow({
   const key = senderKey(row);
   // A row of several unsubscribed at once leaves Undo, and what it says,
   // to the lead.
-  const alone = batch !== undefined && batch.keys.length === 1;
+  const alone = batch !== undefined && (batch.keys.length === 1 || batch.sender !== undefined);
   const warning = batch?.failed.get(key) || (alone ? batch.problem : "");
   return (
     <li
