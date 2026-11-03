@@ -118,6 +118,10 @@ identifier, from `~/Applications`.
   app signed in to.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Raven on Postgres for
   the workspaces on this Mac, with `code/kit/desktop`.
+  Its window's Content-Security-Policy is in `tauri.conf.json`: a new kind
+  of load (another host, a frame, a worker, wasm, eval) needs its directive
+  there, or the installed app blocks it. `dev:desktop` shows Vite's page,
+  which gets no policy, so try a built app.
 - `migrations`: SQL schema, applied by the server on start.
 
 ## Rules
