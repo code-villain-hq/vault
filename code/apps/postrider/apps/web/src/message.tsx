@@ -39,7 +39,9 @@ import { useWorkspace } from "./workspace";
  * J and K, or ↓ and ↑, open the next and the previous one in the list,
  * while Space and the wheel scroll the mail; E archives it, ⌫ deletes it
  * and V moves it to a folder, the conversation's Inbox mail all at once,
- * and the next opens; R answers it, a conversation's last mail but yours.
+ * and it closes on the list, at the next; R answers it, a conversation's
+ * last mail but yours. Postrider opens no mail you didn't: opening one
+ * marks it read.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
@@ -122,7 +124,7 @@ export function MailPage() {
 
   /**
    * Moves it to its account's Archive or Trash, or to a folder picked or
-   * made, and opens the next mail at once, or closes it after the last. A
+   * made, and closes it on the list, at the next mail, unopened. A
    * conversation's Inbox mail goes all together; what you sent of it stays
    * in Sent. A server that refuses says so in the frame's status, and the
    * mail it kept comes back to the Inbox.
@@ -160,8 +162,8 @@ export function MailPage() {
       }
     });
     const next = mails[index + 1] ?? mails[index - 1];
-    if (index >= 0 && next) open(next);
-    else back.go();
+    if (index >= 0 && next) rememberOpened(mailKey(next));
+    back.go();
   };
 
   useEffect(() => {

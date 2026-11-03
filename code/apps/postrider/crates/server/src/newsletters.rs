@@ -28,8 +28,7 @@
 //! `GET /api/w/{workspace}/newsletters` reads all of each account's
 //! Newsletters, by sender: how often each writes, when it last did, and how
 //! much of it you opened (`\Seen`), the least read first. Read once, only
-//! what came since is read again. Reading it is looking: the number beside
-//! Newsletters in the sidebar is what came since, unread ([`Mail::looked`]).
+//! what came since is read again.
 //!
 //! Unsubscribing asks nothing. It archives what the sender sent at once,
 //! and sends the request [`WAIT`] later, so Undo really undoes it: the
@@ -428,7 +427,7 @@ impl Mail {
     }
 
     /// All of the account's newsletters, by sender: what the page read
-    /// before, and what came since. Reading them is looking ([`Mail::looked`]).
+    /// before, and what came since.
     async fn newsletters_of(
         &self,
         account: &MailAccount,
@@ -450,7 +449,6 @@ impl Mail {
             })
             .await?;
         self.lock_newsletter_headers().insert(key, headers.clone());
-        self.looked(account, headers.validity, headers.next).await?;
         let local = is_this_mac(&account.host);
         let sent = headers
             .mails
@@ -458,38 +456,6 @@ impl Mail {
             .filter_map(|h| read(h, local))
             .collect();
         Ok(by_sender(account.id, sent, now))
-    }
-
-    /// Notes where the account's Newsletters stood when you looked: what
-    /// comes after, unread, is new ([`imap::unseen_since`]).
-    async fn looked(&self, account: &MailAccount, validity: u32, next: u32) -> Result<(), Failure> {
-        sqlx::query(
-            "UPDATE newsletters_set_aside SET looked_validity = $2, looked_uid = $3 \
-             WHERE account_id = $1",
-        )
-        .bind(account.id)
-        .bind(i64::from(validity))
-        .bind(i64::from(next))
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    /// Where the account's Newsletters stood when you last looked: its
-    /// UIDVALIDITY and UIDNEXT then.
-    pub(crate) async fn last_looked(&self, account: &MailAccount) -> Option<(u32, u32)> {
-        let looked: Option<(i64, i64)> = sqlx::query_as(
-            "SELECT looked_validity, looked_uid FROM newsletters_set_aside \
-             WHERE account_id = $1 AND looked_uid IS NOT NULL",
-        )
-        .bind(account.id)
-        .fetch_optional(&self.pool)
-        .await
-        .inspect_err(|e| tracing::warn!("couldn't read when Newsletters was looked at: {e}"))
-        .ok()
-        .flatten();
-        let (validity, next) = looked?;
-        Some((u32::try_from(validity).ok()?, u32::try_from(next).ok()?))
     }
 
     fn lock_newsletter_headers(

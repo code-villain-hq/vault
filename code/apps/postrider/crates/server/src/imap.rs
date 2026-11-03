@@ -609,35 +609,10 @@ pub async fn folders(session: &mut Session) -> Result<Vec<Place>, Failure> {
     Ok(places(listed))
 }
 
-/// How many of a folder's mails are unread.
-pub async fn unseen(session: &mut Session, folder: &str) -> Result<u32, Failure> {
-    Ok(session
-        .status(folder, "(UNSEEN)")
-        .await?
-        .unseen
-        .unwrap_or(0))
-}
-
-/// How many of a folder's mails came after `looked` (its UIDVALIDITY and
-/// UIDNEXT when you last looked) and are unread: none when that's unknown,
-/// or its UIDs mean other mails now.
-pub async fn unseen_since(
-    session: &mut Session,
-    folder: &str,
-    looked: Option<(u32, u32)>,
-) -> Result<u32, Failure> {
-    let Some((validity, next)) = looked else {
-        return Ok(0);
-    };
-    // Opened again, not asked with STATUS: a session that has it open
-    // already may answer STATUS with what it saw when it opened it.
-    let opened = session.examine(folder).await?;
-    if opened.uid_validity != Some(validity) || opened.uid_next.is_some_and(|now| now <= next) {
-        return Ok(0);
-    }
-    // `n:*` holds the newest mail even when its UID is below n.
-    let found = session.uid_search(format!("UID {next}:* UNSEEN")).await?;
-    Ok(u32::try_from(found.into_iter().filter(|uid| *uid >= next).count()).unwrap_or(u32::MAX))
+/// How many of a folder's mails are unread, and how many it holds.
+pub async fn unseen(session: &mut Session, folder: &str) -> Result<(u32, u32), Failure> {
+    let status = session.status(folder, "(MESSAGES UNSEEN)").await?;
+    Ok((status.unseen.unwrap_or(0), status.exists))
 }
 
 /// A folder as LIST names it.

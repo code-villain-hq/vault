@@ -65,21 +65,14 @@ impl Mail {
     }
 
     /// An account's folders with what's unread in each, as its server says
-    /// now: in Newsletters, what came since you last looked there
-    /// ([`Mail::last_looked`]). Offline, the folders it had, with nothing
-    /// counted.
+    /// now. Offline, the folders it had, with nothing counted.
     async fn count_folders(&self, account: &MailAccount) -> Vec<(Place, u32)> {
-        let looked = self.last_looked(account).await;
         let counted = self
             .on_server(account, |session| {
                 Box::pin(async move {
                     let mut counted = Vec::new();
                     for place in imap::folders(session).await? {
-                        let unseen = if place.role == Some(FolderRole::Newsletters) {
-                            imap::unseen_since(session, &place.path, looked).await?
-                        } else {
-                            imap::unseen(session, &place.path).await?
-                        };
+                        let unseen = imap::unseen(session, &place.path).await?;
                         counted.push((place, unseen));
                     }
                     Ok(counted)
@@ -88,9 +81,13 @@ impl Mail {
             .await;
         match counted {
             Ok(counted) => {
+                tracing::debug!(address = %account.address, "unread of all: {}", tally(&counted));
                 let places = counted.iter().map(|(place, _)| place.clone()).collect();
                 self.lock_places().insert(account.id, places);
                 counted
+                    .into_iter()
+                    .map(|(place, (unseen, _))| (place, unseen))
+                    .collect()
             }
             Err(failure) => {
                 tracing::info!(address = %account.address, "couldn't list folders: {}", failure.message());
@@ -418,6 +415,22 @@ impl Mail {
 }
 
 /// What the sidebar calls a folder for its role, whatever its server does.
+/// "Archive 0 of 812, Newsletters 3 of 940, own 2 of 61 in 4": an
+/// account's counts, for the log, without its folders' own names.
+fn tally(counted: &[(Place, (u32, u32))]) -> String {
+    let mut own = (0, 0, 0);
+    let mut said: Vec<String> = Vec::new();
+    for (place, (unseen, all)) in counted {
+        match place.role {
+            Some(role) => said.push(format!("{} {unseen} of {all}", role_name(role))),
+            None => own = (own.0 + unseen, own.1 + all, own.2 + 1),
+        }
+    }
+    said.sort();
+    said.push(format!("own {} of {} in {}", own.0, own.1, own.2));
+    said.join(", ")
+}
+
 pub(crate) fn role_name(role: FolderRole) -> String {
     match role {
         FolderRole::Sent => "Sent",

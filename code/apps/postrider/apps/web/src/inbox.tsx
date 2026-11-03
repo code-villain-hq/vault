@@ -90,7 +90,8 @@ type Row = { mail: MailSummary; conversation?: Conversation };
  * A list of mail, the Inbox's or another's: J and K (and the arrows) move
  * through it, Enter or O opens the one they're on. With a mail open beside
  * it (`open`, its key), the mail takes the keys and the list follows it.
- * The Inbox lists `conversations`, the others `mails`.
+ * One that leaves the list, filed away, leaves them on the mail that takes
+ * its place. The Inbox lists `conversations`, the others `mails`.
  */
 export function MailList({
   mails,
@@ -123,13 +124,16 @@ export function MailList({
   const own = useMemo(() => ownAddresses(byId.values()), [byId]);
   const holds = (row: Row, key: string | undefined) =>
     row.conversation ? hasMail(row.conversation, key) : mailKey(row.mail) === key;
-  // By key, so new mail at the top doesn't move it to another.
-  const [focusedKey, setFocusedKey] = useState(open ?? lastOpened);
-  if (open !== undefined && open !== focusedKey) setFocusedKey(open);
-  const focused = Math.max(
-    0,
-    rows.findIndex((row) => holds(row, focusedKey)),
-  );
+  // By key, so new mail at the top doesn't move it to another; where it
+  // was, for when it leaves.
+  const [focus, setFocus] = useState({ key: open ?? lastOpened, at: 0 });
+  if (open !== undefined && open !== focus.key) setFocus({ key: open, at: focus.at });
+  const found = rows.findIndex((row) => holds(row, focus.key));
+  const focused = found >= 0 ? found : Math.min(focus.at, Math.max(rows.length - 1, 0));
+  const taking = found < 0 && open === undefined ? rows[focused] : undefined;
+  if (taking) setFocus({ key: mailKey(taking.mail), at: focused });
+  else if (found >= 0 && found !== focus.at) setFocus({ key: focus.key, at: found });
+  const setFocusedKey = (key: string) => setFocus({ key, at: focused });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -66,9 +66,9 @@ export function NewslettersPage() {
   const now = useNow();
   const base = `/api/w/${workspace.id}/newsletters`;
 
-  // Read when the page opens, after Undo, and when new newsletters came:
-  // the sidebar counts them. Each read is looking, so the count goes; the
-  // server reads only what came since its last read. The first time an
+  // Read when the page opens, after Undo, and when what's unread in
+  // Newsletters changes, as new ones come: the server reads only what came
+  // since its last read. The first time an
   // account comes online, its Inbox newsletters move here: until they have,
   // read every 5 seconds.
   const [data, setData] = useState<Newsletters>();
@@ -90,11 +90,11 @@ export function NewslettersPage() {
     const timer = setTimeout(load, 5000);
     return () => clearTimeout(timer);
   }, [moving, data, load]);
-  const fresh = folders.find((f) => f.role === "newsletters")?.unread ?? 0;
+  const unread = folders.find((f) => f.role === "newsletters")?.unread ?? 0;
   const loaded = data !== undefined;
   useEffect(() => {
-    if (fresh > 0 && loaded) load();
-  }, [fresh, loaded, load]);
+    if (unread > 0 && loaded) load();
+  }, [unread, loaded, load]);
 
   const [sort, setSort] = useState(storedSort);
   const sortBy = (by: SortBy) => {

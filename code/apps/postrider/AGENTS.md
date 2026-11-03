@@ -110,7 +110,9 @@ is taken as gone, as one the Mac slept through is, and opened again.
 A mail opens with `GET /api/w/{id}/mails/{account}/{uid}`: the server
 fetches its source over IMAP once and keeps it (`mail_sources`, gone with
 its line in the Inbox), so it opens again offline, and marks it read on
-the server. `message.rs` reads the source: who it went to, its text, its
+the server. Only you opening a mail marks it read: every other fetch, the
+lists, snippets, conversations, judging, sorting and search, uses
+`BODY.PEEK`, and Postrider opens no mail by itself. `message.rs` reads the source: who it went to, its text, its
 HTML with inline pictures written in, its attachments. The page shows the
 HTML in a frame where no script runs and pictures load without a referrer.
 The frame is as tall as the mail says it is; a last style sets the mail's
@@ -133,7 +135,8 @@ Only the Inbox is followed and kept, and what conversations need of Sent
 and Archive (below). The other folders are read when
 they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
 account's folders, each once by its role (Sent, Archive, Drafts, Trash,
-Junk) or its name, with what's unread; `/folders/{key}` is a folder's
+Junk) or its name, with what's unread (`STATUS`, logged at debug as
+counts only); `/folders/{key}` is a folder's
 newest mail; `/search?q=` asks every folder but Drafts, Trash and Junk for
 the mail with every word in it (IMAP `TEXT`). Before the servers answer,
 `/search?q=&here=true` finds the words in what this Mac has already, the
@@ -146,7 +149,9 @@ only its new mail. An account keeps up to three connections for this
 (`READERS`), beside its watcher's, and a search reads that many of its
 folders at once. The sidebar asks for the folders again when the Inbox
 changes, when a folder or unread mail is opened, and every minute while
-the app shows; the folder shown reads its mail again with it.
+the app shows; the folder shown reads its mail again with it. Every
+item but Sent, Drafts and Trash shows its unread count, Newsletters too,
+and none when nothing is unread.
 
 Today is read live too: `GET /api/w/{id}/day?from&to` asks the CalDAV
 server for every calendar's events (`caldav.rs`). A calendar wears the hue
@@ -162,8 +167,9 @@ reached, the page shows it, "Offline · as of 10:52".
 Every change happens on the account's server; the Inbox follows it there.
 
 - E archives and ⌫ deletes (`archive.rs`): the mail moves to its
-  account's Archive or Trash (made when there's none) and the next one
-  opens; from the Inbox, all of a conversation's Inbox mail goes. Mail in
+  account's Archive or Trash (made when there's none), and the list comes
+  back on the next one, unopened; from the Inbox, all of a conversation's
+  Inbox mail goes. Mail in
   Trash stays there; its server empties it.
 - V moves it (`move.tsx`, `POST /mails/{account}/{uid}/move` with `to`):
   to the Inbox, Archive, Junk or a folder of yours, picked by typing part
@@ -374,11 +380,9 @@ names or its address; a find with no sender says so. It leads with the
 ones you never open that wrote in the last month, and a button for all
 of them, but not while you find one. The server keeps the headers it
 read (`KeptHeaders`, by UIDVALIDITY), so each read fetches only what came
-since. Reading the page is looking at it: it notes Newsletters' UIDNEXT
-(`looked_uid` in `newsletters_set_aside`), and the sidebar counts the
-unread newsletters that came after (`unseen_since`); when there are, the
-open page reads again. It reads once otherwise, except while an
-account's newsletters are still being set aside (`setting_aside`): then
+since. When what's unread in Newsletters changes, the open page reads
+again (`looked_uid` in `newsletters_set_aside` is no longer used). It
+reads once otherwise, except while an account's newsletters are still being set aside (`setting_aside`): then
 it says so and reads every 5 seconds until they are. When setting them
 aside or sorting them again failed, it says why (kept in memory,
 `set_aside_failed`, as `setting_aside` or `not_sorted`); the account
