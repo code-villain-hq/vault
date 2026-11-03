@@ -59,3 +59,6 @@ A change here changes every app. Keep the protocol as it is unless every app
 moves with it, and keep app rules out: they go behind `Rules`. Check with
 `bun run check` in Forge, Glyph, Raven, Almanac and Layer; each runs the client's
 tests and builds the crate (CI runs all four when `code/kit` changes).
+`CARGO_BUILD_JOBS=2 cargo test` here runs the feed's own tests (`tests/feed.rs`:
+several viewers, removals, guests, and the queries one write costs) on the
+Postgres Forge develops with (`.cargo/config.toml`).

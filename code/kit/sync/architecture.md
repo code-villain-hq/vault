@@ -33,7 +33,7 @@ sequenceDiagram
         S-->>C: Accepted: last sync_id, or null for no changes
     end
 
-    Note over S,O: Each feed checks access and reads only changes its viewer may see
+    Note over S,O: The workspace's feeds read the change once; each checks its viewer's access, then sends what they may see
     S-->>C: WebSocket delta with records and cursor
     S-->>O: WebSocket delta for each authorized viewer
     C->>C: Update confirmed records; advance cursor
@@ -89,6 +89,12 @@ is still pending locally.
 
 The sync log is the durable source for catch-up. PostgreSQL NOTIFY wakes feeds;
 it does not carry the records. A heartbeat also checks for missed changes.
+The feeds following one workspace in a server share their reads of the log's
+latest entries, so a change is read once, not once per viewer. Each feed still
+checks its own viewer before every page it sends and on every wake: the app's
+check (signed in, still a member) and their access (role, guest version). A
+feed that falls behind the shared entries, or is catching up after
+connecting, reads the log itself.
 Workspace write locking keeps sync IDs in commit order, and each transaction's
 operations succeed or fail together. This is server-ordered transaction sync,
 not a CRDT or peer-to-peer merge protocol.
@@ -102,4 +108,5 @@ not a CRDT or peer-to-peer merge protocol.
 | HTTP writes and WebSocket transport | [transport.ts](client/src/transport.ts) |
 | Transaction application and app rule hooks | [apply.rs](src/apply.rs) |
 | Authorized snapshots and log reads | [read.rs](src/read.rs) |
-| Catch-up, live feed and access checks | [feed.rs](src/feed.rs) |
+| Catch-up, live feed, shared log reads and access checks | [feed.rs](src/feed.rs) |
+| Feed behaviour and query count with several viewers | [tests/feed.rs](tests/feed.rs) |

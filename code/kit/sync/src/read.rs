@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use serde_json::Value;
-use sqlx::{AssertSqlSafe, PgPool};
+use sqlx::{AssertSqlSafe, PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::scope::{condition, guest_filter, served_epoch};
@@ -92,8 +92,7 @@ pub async fn entries_after<R: Rules>(
         .execute(&mut *db)
         .await?;
     let guest = R::guest_access(&mut db, viewer).await?;
-    type Row = (i64, Uuid, String, Uuid, String, Option<Value>, Option<Uuid>);
-    let rows: Vec<Row> = sqlx::query_as(
+    let rows: Vec<LogRow> = sqlx::query_as(
         "SELECT sync_id, transaction_id, model, model_id, action, data, visible_to FROM sync_log \
          WHERE workspace_id = $1 AND sync_id > $2 ORDER BY sync_id LIMIT $3",
     )
@@ -102,59 +101,81 @@ pub async fn entries_after<R: Rules>(
     .bind(limit)
     .fetch_all(&mut *db)
     .await?;
-
-    let upto = rows.last().map_or(after, |row| row.0);
-    let rows: Vec<Row> = rows
-        .into_iter()
-        .filter(|row| row.6.is_none_or(|user| user == viewer.user_id))
-        .collect();
-
+    let upto = rows.last().map_or(after, |row| row.sync_id);
     let visible = match guest {
         None => None,
-        Some(_) => {
-            let changed = rows.iter().filter(|row| row.5.is_some()).filter_map(|row| {
-                <R::Model as Model>::from_name(&row.2).map(|model| (model, row.3))
-            });
-            Some(guest_filter(&mut db, viewer, changed).await?)
-        }
+        Some(_) => Some(guest_sees_of::<R::Model>(&mut db, viewer, &rows).await?),
     };
     db.commit().await?;
+    Ok((visible_entries(rows, viewer, visible.as_ref())?, upto))
+}
 
-    let entries = rows
-        .into_iter()
+/// One entry of `sync_log`, as stored.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub(crate) struct LogRow {
+    pub sync_id: i64,
+    pub transaction_id: Uuid,
+    pub model: String,
+    pub model_id: Uuid,
+    pub action: String,
+    pub data: Option<Value>,
+    pub visible_to: Option<Uuid>,
+}
+
+/// Of the records `rows` change (not delete), the ones the guest `viewer`
+/// may see now. Run it in the snapshot the guest's access was read in.
+pub(crate) async fn guest_sees_of<M: Model>(
+    db: &mut PgConnection,
+    viewer: Actor,
+    rows: &[LogRow],
+) -> Result<HashSet<(M, Uuid)>, SyncError> {
+    let changed = rows
+        .iter()
+        .filter(|row| row.data.is_some() && row.visible_to.is_none_or(|u| u == viewer.user_id))
+        .filter_map(|row| M::from_name(&row.model).map(|model| (model, row.model_id)));
+    guest_filter(db, viewer, changed).await
+}
+
+/// The entries of `rows` that `viewer` gets: not those private to someone
+/// else, and for a guest (`visible` is `Some`) only deletes and the
+/// records they may see.
+pub(crate) fn visible_entries<M: Model>(
+    rows: impl IntoIterator<Item = LogRow>,
+    viewer: Actor,
+    visible: Option<&HashSet<(M, Uuid)>>,
+) -> Result<Vec<SyncEntry<M>>, SyncError> {
+    rows.into_iter()
+        .filter(|row| row.visible_to.is_none_or(|user| user == viewer.user_id))
         .filter(|row| {
-            let Some(visible) = &visible else { return true };
-            row.5.is_none()
-                || <R::Model as Model>::from_name(&row.2)
-                    .is_some_and(|model| visible.contains(&(model, row.3)))
+            let Some(visible) = visible else { return true };
+            row.data.is_none()
+                || M::from_name(&row.model)
+                    .is_some_and(|model| visible.contains(&(model, row.model_id)))
         })
-        .map(
-            |(sync_id, transaction_id, model, model_id, action, data, _)| {
-                let model = <R::Model as Model>::from_name(&model).ok_or_else(|| {
-                    SyncError::Invalid(format!("unknown model {model:?} in sync_log"))
-                })?;
-                let action = match action.as_str() {
-                    "insert" => SyncAction::Insert,
-                    "update" => SyncAction::Update,
-                    "delete" => SyncAction::Delete,
-                    other => {
-                        return Err(SyncError::Invalid(format!(
-                            "unknown action {other:?} in sync_log"
-                        )));
-                    }
-                };
-                Ok(SyncEntry {
-                    sync_id,
-                    transaction_id,
-                    model,
-                    model_id,
-                    action,
-                    data,
-                })
-            },
-        )
-        .collect::<Result<_, _>>()?;
-    Ok((entries, upto))
+        .map(|row| {
+            let model = M::from_name(&row.model).ok_or_else(|| {
+                SyncError::Invalid(format!("unknown model {:?} in sync_log", row.model))
+            })?;
+            let action = match row.action.as_str() {
+                "insert" => SyncAction::Insert,
+                "update" => SyncAction::Update,
+                "delete" => SyncAction::Delete,
+                other => {
+                    return Err(SyncError::Invalid(format!(
+                        "unknown action {other:?} in sync_log"
+                    )));
+                }
+            };
+            Ok(SyncEntry {
+                sync_id: row.sync_id,
+                transaction_id: row.transaction_id,
+                model,
+                model_id: row.model_id,
+                action,
+                data: row.data,
+            })
+        })
+        .collect()
 }
 
 /// The workspace's latest sync id, or 0 if nothing has changed yet.

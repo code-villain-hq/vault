@@ -1,0 +1,4 @@
+# Environment for `cargo test` in local development: the feed's tests make a
+# database of their own on the Postgres Forge develops with, and drop it after.
+[env]
+DATABASE_URL = "postgres://forge:forge@localhost:5433/forge"
