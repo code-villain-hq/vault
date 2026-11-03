@@ -16,6 +16,11 @@ export function rhythm({ sent, per_week: perWeek }: Counted): string {
   return "Now and then";
 }
 
+/** How many of its mails you haven't opened yet. */
+export function unread({ sent, opened }: Counted): number {
+  return Math.max(sent - opened, 0);
+}
+
 /** How much of it you opened: "Never opened", "Opened 3 of 22". */
 export function opened({ sent, opened }: Counted): string {
   return opened === 0 ? "Never opened" : `Opened ${opened} of ${sent}`;
@@ -63,10 +68,16 @@ const ORDERS: Record<SortBy, (a: Newsletter, b: Newsletter) => number> = {
   opened: leastReadFirst,
 };
 
-/** The senders in `sort`'s order. */
+/**
+ * The senders in `sort`'s order, those with mail you haven't opened first,
+ * whatever the order: where the sidebar's count leads.
+ */
 export function sorted(senders: Newsletter[], sort: Sort): Newsletter[] {
   const order = ORDERS[sort.by];
-  return [...senders].sort((a, b) => (sort.reversed ? order(b, a) : order(a, b)));
+  const waiting = (n: Newsletter) => (unread(n) > 0 ? 0 : 1);
+  return [...senders].sort(
+    (a, b) => waiting(a) - waiting(b) || (sort.reversed ? order(b, a) : order(a, b)),
+  );
 }
 
 /** Lower case, without accents: "Zoë" is found by "zoe". */

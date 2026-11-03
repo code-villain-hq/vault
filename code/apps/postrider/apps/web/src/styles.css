@@ -480,6 +480,16 @@ input.crumb-name {
 .nl .meta {
   display: contents;
 }
+/* A sender's name, and what of it you haven't opened right after. */
+.nl .who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.nl .who .nav-count {
+  margin-left: 0;
+}
 .nl .name {
   overflow: hidden;
   font-weight: 600;
@@ -553,7 +563,7 @@ input.crumb-name {
   .nl .av {
     grid-area: av;
   }
-  .nl .name {
+  .nl .who {
     grid-area: name;
   }
   .nl .lw {

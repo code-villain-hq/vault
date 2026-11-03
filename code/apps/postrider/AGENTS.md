@@ -373,9 +373,12 @@ account's Newsletters by sender, so nothing in the folder is left off it
 (named as its newest mail names it, or by its organisation when that
 name is none or says nothing, "Notification": `sender_name`; `names`
 keeps every name it wrote as): when each last wrote, how often it writes
-(`rhythm.ts`) and how much of it you opened, the least read first. Each
-column's head sorts by it, clicked again the other way, and the order is
-kept on this device (`localStorage`). / finds a sender by any of its
+(`rhythm.ts`) and how much of it you opened, the least read first. A
+sender with mail you haven't opened comes first, whatever the order, with
+how much of it beside its name, as the sidebar shows what's unread in
+Newsletters: both count `\Seen`, so they add up. Each column's head sorts
+by it, clicked again the other way, and the order is kept on this device
+(`localStorage`). / finds a sender by any of its
 names or its address; a find with no sender says so. It leads with the
 ones you never open that wrote in the last month, and a button for all
 of them, but not while you find one. The server keeps the headers it

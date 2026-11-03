@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Newsletter } from "@postrider/types";
-import { finds, leastReadFirst, neverOpened, opened, rhythm, sorted } from "./rhythm";
+import { finds, leastReadFirst, neverOpened, opened, rhythm, sorted, unread } from "./rhythm";
 
 function sender(
   name: string,
@@ -41,6 +41,8 @@ test("how much of it you open", () => {
   expect(neverOpened(sender("H", 22, 3))).toBe(false);
   // One that stopped writing isn't worth leaving.
   expect(neverOpened({ ...sender("S", 5, 0), recent: 0 })).toBe(false);
+  expect(unread(sender("H", 22, 3))).toBe(19);
+  expect(unread(sender("H", 22, 22))).toBe(0);
 });
 
 test("the least read come first, then who sends most", () => {
@@ -55,7 +57,7 @@ test("the least read come first, then who sends most", () => {
 
 test("each head sorts its own way, and the other way round", () => {
   const senders = [
-    sender("heise", 22, 22, 5.1, "2026-10-30T08:00:00Z"),
+    sender("heise", 22, 21, 5.1, "2026-10-30T08:00:00Z"),
     sender("Babylon", 4, 2, 0.3, "2026-11-01T08:00:00Z"),
     sender("Kino", 1, 0, 1, "2026-11-02T09:00:00Z"),
     sender("Zalando", 90, 0, 7, "2026-10-12T08:00:00Z"),
@@ -68,6 +70,21 @@ test("each head sorts its own way, and the other way round", () => {
   // Once is the least often, however recent.
   expect(names("often")).toEqual(["Zalando", "heise", "Babylon", "Kino"]);
   expect(names("opened")).toEqual(["Zalando", "Kino", "Babylon", "heise"]);
+});
+
+test("those with mail you haven't opened lead, in every order", () => {
+  const senders = [
+    sender("Babylon", 4, 4, 0.3, "2026-11-01T08:00:00Z"),
+    sender("heise", 22, 21, 5.1, "2026-10-30T08:00:00Z"),
+    sender("Kino", 1, 1, 1, "2026-11-02T09:00:00Z"),
+    sender("Zalando", 90, 88, 7, "2026-10-12T08:00:00Z"),
+  ];
+  const names = (by: "name" | "newest" | "often" | "opened", reversed = false) =>
+    sorted(senders, { by, reversed }).map((n) => n.name);
+  expect(names("name")).toEqual(["heise", "Zalando", "Babylon", "Kino"]);
+  expect(names("name", true)).toEqual(["Zalando", "heise", "Kino", "Babylon"]);
+  expect(names("newest")).toEqual(["heise", "Zalando", "Kino", "Babylon"]);
+  expect(names("often", true)).toEqual(["heise", "Zalando", "Kino", "Babylon"]);
 });
 
 test("a sender is found by any name it wrote as, or its address", () => {

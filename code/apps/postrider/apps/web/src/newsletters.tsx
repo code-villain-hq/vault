@@ -1,6 +1,7 @@
 // Newsletters: every sender whose mail went to many, as its header says or
 // Claude Code found reading it, the least read first, led by the ones you
-// never open. Each column's head sorts
+// never open. Those with mail you haven't opened come first, with how much,
+// as the sidebar counts it. Each column's head sorts
 // by it, remembered on this device, and / finds a sender by any name it
 // wrote as. Unsubscribing asks nothing: it archives what the sender sent,
 // and the request waits 10 seconds on the server, so Undo really undoes it.
@@ -24,7 +25,7 @@ import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, RequestError } from "./api";
 import { AccountProblems, initial, useNow } from "./inbox";
-import { PageBody, PageHeader } from "./layout";
+import { PageBody, PageHeader, Unread } from "./layout";
 import { hue, mailTime, useAccounts, useFolders } from "./mail";
 import { isDesktop, openInBrowser } from "./platform";
 import {
@@ -37,6 +38,7 @@ import {
   type SortBy,
   senderKey,
   sorted,
+  unread,
 } from "./rhythm";
 import { Button, Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
@@ -67,8 +69,8 @@ export function NewslettersPage() {
   const base = `/api/w/${workspace.id}/newsletters`;
 
   // Read when the page opens, after Undo, and when what's unread in
-  // Newsletters changes, as new ones come: the server reads only what came
-  // since its last read. The first time an
+  // Newsletters changes, as new ones come or you open one elsewhere: the
+  // server reads only what came since its last read. The first time an
   // account comes online, its Inbox newsletters move here: until they have,
   // read every 5 seconds.
   const [data, setData] = useState<Newsletters>();
@@ -90,11 +92,13 @@ export function NewslettersPage() {
     const timer = setTimeout(load, 5000);
     return () => clearTimeout(timer);
   }, [moving, data, load]);
-  const unread = folders.find((f) => f.role === "newsletters")?.unread ?? 0;
-  const loaded = data !== undefined;
+  const counted = folders.find((f) => f.role === "newsletters")?.unread;
+  const countedBefore = useRef(counted);
   useEffect(() => {
-    if (unread > 0 && loaded) load();
-  }, [unread, loaded, load]);
+    const before = countedBefore.current;
+    countedBefore.current = counted;
+    if (before !== undefined && counted !== before) load();
+  }, [counted, load]);
 
   const [sort, setSort] = useState(storedSort);
   const sortBy = (by: SortBy) => {
@@ -591,13 +595,16 @@ function SenderRow({
       <span className="av" aria-hidden="true">
         {initial(row.name)}
       </span>
-      <Link
-        {...senderMail(workspace.url_key, row)}
-        className="name"
-        title={account ? `${row.address}, to ${account.name}` : row.address}
-      >
-        {row.name}
-      </Link>
+      <span className="who">
+        <Link
+          {...senderMail(workspace.url_key, row)}
+          className="name"
+          title={account ? `${row.address}, to ${account.name}` : row.address}
+        >
+          {row.name}
+        </Link>
+        {!done && <Unread count={unread(row)} />}
+      </span>
       <span className="lw" title={new Date(row.newest).toLocaleString()}>
         {mailTime(row.newest, now)}
       </span>

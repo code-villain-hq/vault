@@ -392,7 +392,8 @@ function FolderLink({
   );
 }
 
-function Unread({ count }: { count: number }) {
+/** What's unread, as the sidebar and the Newsletters page show it: none when nothing is. */
+export function Unread({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
     <span className="nav-count ml-auto flex items-center gap-1.5 text-xs font-normal text-muted tabular-nums">
