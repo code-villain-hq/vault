@@ -1,5 +1,5 @@
 import { shortcutFree } from "@code-villain/web";
-import type { AccountStatus, Day, MailAccount, MailSummary } from "@postrider/types";
+import type { AccountStatus, Conversation, Day, MailAccount, MailSummary } from "@postrider/types";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
@@ -10,7 +10,10 @@ import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
 import { buttonClass, Empty } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
-/** The Inbox, in the list column: today's events, then one Inbox for every account. */
+/**
+ * The Inbox, in the list column: today's events, then one Inbox for every
+ * account, a row for each conversation.
+ */
 export function InboxList({ open }: { open: string | undefined }) {
   const { inbox } = useInbox();
   const accounts = useAccounts();
@@ -25,8 +28,8 @@ export function InboxList({ open }: { open: string | undefined }) {
         <Today now={now} />
         <AccountProblems accounts={accounts} statuses={inbox?.accounts ?? []} />
         {inbox &&
-          (inbox.mails.length ? (
-            <MailList mails={inbox.mails} byId={byId} now={now} open={open} />
+          (inbox.conversations.length ? (
+            <MailList conversations={inbox.conversations} byId={byId} now={now} open={open} />
           ) : (
             <Empty title="Nothing here." />
           ))}
@@ -38,6 +41,29 @@ export function InboxList({ open }: { open: string | undefined }) {
 /** A mail's key in its list, and in the page that opens it: UIDs count per folder. */
 export function mailKey(mail: { folder?: string | null; account_id: string; uid: number }): string {
   return `${mail.folder?.toLowerCase() ?? ""}:${mail.account_id}:${mail.uid}`;
+}
+
+/**
+ * The mail a conversation's row opens: its newest in the Inbox. Every
+ * conversation has one; what you sent and archived of it comes along.
+ */
+export function anchorOf(conversation: Conversation): MailSummary | undefined {
+  return conversation.mails.findLast((mail) => mail.folder === null);
+}
+
+/** Whether a conversation has the mail `key`. */
+export function hasMail(conversation: Conversation, key: string | undefined): boolean {
+  return conversation.mails.some((mail) => mailKey(mail) === key);
+}
+
+/** Your accounts' addresses, in lower case, to tell your mail by. */
+export function ownAddresses(accounts: Iterable<MailAccount>): Set<string> {
+  return new Set([...accounts].map((account) => account.address.toLowerCase()));
+}
+
+/** Whether you wrote it: it's in Sent, or it's from one of your accounts. */
+export function isYours(mail: MailSummary, own: Set<string>): boolean {
+  return mail.folder === "sent" || own.has(mail.from_address.toLowerCase());
 }
 
 /** Which list a mail was opened from: the Inbox, a folder, or a search. */
@@ -57,19 +83,25 @@ export function rememberOpened(key: string) {
   lastOpened = key;
 }
 
+/** A row of a list: a mail, or in the Inbox a conversation, opened by its newest Inbox mail. */
+type Row = { mail: MailSummary; conversation?: Conversation };
+
 /**
  * A list of mail, the Inbox's or another's: J and K (and the arrows) move
  * through it, Enter or O opens the one they're on. With a mail open beside
  * it (`open`, its key), the mail takes the keys and the list follows it.
+ * The Inbox lists `conversations`, the others `mails`.
  */
 export function MailList({
   mails,
+  conversations,
   byId,
   now,
   from = {},
   open,
 }: {
-  mails: MailSummary[];
+  mails?: MailSummary[];
+  conversations?: Conversation[];
   byId: Map<string, MailAccount>;
   now: Date;
   from?: From;
@@ -78,12 +110,25 @@ export function MailList({
   const { workspace } = useWorkspace();
   const navigate = useNavigate();
   const list = useRef<HTMLOListElement>(null);
+  const rows = useMemo<Row[]>(
+    () =>
+      conversations?.flatMap((conversation) => {
+        const mail = anchorOf(conversation);
+        return mail ? [{ mail, conversation }] : [];
+      }) ??
+      mails?.map((mail) => ({ mail })) ??
+      [],
+    [mails, conversations],
+  );
+  const own = useMemo(() => ownAddresses(byId.values()), [byId]);
+  const holds = (row: Row, key: string | undefined) =>
+    row.conversation ? hasMail(row.conversation, key) : mailKey(row.mail) === key;
   // By key, so new mail at the top doesn't move it to another.
   const [focusedKey, setFocusedKey] = useState(open ?? lastOpened);
   if (open !== undefined && open !== focusedKey) setFocusedKey(open);
   const focused = Math.max(
     0,
-    mails.findIndex((mail) => mailKey(mail) === focusedKey),
+    rows.findIndex((row) => holds(row, focusedKey)),
   );
 
   useEffect(() => {
@@ -95,10 +140,10 @@ export function MailList({
         key === "j" || key === "ArrowDown" ? 1 : key === "k" || key === "ArrowUp" ? -1 : 0;
       if (step) {
         event.preventDefault();
-        const next = mails[Math.min(Math.max(focused + step, 0), mails.length - 1)];
-        if (next) setFocusedKey(mailKey(next));
+        const next = rows[Math.min(Math.max(focused + step, 0), rows.length - 1)];
+        if (next) setFocusedKey(mailKey(next.mail));
       } else if ((key === "Enter" && event.target === document.body) || key === "o") {
-        const mail = mails[focused];
+        const mail = rows[focused]?.mail;
         if (!mail) return;
         event.preventDefault();
         rememberOpened(mailKey(mail));
@@ -119,14 +164,16 @@ export function MailList({
 
   return (
     <ol ref={list} className="mails" aria-label="Mail">
-      {mails.map((mail, index) => (
+      {rows.map((row, index) => (
         <MailRow
-          key={mailKey(mail)}
-          mail={mail}
+          key={mailKey(row.mail)}
+          mail={row.mail}
+          conversation={row.conversation}
+          own={own}
           index={index}
           focused={index === focused}
-          selected={mailKey(mail) === open}
-          account={byId.get(mail.account_id)}
+          selected={open !== undefined && holds(row, open)}
+          account={byId.get(row.mail.account_id)}
           now={now}
           from={from}
         />
@@ -145,9 +192,15 @@ export function useNow(): Date {
   return now;
 }
 
-/** A mail's lines in a list: who and when, its subject, then how it starts. */
+/**
+ * A mail's lines in a list: who and when, its subject, then how it starts.
+ * A conversation's names who wrote in it but you, counts its mail, and
+ * starts as its last mail does; it's unread while any of it in the Inbox is.
+ */
 function MailRow({
   mail,
+  conversation,
+  own,
   index,
   focused,
   selected,
@@ -156,6 +209,8 @@ function MailRow({
   from,
 }: {
   mail: MailSummary;
+  conversation: Conversation | undefined;
+  own: Set<string>;
   index: number;
   focused: boolean;
   selected: boolean;
@@ -164,9 +219,13 @@ function MailRow({
   from: From;
 }) {
   const { workspace } = useWorkspace();
-  const unread = !mail.seen;
+  const all = conversation?.mails ?? [mail];
+  const last = all.at(-1) ?? mail;
+  const unread = all.some((m) => m.folder === mail.folder && !m.seen);
+  const others = [...new Set(all.filter((m) => !isYours(m, own)).map((m) => m.from_name))];
   // Sent mail names who it went to.
-  const who = mail.to_name ?? mail.from_name;
+  const who = conversation ? others.join(", ") || mail.from_name : (mail.to_name ?? mail.from_name);
+  const snippet = conversation && isYours(last, own) ? `You: ${last.snippet}` : last.snippet;
   return (
     <li>
       <Link
@@ -185,11 +244,16 @@ function MailRow({
           {initial(who)}
         </span>
         <span className="who">{mail.to_name === null ? who : `To ${who}`}</span>
-        <time className="when" dateTime={mail.date} title={new Date(mail.date).toLocaleString()}>
-          {mailTime(mail.date, now)}
+        {all.length > 1 && (
+          <span className="count" aria-label={`${all.length} mails`}>
+            {all.length}
+          </span>
+        )}
+        <time className="when" dateTime={last.date} title={new Date(last.date).toLocaleString()}>
+          {mailTime(last.date, now)}
         </time>
         <span className="subject">{mail.subject || "(no subject)"}</span>
-        {mail.snippet && <span className="snippet">{mail.snippet}</span>}
+        {last.snippet && <span className="snippet">{snippet}</span>}
       </Link>
     </li>
   );

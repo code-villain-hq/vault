@@ -1,4 +1,4 @@
-import type { AccountStatus, Folder, Inbox, MailAccount } from "@postrider/types";
+import type { AccountStatus, Folder, Inbox, MailAccount, MailSummary } from "@postrider/types";
 import {
   createContext,
   type CSSProperties,
@@ -124,9 +124,16 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     });
   }, [workspace.id, place]);
   const shown = useMemo<InboxState>(() => {
+    // Only the Inbox's mail leaves: what you sent of a conversation stays in Sent.
+    const stays = (mail: MailSummary) =>
+      mail.folder !== null || !leaving.has(`${mail.account_id}:${mail.uid}`);
     const inbox = state.inbox && {
       ...state.inbox,
-      mails: state.inbox.mails.filter((mail) => !leaving.has(`${mail.account_id}:${mail.uid}`)),
+      mails: state.inbox.mails.filter(stays),
+      conversations: state.inbox.conversations.flatMap((conversation) => {
+        const mails = conversation.mails.filter(stays);
+        return mails.some((mail) => mail.folder === null) ? [{ mails }] : [];
+      }),
     };
     return { inbox, offline: state.offline, leave, stay, sync, syncing, synced };
   }, [state, leaving, leave, stay, sync, syncing, synced]);

@@ -10,6 +10,7 @@ pub mod ask;
 pub mod auth;
 pub mod caldav;
 pub mod connect;
+pub mod conversations;
 pub mod error;
 pub mod files;
 pub mod folders;

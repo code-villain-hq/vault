@@ -122,7 +122,8 @@ impl Mail {
     }
 
     /// Puts a sent mail in its account's Sent, as the account's other mail
-    /// apps would; its server doesn't.
+    /// apps would; its server doesn't. Then the Inbox changes, so its
+    /// conversation reads Sent again and shows it (`conversations::keep`).
     async fn file_sent(&self, account: &MailAccount, raw: Vec<u8>) {
         let filed = async {
             let sent = self.folder_for(account, FolderRole::Sent).await?;
@@ -132,8 +133,11 @@ impl Mail {
             })
             .await
         };
-        if let Err(failure) = filed.await {
-            tracing::info!(address = %account.address, "couldn't put it in Sent: {}", failure.message());
+        match filed.await {
+            Ok(()) => self.bump(),
+            Err(failure) => {
+                tracing::info!(address = %account.address, "couldn't put it in Sent: {}", failure.message())
+            }
         }
     }
 }

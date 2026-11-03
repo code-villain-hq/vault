@@ -4,7 +4,7 @@
 //! the next change with `?after=`. A mail opened from it is read at
 //! `GET /api/w/{workspace}/mails/{account}/{uid}`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -22,6 +22,7 @@ use tokio::task::AbortHandle;
 use uuid::Uuid;
 
 use crate::auth::Member;
+use crate::conversations::{self, Joins};
 use crate::error::AppError;
 use crate::imap::{self, Failure, KeptHeaders, Login, Place, Session, Summary};
 use crate::message;
@@ -222,8 +223,13 @@ impl Mail {
 
     /// Waits until the version is no longer `after`, or for [`LONG_POLL`].
     pub async fn changed_since(&self, after: i64) {
+        let _ = tokio::time::timeout(LONG_POLL, self.changed_from(after)).await;
+    }
+
+    /// Waits until the version is no longer `after`, however long it takes.
+    pub(crate) async fn changed_from(&self, after: i64) {
         let mut version = self.version.subscribe();
-        let _ = tokio::time::timeout(LONG_POLL, version.wait_for(|v| *v != after)).await;
+        let _ = version.wait_for(|v| *v != after).await;
     }
 
     /// The workspace's Inbox: its accounts' states, and their newest mail,
@@ -258,21 +264,39 @@ impl Mail {
             String,
             DateTime<Utc>,
             bool,
+            String,
+            Option<Vec<String>>,
+            Vec<String>,
+            String,
         );
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT m.account_id, m.uid, m.from_name, m.from_address, m.subject, m.snippet, \
-             m.date, m.seen FROM inbox_mails m JOIN mail_accounts a ON a.id = m.account_id \
+             m.date, m.seen, m.message_id, m.refs, m.to_addresses, m.reply_to \
+             FROM inbox_mails m JOIN mail_accounts a ON a.id = m.account_id \
              WHERE a.workspace_id = $1 ORDER BY m.date DESC, m.uid DESC LIMIT $2",
         )
         .bind(workspace_id)
         .bind(i64::from(imap::KEEP))
         .fetch_all(&self.pool)
         .await?;
-        let mails = rows
+        let inbox: Vec<(MailSummary, Joins)> = rows
             .into_iter()
             .map(
-                |(account_id, uid, from_name, from_address, subject, snippet, date, seen)| {
-                    MailSummary {
+                |(
+                    account_id,
+                    uid,
+                    from_name,
+                    from_address,
+                    subject,
+                    snippet,
+                    date,
+                    seen,
+                    message_id,
+                    refs,
+                    to_addresses,
+                    reply_to,
+                )| {
+                    let summary = MailSummary {
                         account_id,
                         folder: None,
                         uid,
@@ -283,14 +307,32 @@ impl Mail {
                         date,
                         seen,
                         to_name: None,
-                    }
+                    };
+                    let joins = Joins {
+                        message_id,
+                        refs: refs.unwrap_or_default(),
+                        to_addresses,
+                        reply_to,
+                    };
+                    (summary, joins)
                 },
             )
             .collect();
+        let mails = inbox.iter().map(|(summary, _)| summary.clone()).collect();
+        let own: HashSet<String> =
+            sqlx::query_scalar("SELECT lower(address) FROM mail_accounts WHERE workspace_id = $1")
+                .bind(workspace_id)
+                .fetch_all(&self.pool)
+                .await?
+                .into_iter()
+                .collect();
+        let filed = self.filed(workspace_id).await?;
+        let conversations = conversations::conversations(inbox, filed, &own);
         Ok(Inbox {
             version,
             accounts,
             mails,
+            conversations,
         })
     }
 
@@ -604,6 +646,13 @@ impl Mail {
             .send_modify(|rounds| *rounds.entry(account_id).or_default() += 1);
     }
 
+    /// Where an account's server stands, once its watcher has looked.
+    pub(crate) fn state_of(&self, account_id: Uuid) -> Option<AccountState> {
+        self.lock_statuses()
+            .get(&account_id)
+            .map(|status| status.state)
+    }
+
     fn set(&self, account_id: Uuid, state: AccountState, message: Option<String>) {
         let status = AccountStatus {
             account_id,
@@ -614,7 +663,7 @@ impl Mail {
         self.bump();
     }
 
-    fn bump(&self) {
+    pub(crate) fn bump(&self) {
         self.version.send_modify(|v| *v += 1);
     }
 

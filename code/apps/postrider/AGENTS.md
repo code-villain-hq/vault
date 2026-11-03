@@ -117,7 +117,8 @@ The frame is as tall as the mail says it is; a last style sets the mail's
 `html` and `body` to `height: auto`, since newsletters that make them 100%
 tall would otherwise fold the frame to nothing.
 
-Only the Inbox is followed and kept. The other folders are read when
+Only the Inbox is followed and kept, and what conversations need of Sent
+and Archive (below). The other folders are read when
 they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
 account's folders, each once by its role (Sent, Archive, Drafts, Trash,
 Junk) or its name, with what's unread; `/folders/{key}` is a folder's
@@ -150,7 +151,8 @@ Every change happens on the account's server; the Inbox follows it there.
 
 - E archives and ⌫ deletes (`archive.rs`): the mail moves to its
   account's Archive or Trash (made when there's none) and the next one
-  opens. Mail in Trash stays there; its server empties it.
+  opens; from the Inbox, all of a conversation's Inbox mail goes. Mail in
+  Trash stays there; its server empties it.
 - V moves it (`move.tsx`, `POST /mails/{account}/{uid}/move` with `to`):
   to the Inbox, Archive, Junk or a folder of yours, picked by typing part
   of its name, or to a new one made with that name.
@@ -182,6 +184,37 @@ New unread mail is a notification in the desktop app (more than three at
 once are one), through `code/kit/notify`, and the dock badge counts the
 Inbox's unread mail (`mail.tsx`, `platform.ts`). What a server has when its
 account comes online doesn't notify.
+
+## Conversations
+
+The Inbox shows a row for each conversation (`conversations.rs`), with
+what you sent and archived of it. Mail joins one by its header first:
+Message-ID, In-Reply-To and References. Helpdesks often break that chain
+and move the subject's prefix ("[Pen Store] Re:" against "Re: [Pen
+Store]"), so mail also joins by its subject read without Re:, Fwd:, Sv:,
+AW: and [tags] (`mail_parser::thread_name`), but only with the same other
+party (the domain, or the address at a free-mail domain, `SHARED`),
+within 30 days, and when the subjects differ or either answers a mail, so
+a shop's alike notices stay apart. The subject alone joins nothing.
+
+What you sent and archived is kept in Postgres (`filed_mails`), from each
+account's Sent and Archive, as far back as its Inbox's oldest mail and a
+month more, at most a year and the newest 1000 of each.
+`conversations::keep` reads what's new when the Inbox changes and every 5
+minutes, for the accounts that are online, on reader connections. A mail
+kept in two places (the Inbox and Archive, or Sent twice) shows once, by
+Message-ID; the log counts what's in Sent twice. The Inbox's copy keeps
+In-Reply-To, References, To, Cc and Reply-To (`inbox_mails.refs` and
+beside it); mail copied before that is read again once.
+
+A row names who wrote in it but you, counts its mail, and starts as its
+last mail does ("You: …"); it's ordered by its newest mail, yours too,
+and unread while any of its Inbox mail is. It opens its newest Inbox mail,
+and the page shows the whole conversation, oldest first: the last mail,
+the one R answers and what was unread show whole, the rest a line each,
+which a click unfolds. J and K move by conversation; E, ⌫ and V take all
+its Inbox mail, while yours stays in Sent; R answers its last mail but
+yours. A reply sent from Postrider shows in it once it's in Sent.
 
 ## Asking Postrider, and sorting
 
@@ -350,7 +383,8 @@ Like the ask field's, what it needs is kept in memory.
   others. Accounts and the calendar are made by the server, after it
   signs in (`POST /accounts`, `/calendar`), never by the web app.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
-  `mail.rs`, the folders and search in `folders.rs`), reading a mail
+  `mail.rs`, the folders and search in `folders.rs`, conversations in
+  `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`), archiving, replying and
   files (`archive.rs`, `reply.rs`, `files.rs`), More professional
   (`rewrite.rs`), CalDAV (`caldav.rs`),

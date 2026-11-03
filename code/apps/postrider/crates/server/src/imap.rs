@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use async_imap::types::{Fetch, Flag, NameAttribute};
 use base64::Engine;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use futures::TryStreamExt;
 use postrider_domain::FolderRole;
 use sqlx::PgPool;
@@ -302,8 +302,8 @@ pub async fn sync_inbox(
             sqlx::query(
                 "INSERT INTO inbox_mails \
                  (account_id, uid, from_name, from_address, subject, snippet, date, seen, \
-                 message_id) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
+                 message_id, refs, to_addresses, reply_to) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
                  ON CONFLICT (account_id, uid) DO UPDATE SET seen = EXCLUDED.seen",
             )
             .bind(account_id)
@@ -315,13 +315,45 @@ pub async fn sync_inbox(
             .bind(summary.date)
             .bind(is_seen(fetch))
             .bind(&summary.message_id)
+            .bind(&summary.threading.refs)
+            .bind(&summary.threading.to_addresses)
+            .bind(&summary.threading.reply_to)
             .execute(pool)
             .await?;
             changed = true;
         }
     }
+
+    // Mail copied before conversations were: what joins it to others.
+    let unthreaded: Vec<u32> = sqlx::query_scalar::<_, i64>(
+        "SELECT uid FROM inbox_mails WHERE account_id = $1 AND refs IS NULL",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .filter_map(|uid| u32::try_from(uid).ok())
+    .collect();
+    for headed in fetch_headers(session, &unthreaded, THREADING).await? {
+        let threading = Threading::read(&headed.header);
+        sqlx::query(
+            "UPDATE inbox_mails SET refs = $3, to_addresses = $4, reply_to = $5 \
+             WHERE account_id = $1 AND uid = $2",
+        )
+        .bind(account_id)
+        .bind(i64::from(headed.uid))
+        .bind(&threading.refs)
+        .bind(&threading.to_addresses)
+        .bind(&threading.reply_to)
+        .execute(pool)
+        .await?;
+        changed = true;
+    }
     Ok(changed)
 }
+
+/// The header fields [`Threading`] reads.
+const THREADING: &str = "IN-REPLY-TO REFERENCES TO CC REPLY-TO";
 
 /// A mail's whole source, from one of the account's folders, without
 /// marking it read. `None` when it's no longer there, or the folder's UIDs
@@ -837,6 +869,47 @@ pub async fn search(
     Ok(Lines { validity, lines })
 }
 
+/// What [`filed`] read of a folder: the UIDs of its mail since the day
+/// asked, and the lines of those it didn't know, under its UIDVALIDITY.
+pub struct Filed {
+    pub validity: i64,
+    pub there: Vec<i64>,
+    pub lines: Vec<Line>,
+}
+
+/// The newest `at_most` mails in `folder` that came since `since`, the ones
+/// `kept` doesn't have under `kept_validity` read in full.
+pub async fn filed(
+    session: &mut Session,
+    folder: &str,
+    since: NaiveDate,
+    at_most: usize,
+    kept: &HashSet<i64>,
+    kept_validity: i64,
+) -> Result<Filed, Failure> {
+    let mailbox = session.examine(folder).await?;
+    let validity = i64::from(mailbox.uid_validity.unwrap_or(0));
+    let mut there: Vec<i64> = session
+        .uid_search(format!("SINCE {}", since.format("%d-%b-%Y")))
+        .await?
+        .into_iter()
+        .map(i64::from)
+        .collect();
+    there.sort_unstable_by(|a, b| b.cmp(a));
+    there.truncate(at_most);
+    let new: Vec<i64> = there
+        .iter()
+        .filter(|uid| validity != kept_validity || !kept.contains(uid))
+        .copied()
+        .collect();
+    let lines = lines(session, &new, &HashMap::new()).await?;
+    Ok(Filed {
+        validity,
+        there,
+        lines,
+    })
+}
+
 /// The mails with every one of `words` in them, in a header or the text:
 /// `TEXT "word"` for each word, quoted; in UTF-8 when one needs it.
 pub fn words_query(words: &[String]) -> String {
@@ -1045,6 +1118,59 @@ pub struct Summary {
     pub date: DateTime<Utc>,
     /// Its Message-ID, without the brackets; empty when it has none.
     pub message_id: String,
+    /// Whom it answers, and where it goes in a conversation.
+    pub threading: Threading,
+}
+
+/// What joins a mail to others in a conversation: the Message-IDs it
+/// answers (In-Reply-To, then References), whom it went to (To and Cc) and
+/// whom answers go to (Reply-To). Addresses in lower case.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Threading {
+    pub refs: Vec<String>,
+    pub to_addresses: Vec<String>,
+    pub reply_to: String,
+}
+
+impl Threading {
+    /// Read from a mail's header, or the start of the mail.
+    pub fn read(header: &[u8]) -> Threading {
+        mail_parser::MessageParser::new()
+            .parse(header)
+            .map(|message| Threading::of(&message))
+            .unwrap_or_default()
+    }
+
+    fn of(message: &mail_parser::Message) -> Threading {
+        let ids = |list: Option<mail_parser::TextList>| {
+            list.map(|ids| ids.iter().map(str::to_string).collect::<Vec<_>>())
+                .unwrap_or_default()
+        };
+        let mut refs = ids(message.in_reply_to());
+        for id in ids(message.references()) {
+            if !refs.contains(&id) {
+                refs.push(id);
+            }
+        }
+        let addresses = |list: Option<mail_parser::AddressList>| {
+            list.map(|list| {
+                list.mailboxes()
+                    .filter_map(|mailbox| mailbox.address().map(str::to_lowercase))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+        };
+        let mut to_addresses = addresses(message.to());
+        to_addresses.extend(addresses(message.cc()));
+        Threading {
+            refs,
+            to_addresses,
+            reply_to: addresses(message.reply_to())
+                .into_iter()
+                .next()
+                .unwrap_or_default(),
+        }
+    }
 }
 
 /// Reads the list's line from the start of a mail: who it's from, its
@@ -1100,6 +1226,7 @@ pub fn summarize(raw: &[u8], arrived: Option<DateTime<Utc>>) -> Summary {
             .and_then(|m| m.message_id())
             .unwrap_or_default()
             .to_string(),
+        threading: message.as_ref().map(Threading::of).unwrap_or_default(),
     }
 }
 

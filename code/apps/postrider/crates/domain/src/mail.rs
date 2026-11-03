@@ -306,6 +306,17 @@ pub struct Inbox {
     pub version: i64,
     pub accounts: Vec<AccountStatus>,
     pub mails: Vec<MailSummary>,
+    /// The same mail, a row for each conversation, newest first.
+    pub conversations: Vec<Conversation>,
+}
+
+/// A conversation in the Inbox: its mail, oldest first. The Inbox's, and
+/// what you sent and archived of it, by its folder; a mail kept in two
+/// places shows once.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Conversation {
+    pub mails: Vec<MailSummary>,
 }
 
 /// What a folder is for, as its server says (RFC 6154) or its name does.

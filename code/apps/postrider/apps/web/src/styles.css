@@ -313,7 +313,8 @@ input.crumb-name {
 }
 
 /* A list of mail, no dividers: who and when, the subject, how it starts.
-   Unread reads in weight and the live dot; the open mail is selected. */
+   Unread reads in weight and the live dot; the open mail is selected. A
+   conversation counts its mail between who and when. */
 .mails {
   display: grid;
   gap: 1px;
@@ -321,11 +322,11 @@ input.crumb-name {
 }
 .mail {
   display: grid;
-  grid-template-columns: 8px 26px minmax(0, 1fr) auto;
+  grid-template-columns: 8px 26px minmax(0, 1fr) auto auto;
   grid-template-areas:
-    "dot av who when"
-    ". av subject subject"
-    ". . snippet snippet";
+    "dot av who count when"
+    ". av subject subject subject"
+    ". . snippet snippet snippet";
   column-gap: 10px;
   row-gap: 1px;
   align-items: center;
@@ -341,6 +342,12 @@ input.crumb-name {
 }
 .mail .who {
   grid-area: who;
+}
+.mail .count {
+  grid-area: count;
+  color: var(--faint);
+  font-size: var(--type-ui-small-size);
+  font-variant-numeric: tabular-nums;
 }
 .mail .when {
   grid-area: when;
@@ -367,6 +374,7 @@ input.crumb-name {
 .mail.unread .subject {
   font-weight: 700;
 }
+.mail.unread .count,
 .mail.unread .when {
   color: var(--muted);
 }
@@ -569,24 +577,59 @@ input.crumb-name {
   }
 }
 
-/* A mail, opened beside its list: its sender, its files, then its words. */
+/* A mail, opened beside its list: its sender, its files, then its words.
+   A conversation shows each of its mail so, oldest first, and folds the
+   ones read before to a line: who, and how it starts. */
 .letter {
   display: grid;
   gap: 16px;
   padding: 20px 24px 32px;
 }
-.letter-head {
+.said {
   display: grid;
-  gap: 12px;
+  gap: 16px;
+}
+.said + .said,
+.folded + .said {
+  margin-top: 8px;
 }
 .from {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  text-align: left;
 }
 .from .av {
   width: 32px;
   height: 32px;
+}
+.folded {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 36px;
+  margin: -8px -8px;
+  padding: 0 8px;
+  text-align: left;
+  border-radius: var(--radius-md);
+}
+.folded .name {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folded:hover {
+  background: var(--hover);
+}
+.folded:focus-visible,
+.from:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
 }
 .files {
   display: flex;

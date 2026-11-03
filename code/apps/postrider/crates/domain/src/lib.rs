@@ -18,11 +18,11 @@ mod user;
 pub use account::{Me, Role, UserInfo, WorkspaceInfo, clean_name, normalize_email, url_key_from};
 pub use mail::{
     AccountState, AccountStatus, Answer, Asked, Attachment, Calendar, CalendarConnect,
-    CalendarCreate, CalendarPatch, Day, Event, Folder, FolderLink, FolderRole, HUES, Inbox,
-    KeptInInbox, Listing, MailAccount, MailAccountConnect, MailAccountCreate, MailAccountPatch,
-    MailRef, MailSummary, Message, MoveMail, NewMail, Newsletter, NewsletterRef, Newsletters,
-    RenameFolder, Reply, Rewrite, Rewritten, SenderProblem, Senders, ServerCalendar, SettingAside,
-    UnsubscribeSent, Unsubscribed, Unsubscribing,
+    CalendarCreate, CalendarPatch, Conversation, Day, Event, Folder, FolderLink, FolderRole, HUES,
+    Inbox, KeptInInbox, Listing, MailAccount, MailAccountConnect, MailAccountCreate,
+    MailAccountPatch, MailRef, MailSummary, Message, MoveMail, NewMail, Newsletter, NewsletterRef,
+    Newsletters, RenameFolder, Reply, Rewrite, Rewritten, SenderProblem, Senders, ServerCalendar,
+    SettingAside, UnsubscribeSent, Unsubscribed, Unsubscribing,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{

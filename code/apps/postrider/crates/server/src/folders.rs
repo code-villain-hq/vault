@@ -439,7 +439,7 @@ fn summary(account_id: Uuid, place: &Place, line: Line) -> MailSummary {
         subject,
         snippet,
         date,
-        message_id: _,
+        ..
     } = line.summary;
     MailSummary {
         account_id,

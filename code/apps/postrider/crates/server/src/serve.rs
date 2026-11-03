@@ -12,8 +12,9 @@ use crate::{AppState, app};
 const GRACE: Duration = Duration::from_secs(3);
 
 /// Runs Postrider on `listener`, with its workers, until `shutdown`
-/// resolves: the sync feed, a watcher for every account's Inbox and, with
-/// Claude Code, the sorter that reads new mail (`reading.rs`) and the
+/// resolves: the sync feed, a watcher for every account's Inbox, what
+/// joins its mail in conversations from Sent and Archive
+/// (`conversations.rs`) and, with Claude Code, the sorter that reads new mail (`reading.rs`) and the
 /// judge that tells newsletters by reading them (`judging.rs`). The
 /// dev server and the desktop app both start it this way.
 pub async fn serve(
@@ -31,6 +32,7 @@ pub async fn serve(
     if let Err(e) = mail.watch_all().await {
         tracing::error!(error = %e, "couldn't start reading the Inboxes");
     }
+    workers.spawn(crate::conversations::keep(mail.clone()));
     if let Some(claude_code) = state.claude_code.clone() {
         workers.spawn(crate::reading::sort(mail.clone(), claude_code.clone()));
         workers.spawn(crate::judging::judge(mail.clone(), claude_code));

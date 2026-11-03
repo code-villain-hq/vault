@@ -10,11 +10,21 @@ import {
 import type { Attachment, MailSummary, Message, MoveMail } from "@postrider/types";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { Archive, ArrowLeft, FolderInput, Paperclip, Reply, Trash2 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
 import { ReplyDialog } from "./compose";
 import { forgetListed, markSeen, useListedMails } from "./folders";
-import { type From, initial, mailKey, openedFrom, rememberOpened } from "./inbox";
+import {
+  anchorOf,
+  type From,
+  hasMail,
+  initial,
+  isYours,
+  mailKey,
+  openedFrom,
+  ownAddresses,
+  rememberOpened,
+} from "./inbox";
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
 import { MoveDialog } from "./move";
@@ -24,10 +34,12 @@ import { useWorkspace } from "./workspace";
 
 /**
  * `/$workspace/mail/$account/$uid`: a mail, opened beside the list it was
- * opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`). Esc
- * closes it; J and K, or ↓ and ↑, open the next and the previous one in
- * it, while Space and the wheel scroll the mail; E archives it, ⌫ deletes
- * it and V moves it to a folder, and the next opens; R answers it.
+ * opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`). From
+ * the Inbox it opens its whole conversation, oldest first. Esc closes it;
+ * J and K, or ↓ and ↑, open the next and the previous one in the list,
+ * while Space and the wheel scroll the mail; E archives it, ⌫ deletes it
+ * and V moves it to a folder, the conversation's Inbox mail all at once,
+ * and the next opens; R answers it, a conversation's last mail but yours.
  */
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
@@ -41,45 +53,58 @@ export function MailPage() {
   const key = mailKey({ folder: from.folder, account_id: account, uid: Number(uid) });
   const listed = from.folder !== undefined || from.q !== undefined;
   const listedMails = useListedMails(from);
-  const mails = listed ? listedMails : (inbox?.mails ?? []);
-  const index = mails.findIndex((mail) => mailKey(mail) === key);
+  const own = useMemo(() => ownAddresses(accounts), [accounts]);
+  const folder = from.folder;
+  const conversation = listed ? undefined : inbox?.conversations.find((c) => hasMail(c, key));
+  // The Inbox steps by conversation, as its rows do; the other lists by mail.
+  const mails = listed
+    ? listedMails
+    : (inbox?.conversations ?? []).flatMap((c) => anchorOf(c) ?? []);
+  const at = conversation ? anchorOf(conversation) : undefined;
+  const index = mails.findIndex((mail) => mailKey(mail) === (at ? mailKey(at) : key));
   const [replying, setReplying] = useState(false);
   const [moving, setMoving] = useState(false);
-  const [opened, setOpened] = useState<{ key: string; message?: Message; error?: string }>();
-  const message = opened?.key === key ? opened.message : undefined;
-  const error = opened?.key === key ? opened.error : undefined;
+  const letters: Letter[] = conversation
+    ? conversation.mails.map((mail) => ({
+        key: mailKey(mail),
+        account: mail.account_id,
+        uid: mail.uid,
+        folder: mail.folder ?? undefined,
+        mail,
+      }))
+    : [
+        {
+          key,
+          account,
+          uid: Number(uid),
+          folder: from.folder,
+          mail: (listed ? listedMails : (inbox?.mails ?? [])).find((m) => mailKey(m) === key),
+        },
+      ];
+  const thread = letters[0]?.key ?? key;
+  // What its server sent of each, kept while it shows.
+  const [messages, setMessages] = useState<Record<string, Message>>({});
+  const shown = useRef(new Set<string>());
+  shown.current = new Set(letters.map((letter) => letter.key));
+  const onRead = useCallback(
+    (letter: string, message: Message) =>
+      setMessages((was) => ({
+        ...Object.fromEntries(Object.entries(was).filter(([k]) => shown.current.has(k))),
+        [letter]: message,
+      })),
+    [],
+  );
   // Its line in the Inbox shows at once; the rest comes from its server.
-  const summary: MailSummary | undefined = message ?? mails[index];
+  const summary: MailSummary | undefined =
+    messages[key] ?? letters.find((letter) => letter.key === key)?.mail;
+  // A conversation's answer goes to the last who wrote in it but you.
+  const answered = conversation
+    ? (conversation.mails.findLast((mail) => !isYours(mail, own)) ?? conversation.mails.at(-1))
+    : summary;
+  const answeredKey = answered && (conversation ? mailKey(answered) : key);
+  const unfolded = useUnfolded(thread, letters, [key, answeredKey]);
 
-  const folder = from.folder;
-  const q = from.q;
-  const writer = from.sender;
-  // Read now: its folder's unread count goes down once it's open.
-  const unread = useRef(false);
-  unread.current = summary?.seen === false;
-  useEffect(() => {
-    rememberOpened(key);
-    const stop = new AbortController();
-    const inFolder = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
-    api<Message>(
-      "GET",
-      `/api/w/${workspace.id}/mails/${account}/${uid}${inFolder}`,
-      undefined,
-      place,
-      stop.signal,
-    ).then(
-      (answer) => {
-        setOpened({ key, message: answer });
-        if (folder === undefined) return;
-        markSeen({ folder, q, sender: writer }, key);
-        if (unread.current) refresh();
-      },
-      (problem: unknown) => {
-        if (!stop.signal.aborted) setOpened({ key, error: messageOf(problem) });
-      },
-    );
-    return () => stop.abort();
-  }, [workspace.id, place, account, uid, key, folder, q, writer, refresh]);
+  useEffect(() => rememberOpened(key), [key]);
 
   const open = (mail: MailSummary | undefined) => {
     if (!mail) return;
@@ -98,29 +123,42 @@ export function MailPage() {
   /**
    * Moves it to its account's Archive or Trash, or to a folder picked or
    * made, and opens the next mail at once, or closes it after the last. A
-   * server that refuses says so in the frame's status, and the mail comes
-   * back to the Inbox.
+   * conversation's Inbox mail goes all together; what you sent of it stays
+   * in Sent. A server that refuses says so in the frame's status, and the
+   * mail it kept comes back to the Inbox.
    */
   const fileAway = (to: "archive" | "trash" | MoveMail) => {
     if (!summary) return;
     if ((to === "archive" && !archivable) || (to === "trash" && !deletable)) return;
-    const fromInbox = (summary.folder ?? "inbox").toLowerCase() === "inbox";
-    if (fromInbox) leave(summary.account_id, summary.uid);
-    if (listed) forgetListed(from, key);
-    const query = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+    const going = conversation
+      ? conversation.mails
+          .filter((mail) => mail.folder === null)
+          .map((mail) => ({ mail, folder: undefined }))
+      : [{ mail: summary, folder }];
     const picked = typeof to === "object";
-    api(
-      "POST",
-      `/api/w/${workspace.id}/mails/${account}/${uid}/${picked ? "move" : to}${query}`,
-      picked ? to : undefined,
-      place,
-    ).then(
-      () => refresh(),
-      (problem: unknown) => {
-        if (fromInbox) stay(summary.account_id, summary.uid);
-        refusals.dispatchEvent(new CustomEvent("refused", { detail: messageOf(problem) }));
-      },
-    );
+    void Promise.allSettled(
+      going.map(({ mail, folder }) => {
+        const fromInbox = (mail.folder ?? "inbox").toLowerCase() === "inbox";
+        if (fromInbox) leave(mail.account_id, mail.uid);
+        if (listed) forgetListed(from, key);
+        const query = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+        return api(
+          "POST",
+          `/api/w/${workspace.id}/mails/${mail.account_id}/${mail.uid}/${picked ? "move" : to}${query}`,
+          picked ? to : undefined,
+          place,
+        ).catch((problem: unknown) => {
+          if (fromInbox) stay(mail.account_id, mail.uid);
+          throw problem;
+        });
+      }),
+    ).then((done) => {
+      refresh();
+      const refused = done.find((one) => one.status === "rejected");
+      if (refused) {
+        refusals.dispatchEvent(new CustomEvent("refused", { detail: messageOf(refused.reason) }));
+      }
+    });
     const next = mails[index + 1] ?? mails[index - 1];
     if (index >= 0 && next) open(next);
     else back.go();
@@ -146,7 +184,7 @@ export function MailPage() {
       } else if (key === "v" && summary) {
         event.preventDefault();
         setMoving(true);
-      } else if (key === "r" && summary) {
+      } else if (key === "r" && answered) {
         event.preventDefault();
         setReplying(true);
       }
@@ -156,7 +194,6 @@ export function MailPage() {
   });
 
   const subject = summary?.subject || "(no subject)";
-  const sender = accounts.find((a) => a.id === summary?.account_id);
   return (
     <>
       <header
@@ -177,7 +214,7 @@ export function MailPage() {
           {back.name}
         </a>
         <div className="-mr-2 ml-auto flex items-center gap-1">
-          {summary && (
+          {answered && (
             <ReaderButton icon={Reply} label="Reply (R)" onClick={() => setReplying(true)} />
           )}
           {archivable && (
@@ -193,58 +230,28 @@ export function MailPage() {
       </header>
       <PageBody>
         <article className="letter" aria-label={subject}>
-          {summary && (
-            <header className="letter-head">
-              <h2 className="text-title font-semibold">{subject}</h2>
-              <div className="from" style={hue(sender?.hue ?? 1)}>
-                <span className="av" aria-hidden="true">
-                  {initial(summary.from_name)}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate">
-                    <b className="font-semibold">{summary.from_name}</b>
-                    {summary.from_address !== summary.from_name && (
-                      <span className="text-muted"> {summary.from_address}</span>
-                    )}
-                  </p>
-                  {message && message.to.length > 0 && (
-                    <p className="truncate text-xs text-muted">to {message.to.join(", ")}</p>
-                  )}
-                </div>
-                <time
-                  className="ml-auto shrink-0 text-xs text-muted"
-                  dateTime={summary.date}
-                  title={new Date(summary.date).toLocaleString()}
-                >
-                  {ago(summary.date)}
-                </time>
-              </div>
-            </header>
-          )}
-          {error && <ErrorMessage>{error}</ErrorMessage>}
-          {message && message.attachments.length > 0 && (
-            <Attachments
-              files={message.attachments}
-              path={`/api/w/${workspace.id}/mails/${account}/${uid}/files`}
-              folder={folder}
-              place={place}
+          {summary && <h2 className="text-title font-semibold">{subject}</h2>}
+          {letters.map((letter) => (
+            <Said
+              key={letter.key}
+              letter={letter}
+              summary={messages[letter.key] ?? letter.mail}
+              message={messages[letter.key]}
+              folded={letters.length > 1 && !unfolded.has(letter.key)}
+              onToggle={letters.length > 1 ? () => unfolded.flip(letter.key) : undefined}
+              onRead={onRead}
+              list={listed ? from : undefined}
             />
-          )}
-          {message &&
-            (message.html ? (
-              <MailHtml html={message.html} />
-            ) : (
-              <div className="letter-text">{linked(message.text)}</div>
-            ))}
+          ))}
         </article>
       </PageBody>
-      {summary && (
+      {answered && answeredKey && (
         <ReplyDialog
-          key={key}
+          key={answeredKey}
           open={replying}
           onClose={() => setReplying(false)}
-          summary={summary}
-          message={message}
+          summary={messages[answeredKey] ?? answered}
+          message={messages[answeredKey]}
         />
       )}
       <MoveDialog
@@ -254,6 +261,185 @@ export function MailPage() {
         onMove={(to) => fileAway({ to })}
       />
     </>
+  );
+}
+
+/** A mail on the page: where it is, and its line in its list once that's known. */
+type Letter = {
+  key: string;
+  account: string;
+  uid: number;
+  folder: string | undefined;
+  mail: MailSummary | undefined;
+};
+
+/**
+ * Which of a conversation's mail shows whole: its last, what was unread
+ * when it opened, and the `kept` (the one opened, the one R answers);
+ * the rest is a line each, and a click on one turns it.
+ */
+function useUnfolded(
+  thread: string,
+  letters: Letter[],
+  kept: (string | undefined)[],
+): { has: (key: string) => boolean; flip: (key: string) => void } {
+  const unread = () =>
+    new Set(letters.filter((l) => l.mail?.folder === null && !l.mail.seen).map((l) => l.key));
+  const [state, setState] = useState(() => ({
+    thread,
+    unread: unread(),
+    flipped: new Set<string>(),
+  }));
+  // Another conversation starts as it opens; read now, its mail stays open.
+  if (state.thread !== thread) setState({ thread, unread: unread(), flipped: new Set() });
+  const last = letters.at(-1)?.key;
+  return {
+    has: (key) =>
+      (key === last || kept.includes(key) || state.unread.has(key)) !== state.flipped.has(key),
+    flip: (key) =>
+      setState((was) => {
+        const flipped = new Set(was.flipped);
+        if (!flipped.delete(key)) flipped.add(key);
+        return { ...was, flipped };
+      }),
+  };
+}
+
+/**
+ * A mail of those open: who wrote it, to whom and when, then its files and
+ * its words, read from its server once it shows whole, which marks it read.
+ * Folded, a conversation's mail is one line: who and how it starts.
+ */
+function Said({
+  letter,
+  summary,
+  message,
+  folded,
+  onToggle,
+  onRead,
+  list,
+}: {
+  letter: Letter;
+  summary: MailSummary | undefined;
+  message: Message | undefined;
+  folded: boolean;
+  onToggle: (() => void) | undefined;
+  onRead: (key: string, message: Message) => void;
+  /** The list it was opened from, but the Inbox. */
+  list: From | undefined;
+}) {
+  const { workspace, place } = useWorkspace();
+  const { refresh } = useFolders();
+  const accounts = useAccounts();
+  const [error, setError] = useState<string>();
+  const { key, account, uid, folder } = letter;
+  // Read now: its folder's unread count goes down once it's open.
+  const unread = useRef(false);
+  unread.current = summary?.seen === false;
+  const from = useRef(list);
+  from.current = list;
+  const wanted = !folded && message === undefined;
+
+  useEffect(() => {
+    if (!wanted) return;
+    const stop = new AbortController();
+    const inFolder = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+    setError(undefined);
+    api<Message>(
+      "GET",
+      `/api/w/${workspace.id}/mails/${account}/${uid}${inFolder}`,
+      undefined,
+      place,
+      stop.signal,
+    ).then(
+      (answer) => {
+        onRead(key, answer);
+        if (folder === undefined) return;
+        if (from.current) markSeen(from.current, key);
+        if (unread.current) refresh();
+      },
+      (problem: unknown) => {
+        if (!stop.signal.aborted) setError(messageOf(problem));
+      },
+    );
+    return () => stop.abort();
+  }, [wanted, workspace.id, place, account, uid, key, folder, onRead, refresh]);
+
+  const sender = accounts.find((a) => a.id === account);
+  if (!summary) return error ? <ErrorMessage>{error}</ErrorMessage> : null;
+  const when = (
+    <time
+      className="ml-auto shrink-0 text-xs text-muted"
+      dateTime={summary.date}
+      title={new Date(summary.date).toLocaleString()}
+    >
+      {ago(summary.date)}
+    </time>
+  );
+  if (folded) {
+    return (
+      <button type="button" className="folded" style={hue(sender?.hue ?? 1)} onClick={onToggle}>
+        <span className="av sm" aria-hidden="true">
+          {initial(summary.from_name)}
+        </span>
+        <b className="name font-semibold">{summary.from_name}</b>
+        <span className="min-w-0 truncate text-faint">{summary.snippet}</span>
+        {when}
+      </button>
+    );
+  }
+  const head = (
+    <>
+      <span className="av" aria-hidden="true">
+        {initial(summary.from_name)}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate">
+          <b className="font-semibold">{summary.from_name}</b>
+          {summary.from_address !== summary.from_name && (
+            <span className="text-muted"> {summary.from_address}</span>
+          )}
+        </span>
+        {message && message.to.length > 0 && (
+          <span className="block truncate text-xs text-muted">to {message.to.join(", ")}</span>
+        )}
+      </span>
+      {when}
+    </>
+  );
+  return (
+    <section className="said" aria-label={`From ${summary.from_name}`}>
+      {onToggle ? (
+        <button
+          type="button"
+          className="from"
+          style={hue(sender?.hue ?? 1)}
+          onClick={onToggle}
+          title="Fold"
+        >
+          {head}
+        </button>
+      ) : (
+        <div className="from" style={hue(sender?.hue ?? 1)}>
+          {head}
+        </div>
+      )}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      {message && message.attachments.length > 0 && (
+        <Attachments
+          files={message.attachments}
+          path={`/api/w/${workspace.id}/mails/${account}/${uid}/files`}
+          folder={folder}
+          place={place}
+        />
+      )}
+      {message &&
+        (message.html ? (
+          <MailHtml html={message.html} />
+        ) : (
+          <div className="letter-text">{linked(message.text)}</div>
+        ))}
+    </section>
   );
 }
 

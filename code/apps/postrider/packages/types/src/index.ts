@@ -8,6 +8,7 @@ export type * from "./generated/Calendar";
 export type * from "./generated/CalendarConnect";
 export type * from "./generated/CalendarCreate";
 export type * from "./generated/CalendarPatch";
+export type * from "./generated/Conversation";
 export type * from "./generated/Day";
 export type * from "./generated/Event";
 export type * from "./generated/Folder";
