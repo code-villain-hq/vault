@@ -5,7 +5,7 @@
 // row's photo cell, or a picture's point, which the sync engine carries to
 // every client.
 
-import type { Block, Field, Point, Topic } from "@almanac/types";
+import type { Block, Field, Point, PointPatch, Topic } from "@almanac/types";
 import { ImagePlus, X } from "lucide-react";
 import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import { cellsPatch } from "./collection";
@@ -325,6 +325,15 @@ function Figure({ point, editable = false }: { point: Point; editable?: boolean 
 }
 
 /**
+ * A caption's change: its words, and the photo given again as the one cell
+ * that changes, which a caption taken off needs. The point's other cells
+ * stay as the server has them, whatever another device changed meanwhile.
+ */
+export function captionPatch(point: Point, caption: string): PointPatch {
+  return { ...cellsPatch(point, { [PICTURE_CELL]: point.cells[PICTURE_CELL] }), text: caption };
+}
+
+/**
  * A picture's caption, written in place: Add a caption shows on hover while
  * there's none, and leaving the line keeps what's written; Escape keeps
  * what was there.
@@ -342,7 +351,7 @@ function Caption({ point }: { point: Point }) {
     const caption = text.trim();
     if (dropping.current) dropping.current = false;
     else if (caption !== point.text) {
-      sync.update("Point", point.id, { text: caption, cells: point.cells });
+      sync.update("Point", point.id, captionPatch(point, caption));
     }
   };
   return (
