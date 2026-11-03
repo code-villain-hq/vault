@@ -426,6 +426,7 @@ impl Adapter {
         }
         Ok(Agent {
             kind: self.kind,
+            allowed: allowed(question),
             child,
             stdin,
             lines: BufReader::new(stdout).lines(),
@@ -492,6 +493,8 @@ fn heard(update: &Value, answer: &mut Answer, piece: &mut impl FnMut(&str)) {
 /// A running adapter, spoken to in JSON-RPC, one message per line.
 struct Agent {
     kind: Kind,
+    /// The tools this question may run, by their full names (`allowed`).
+    allowed: Vec<String>,
     child: Child,
     stdin: ChildStdin,
     lines: Lines<BufReader<ChildStdout>>,
@@ -499,6 +502,22 @@ struct Agent {
     tail: Arc<Mutex<String>>,
     /// ChatGPT's prompt for this question, removed when it stops.
     instructions: Option<PathBuf>,
+}
+
+/// The tools a question may run, by the names Claude Code knows them by:
+/// the web's when it's on, and Almanac's own it was given
+/// (`mcp__almanac__add_items`).
+fn allowed(question: &Question<'_>) -> Vec<String> {
+    let web = if question.web { WEB_TOOLS } else { &[] };
+    web.iter()
+        .map(|t| t.to_string())
+        .chain(
+            question
+                .tools
+                .iter()
+                .map(|t| format!("mcp__{MCP_NAME}__{t}")),
+        )
+        .collect()
 }
 
 /// The prompt's content blocks: the text, then each photo with its number.
@@ -536,17 +555,8 @@ impl Agent {
         question: &Question<'_>,
         with_tools: bool,
     ) -> Result<String, Failure> {
-        let mut tools: Vec<&str> = Vec::new();
-        if question.web {
-            tools.extend(WEB_TOOLS);
-        }
-        let mut allowed: Vec<String> = tools.iter().map(|t| t.to_string()).collect();
-        allowed.extend(
-            question
-                .tools
-                .iter()
-                .map(|t| format!("mcp__{MCP_NAME}__{t}")),
-        );
+        let tools: &[&str] = if question.web { WEB_TOOLS } else { &[] };
+        let allowed = allowed(question);
         let servers = if with_tools {
             json!([{
                 "type": "http",
@@ -614,7 +624,7 @@ impl Agent {
             match message["method"].as_str() {
                 Some("session/update") => update(&message["params"]["update"]),
                 Some(asked) if !message["id"].is_null() => {
-                    let reply = reply_to(asked, &message["params"]);
+                    let reply = reply_to(&self.allowed, asked, &message["params"]);
                     let mut answer = json!({ "jsonrpc": "2.0", "id": message["id"] });
                     if let (Some(answer), Some(reply)) = (answer.as_object_mut(), reply.as_object())
                     {
@@ -683,12 +693,13 @@ impl Agent {
     }
 }
 
-/// Almanac's answer to something the adapter asks. Only Almanac's MCP tools
-/// and the web's may run; anything else (shell, files, …) is cancelled.
-fn reply_to(method: &str, params: &Value) -> Value {
+/// Almanac's answer to something the adapter asks. Only the tools this
+/// question was given (`allowed`) may run; anything else (shell, files, the
+/// web when it's off, …) is cancelled.
+fn reply_to(allowed: &[String], method: &str, params: &Value) -> Value {
     match method {
         "session/request_permission" => {
-            if !permission_is_for_almanac(params) {
+            if !permission_is_allowed(allowed, params) {
                 return json!({ "result": { "outcome": { "outcome": "cancelled" } } });
             }
             let allow = params["options"].as_array().and_then(|options| {
@@ -712,30 +723,21 @@ fn reply_to(method: &str, params: &Value) -> Value {
     }
 }
 
-/// Whether the permission is for a tool Almanac means to allow: one of its
-/// MCP tools (`mcp__almanac__…`) or a web tool when those are on. Shell,
-/// files and anything unnamed are refused.
-fn permission_is_for_almanac(params: &Value) -> bool {
+/// Whether the permission is for a tool the question was given, by its
+/// exact name. The tool is known by the name the adapter gives it, never
+/// by the title or the input, which the model writes: a page it read could
+/// put `mcp__almanac__` or `WebFetch` in either. Shell, files and anything
+/// unnamed are refused.
+fn permission_is_allowed(allowed: &[String], params: &Value) -> bool {
     let tool = &params["toolCall"];
     let kind = tool["kind"].as_str().unwrap_or("");
     if matches!(kind, "execute" | "edit" | "delete" | "move") {
         return false;
     }
-    let names = [
-        tool["title"].as_str(),
-        tool["name"].as_str(),
-        tool["rawInput"]["name"].as_str(),
-        tool["rawInput"]["toolName"].as_str(),
-    ];
-    let mcp = format!("mcp__{MCP_NAME}__");
-    if names
-        .into_iter()
-        .flatten()
-        .any(|name| WEB_TOOLS.iter().any(|w| name == *w || name.contains(w)) || name.contains(&mcp))
-    {
-        return true;
-    }
-    kind == "fetch"
+    tool["name"]
+        .as_str()
+        .or_else(|| tool["_meta"]["claudeCode"]["toolName"].as_str())
+        .is_some_and(|name| allowed.iter().any(|a| a == name))
 }
 
 /// What a JSON-RPC error from the adapter means for the talk.
@@ -758,10 +760,29 @@ fn failure_of(error: &Value) -> Failure {
 mod tests {
     use super::*;
 
+    /// What a question with the web as `web` and Almanac's add_items may run.
+    fn given(web: bool) -> Vec<String> {
+        allowed(&Question {
+            system: "",
+            prompt: "",
+            images: &[],
+            web,
+            tools: &["add_items"],
+            token: "",
+        })
+    }
+
+    fn allows(web: bool, tool: Value) -> bool {
+        let params =
+            json!({ "toolCall": tool, "options": [{ "optionId": "once", "kind": "allow_once" }] });
+        reply_to(&given(web), "session/request_permission", &params)["result"]["outcome"]["outcome"]
+            == "selected"
+    }
+
     #[test]
     fn a_permission_is_given_once() {
         let params = json!({
-            "toolCall": { "title": "mcp__almanac__add_items" },
+            "toolCall": { "name": "mcp__almanac__add_items", "title": "add_items" },
             "options": [
                 { "optionId": "always", "kind": "allow_always" },
                 { "optionId": "once", "kind": "allow_once" },
@@ -769,25 +790,84 @@ mod tests {
             ]
         });
         assert_eq!(
-            reply_to("session/request_permission", &params)["result"]["outcome"]["optionId"],
+            reply_to(&given(false), "session/request_permission", &params)["result"]["outcome"]["optionId"],
             "once"
         );
-        assert!(!reply_to("fs/read_text_file", &json!({}))["error"].is_null());
+        assert!(!reply_to(&given(false), "fs/read_text_file", &json!({}))["error"].is_null());
     }
 
     #[test]
     fn a_shell_permission_is_refused() {
         let params = json!({
-            "toolCall": { "title": "Bash", "kind": "execute" },
+            "toolCall": { "name": "Bash", "title": "Bash", "kind": "execute" },
             "options": [
                 { "optionId": "once", "kind": "allow_once" },
                 { "optionId": "no", "kind": "reject_once" },
             ]
         });
         assert_eq!(
-            reply_to("session/request_permission", &params)["result"]["outcome"]["outcome"],
+            reply_to(&given(true), "session/request_permission", &params)["result"]["outcome"]["outcome"],
             "cancelled"
         );
+    }
+
+    #[test]
+    fn the_web_is_allowed_only_when_it_is_on() {
+        let fetch =
+            json!({ "name": "WebFetch", "title": "Fetch https://example.org", "kind": "fetch" });
+        let search = json!({ "name": "WebSearch", "title": "\"news\"", "kind": "fetch" });
+        assert!(allows(true, fetch.clone()));
+        assert!(allows(true, search.clone()));
+        assert!(!allows(false, fetch));
+        assert!(!allows(false, search));
+        // A fetch that doesn't say which tool it is.
+        assert!(!allows(
+            true,
+            json!({ "title": "Fetch https://example.org", "kind": "fetch" })
+        ));
+    }
+
+    #[test]
+    fn almanacs_tools_are_known_by_their_exact_name() {
+        assert!(allows(
+            false,
+            json!({ "name": "mcp__almanac__add_items", "kind": "other" })
+        ));
+        assert!(allows(
+            false,
+            json!({ "_meta": { "claudeCode": { "toolName": "mcp__almanac__add_items" } } })
+        ));
+        // One it wasn't given for this question, or another server's.
+        assert!(!allows(
+            false,
+            json!({ "name": "mcp__almanac__read_topic" })
+        ));
+        assert!(!allows(
+            false,
+            json!({ "name": "mcp__almanac__add_items_x" })
+        ));
+        assert!(!allows(
+            false,
+            json!({ "name": "mcp__almanac_x__add_items" })
+        ));
+        assert!(!allows(false, json!({ "name": "mcp__almanac__" })));
+        // Titles and input are the model's words, a page's it read included.
+        assert!(!allows(
+            false,
+            json!({ "title": "mcp__almanac__add_items" })
+        ));
+        assert!(!allows(
+            false,
+            json!({ "name": "Read", "title": "Read mcp__almanac__add_items", "kind": "read" })
+        ));
+        assert!(!allows(
+            false,
+            json!({ "name": "Glob", "rawInput": { "name": "mcp__almanac__add_items" } })
+        ));
+        assert!(!allows(
+            true,
+            json!({ "name": "Read", "title": "WebFetch", "kind": "read" })
+        ));
     }
 
     #[test]

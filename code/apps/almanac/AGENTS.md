@@ -95,7 +95,9 @@ Forge. Everything a page shows syncs: `Topic`, `Block`, `Talk`, `Message`,
   /api/w/{id}/photos/{photo}` has it (`sending.ts`), offline too; sent
   again, it's kept once. Another device asks a while for one not sent
   yet (`usePhoto`). `POST /api/w/{id}/photos` stays for older apps. A talk keeps one from the web with
-  `fetch_picture` (public https only, the page's og:image, 5 MB at most)
+  `fetch_picture` (public https only, the page's og:image, 5 MB at most;
+  six an answer, the address without its query or fragment, and none
+  after `read_topic` of another topic: an address goes out of Almanac)
   and sets the cover with `set_cover`. Rows with a photo show it small on
   their line in every view.
 - A picture block (`picture`) shows photos large, a point each: its photo
@@ -147,7 +149,10 @@ Two ways to the same answers, and the same prompts:
   for each question Almanac starts `claude-agent-acp` from the login
   shell's PATH, in an empty folder of its own, with Almanac's prompt, none
   of the user's Claude Code settings, and none of its tools but WebSearch
-  and WebFetch (when the web is on). Almanac's own tools come over MCP
+  and WebFetch (when the web is on). A permission it asks for is given
+  only for those and the question's own tools, by the exact name the
+  adapter sends (`mcp__almanac__add_items`), never by a title or input,
+  which the model writes. Almanac's own tools come over MCP
   (`mcp.rs`, `POST /api/mcp`), behind a token that lasts as long as the
   question. It answers as the user is signed in to Claude Code: no key.
   A start takes a few seconds; one that hasn't opened a session in 30 is

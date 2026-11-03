@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use almanac_domain::{
@@ -104,7 +105,15 @@ pub struct Asking {
     pub set_up: Mutex<Option<SetUp>>,
     /// Where the asker's Mac says what it made of a question handed to it.
     pub handed: Mutex<Option<oneshot::Sender<Answered>>>,
+    /// The pictures this answer has asked for from the web.
+    pictures: AtomicUsize,
+    /// It has read another topic's page: what's there mustn't leave in a
+    /// picture's address.
+    read_elsewhere: AtomicBool,
 }
+
+/// The pictures one answer may fetch: each is a request out of Almanac.
+const MOST_PICTURES: usize = 6;
 
 impl Asking {
     pub fn new(actor: Actor, topic_id: Uuid, mode: Mode) -> Self {
@@ -115,6 +124,8 @@ impl Asking {
             kept: Mutex::new(Kept::default()),
             set_up: Mutex::new(None),
             handed: Mutex::new(None),
+            pictures: AtomicUsize::new(0),
+            read_elsewhere: AtomicBool::new(false),
         }
     }
 
@@ -146,6 +157,27 @@ impl Asking {
 
     pub fn take_set_up(&self) -> Option<SetUp> {
         self.set_up.lock().ok().and_then(|mut s| s.take())
+    }
+
+    /// Whether fetch_picture may ask the web for one more, which it counts.
+    /// A picture's address goes out of Almanac, and a page Claude read could
+    /// have it carry another topic out. Almanac doesn't see the pages Claude
+    /// Code reads, so it can't tell an address Claude found from one it made
+    /// up: it keeps them few, and none after another topic's page.
+    fn may_fetch_picture(&self) -> Result<(), String> {
+        if self.read_elsewhere.load(Ordering::SeqCst) {
+            return Err(
+                "No pictures from the web after reading another topic's page, this \
+                 answer. Say which picture would fit, and they can ask for it."
+                    .into(),
+            );
+        }
+        if self.pictures.fetch_add(1, Ordering::SeqCst) >= MOST_PICTURES {
+            return Err(format!(
+                "That's {MOST_PICTURES} pictures for one answer. Say which others would fit."
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -386,6 +418,7 @@ async fn call(
             if id == asking.topic_id {
                 return Ok("That's this topic: its page is the one you have.".into());
             }
+            asking.read_elsewhere.store(true, Ordering::SeqCst);
             let page = crate::page::Page::load(&state.pool, asking.actor.workspace_id, id)
                 .await
                 .map_err(|_| "Almanac couldn't read that topic.".to_string())?
@@ -407,8 +440,10 @@ async fn call(
         }
         "fetch_picture" => {
             let args: PictureArgs = read(arguments)?;
-            let id = crate::photos::from_web(&state.pool, asking.actor.workspace_id, &args.address)
-                .await?;
+            asking.may_fetch_picture()?;
+            let address = bare_address(&args.address)?;
+            let id =
+                crate::photos::from_web(&state.pool, asking.actor.workspace_id, &address).await?;
             let mut guard = kept()?;
             guard.photos.push(id);
             Ok(format!(
@@ -708,6 +743,18 @@ struct BriefArgs {
 #[derive(Deserialize)]
 struct PictureArgs {
     address: String,
+}
+
+/// A picture's address without its query, fragment or user: where the
+/// picture is, and nothing else for an address to carry out of Almanac.
+fn bare_address(address: &str) -> Result<String, String> {
+    let mut url = reqwest::Url::parse(address.trim())
+        .map_err(|_| format!("{address} isn't a web address."))?;
+    url.set_query(None);
+    url.set_fragment(None);
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    Ok(url.into())
 }
 
 #[derive(Deserialize)]
@@ -1277,8 +1324,9 @@ fn tools(mode: Mode) -> Vec<Value> {
         "fetch_picture",
         "Keeps a picture from the web for the page: a product's, a plant's, a place's. Give the \
          picture's address, or the address of a page about that one thing (a shop's product \
-         page), whose own picture it takes. It answers with the photo's number, which a photo \
-         cell or set_cover takes.",
+         page), whose own picture it takes; what follows ? or # in it is left out. It answers \
+         with the photo's number, which a photo cell or set_cover takes. Six an answer at \
+         most, and none once you've read another topic.",
         json!({ "address": string("The picture's https address, or its page's.") }),
         &["address"],
     );
@@ -1682,6 +1730,38 @@ mod tests {
                 .collect();
             assert_eq!(described, mode.tools());
         }
+    }
+
+    #[test]
+    fn an_answer_fetches_six_pictures_and_none_after_another_topic() {
+        let actor = Actor {
+            user_id: Uuid::nil(),
+            workspace_id: Uuid::nil(),
+        };
+        let asking = Asking::new(actor, Uuid::nil(), Mode::Topic);
+        for _ in 0..MOST_PICTURES {
+            assert!(asking.may_fetch_picture().is_ok());
+        }
+        assert!(asking.may_fetch_picture().is_err());
+
+        let asking = Asking::new(actor, Uuid::nil(), Mode::Topic);
+        assert!(asking.may_fetch_picture().is_ok());
+        asking.read_elsewhere.store(true, Ordering::SeqCst);
+        assert!(asking.may_fetch_picture().is_err());
+    }
+
+    #[test]
+    fn a_pictures_address_carries_nothing_but_where_it_is() {
+        assert_eq!(
+            bare_address(" https://me:pw@shop.example/p/monstera.jpg?notes=Kontonummer#Bad ")
+                .unwrap(),
+            "https://shop.example/p/monstera.jpg"
+        );
+        assert_eq!(
+            bare_address("https://shop.example/p/monstera.jpg").unwrap(),
+            "https://shop.example/p/monstera.jpg"
+        );
+        assert!(bare_address("Monstera").is_err());
     }
 
     #[test]
