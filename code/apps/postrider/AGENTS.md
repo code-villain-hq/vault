@@ -183,15 +183,15 @@ Every change happens on the account's server; the Inbox follows it there.
   `POST /folders/{key}/rename`): in every account that has it, with the
   rules that sort into it, Sieve's and reading ones. Sent, Archive and the
   other role folders keep their names.
-- A sidebar item's menu (`folder-menu.tsx`; a right click, or ⇧F10 or the
-  menu key on the focused item) holds what that item can do, and nothing
-  where it can do nothing (Sent, Drafts, Newsletters). Mark all as read,
-  where the sidebar counts unread mail (`POST /folders/{key}/read`), sets
+- Every sidebar item has a menu (`folder-menu.tsx`; a right click, or
+  ⇧F10 or the menu key on the focused item) with what that item can do,
+  greyed where it can't now: Mark all as read with nothing unread. Mark
+  all as read (`POST /folders/{key}/read`), on every item, sets
   \Seen with one `UID STORE` per account (in chunks of 5,000), and the
   Inbox's copy with it; Undo, where the count was for 30 seconds,
   (`POST /marked/{id}/undo`) unsets it on the same UIDs, unless the
-  folder's UIDVALIDITY changed. Newsletters is never marked read at once:
-  its page goes by what you opened. Rename… opens the top bar's field.
+  folder's UIDVALIDITY changed. On Newsletters it takes the whole folder,
+  so its page counts all of it opened. Rename… opens the top bar's field.
   Delete folder… (`DELETE /folders/{key}`, your own folders, none with
   folders in it) moves its mail to the Trash, then deletes it in every
   account with the rules that sort into it. Empty Trash… and Empty Junk…

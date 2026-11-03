@@ -296,6 +296,7 @@ function MailNav() {
     [unread],
   );
   const inboxMarked = useCountHidden("inbox");
+  const newslettersMarked = useCountHidden(newsletters?.key ?? "newsletters");
   return (
     <nav aria-label="Mail" className="flex flex-col gap-4">
       <div className="flex flex-col gap-0.5">
@@ -312,16 +313,18 @@ function MailNav() {
             {!inboxMarked && <Unread count={unread} />}
           </Link>
         </FolderMenu>
-        <Link
-          to="/$workspace/newsletters"
-          params={{ workspace: workspace.url_key }}
-          className={`${navLink} ${list === "newsletters" ? "active" : ""}`}
-          title="Newsletters (G then N)"
-        >
-          <NavIcon icon={Newspaper} />
-          Newsletters
-          <Unread count={newsletters?.unread ?? 0} />
-        </Link>
+        <MaybeFolderMenu folder={newsletters}>
+          <Link
+            to="/$workspace/newsletters"
+            params={{ workspace: workspace.url_key }}
+            className={`${navLink} ${list === "newsletters" ? "active" : ""}`}
+            title="Newsletters (G then N)"
+          >
+            <NavIcon icon={Newspaper} />
+            Newsletters
+            {!newslettersMarked && <Unread count={newsletters?.unread ?? 0} />}
+          </Link>
+        </MaybeFolderMenu>
         {sent && <FolderLink folder={sent} icon={Send} open={list} title="Sent (G then S)" quiet />}
         {archive && (
           <FolderLink folder={archive} icon={Archive} open={list} title="Archive (G then A)" />
@@ -340,6 +343,11 @@ function MailNav() {
       )}
     </nav>
   );
+}
+
+/** Newsletters' menu, once its accounts have the folder. */
+function MaybeFolderMenu({ folder, children }: { folder?: MailFolder; children: ReactNode }) {
+  return folder ? <FolderMenu folder={folder}>{children}</FolderMenu> : children;
 }
 
 /**
@@ -388,7 +396,7 @@ function FolderLink({
   const { workspace } = useWorkspace();
   const marked = useCountHidden(folder.key);
   return (
-    <FolderMenu folder={folder} own={folder.role === null} counted={!quiet}>
+    <FolderMenu folder={folder} own={folder.role === null}>
       <Link
         to="/$workspace/folders/$folder"
         params={{ workspace: workspace.url_key, folder: folder.key }}

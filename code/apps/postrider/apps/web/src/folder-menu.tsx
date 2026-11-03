@@ -1,9 +1,7 @@
-// A sidebar item's menu, on a right click or ⇧F10 on the focused item:
-// Mark all as read where the sidebar counts unread mail, Rename… and
-// Delete folder… on your own folders, Empty Trash… and Empty Junk…. What
-// can't be undone asks first; marking read can be, with Undo where its
-// count was. Newsletters is never marked read at once: what you opened
-// there is what its page goes by.
+// Every sidebar item's menu, on a right click or ⇧F10 on the focused item:
+// Mark all as read, greyed where nothing is unread, Rename… and Delete
+// folder… on your own folders, Empty Trash… and Empty Junk…. What can't be
+// undone asks first; marking read can be, with Undo where its count was.
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { type Confirmation, ConfirmDialog } from "@code-villain/web";
 import type { Folder, MarkedRead } from "@postrider/types";
@@ -59,21 +57,16 @@ function same(a: string | undefined, b: string) {
 }
 
 const item =
-  "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none";
+  "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none data-disabled:opacity-60";
 
-/**
- * A sidebar item with its menu around it. `own` is one of your own
- * folders; `counted` says the sidebar shows its unread count.
- */
+/** A sidebar item with its menu around it. `own` is one of your own folders. */
 export function FolderMenu({
   folder,
   own = false,
-  counted = true,
   children,
 }: {
   folder: Folder;
   own?: boolean;
-  counted?: boolean;
   children: ReactNode;
 }) {
   const { workspace, place, refusals } = useWorkspace();
@@ -163,10 +156,9 @@ export function FolderMenu({
     });
   };
 
-  const items: { label: string; run: () => void; asks?: boolean }[] = [];
-  if (counted && folder.unread > 0 && folder.role !== "newsletters") {
-    items.push({ label: "Mark all as read", run: markAllRead });
-  }
+  const items: { label: string; run: () => void; asks?: boolean; disabled?: boolean }[] = [
+    { label: "Mark all as read", run: markAllRead, disabled: folder.unread === 0 },
+  ];
   if (own) {
     items.push({ label: "Rename…", run: rename, asks: true });
     items.push({ label: "Delete folder…", run: deleteFolder, asks: true });
@@ -198,7 +190,7 @@ export function FolderMenu({
   const undoHere = marked && same(marked.key, folder.key);
   return (
     <div className="relative">
-      <ContextMenu.Root disabled={items.length === 0}>
+      <ContextMenu.Root>
         <ContextMenu.Trigger ref={area} onKeyDown={onKeyDown}>
           {children}
         </ContextMenu.Trigger>
@@ -214,10 +206,11 @@ export function FolderMenu({
               }
               className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
             >
-              {items.map(({ label, run, asks }) => (
+              {items.map(({ label, run, asks, disabled }) => (
                 <ContextMenu.Item
                   key={label}
                   className={item}
+                  disabled={disabled}
                   onClick={() => {
                     leaveFocus.current = asks === true;
                     run();
