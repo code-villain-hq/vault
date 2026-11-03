@@ -145,6 +145,10 @@ Rust tests need Postgres running (`bun run db`); `DATABASE_URL` comes from
   the workspaces on this Mac, with `code/kit/desktop`. The inbox's
   notifications go through its `notify` command, with `code/kit/notify`:
   the notification plugin's never show on macOS.
+  Its window's Content-Security-Policy is in `tauri.conf.json`: a new kind
+  of load (another host, a frame, a worker, wasm, eval) needs its directive
+  there, or the installed app blocks it. `dev:desktop` shows Vite's page,
+  which gets no policy, so try a built app.
 - `migrations`: SQL schema, applied by the server on start.
 - `scripts`: dev, check, seeding, type generation, and Claude Code's runner
   (`agent-runner`).
