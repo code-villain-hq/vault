@@ -780,11 +780,16 @@ html:root, html:root > body { height: auto !important; min-height: 0 !important;
  * is the mail's own size, and its height stays. Nothing is said before the
  * mail is read, so a 0 is the mail's. Loaded with no text and no picture
  * to show, it says it's empty. Everything it says carries the render's
- * token, which lives only in its own text: it takes itself out of the
- * document before the mail is read, so the mail's styles can't read it.
+ * token, which comes on its own tag: it takes itself out of the document
+ * before the mail is read, so the mail's styles can't read it.
+ *
+ * The text is the same for every mail. A frame written from `srcDoc` has
+ * the window's Content-Security-Policy as well as its own, and the window's
+ * (`tauri.conf.json`) can allow an inline script only by its hash, which
+ * is `REPORTER_HASH`.
  */
-const REPORTER = `
-const token = TOKEN;
+export const REPORTER = `
+const token = document.currentScript.dataset.token;
 document.currentScript.remove();
 const say = (message) => parent.postMessage({ ...message, token }, "*");
 const boxes = new Map();
@@ -861,10 +866,13 @@ document.addEventListener("keydown", (event) => {
   say({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, altKey: event.altKey, shiftKey: event.shiftKey });
 });`;
 
+/** `REPORTER`'s sha256, the one script either policy lets the frame run. */
+export const REPORTER_HASH = "sha256-O+uR5pDQJzYbLosPZckeQ10SR4FkJhyZUjHB27wzXcc=";
+
 /**
  * The frame's document: the mail's HTML under a policy that runs only
- * Postrider's script (by a nonce the mail can't know) and lets nothing post
- * back, on white paper whatever the app's theme, as senders design for.
+ * Postrider's script (by its hash, which no other script has) and lets
+ * nothing post back, on white paper whatever the app's theme, as senders design for.
  * A mail that also offers a dark look (`color-scheme: light dark`) would
  * turn the paper dark at night and keep its own dark text: black on black.
  * So the paper stays light by a rule after the mail's, and the frame tells
@@ -874,16 +882,15 @@ document.addEventListener("keydown", (event) => {
  * mail's, and surer than theirs, keeps them as tall as what they hold.
  * `token` is what the frame's script signs what it says with.
  */
-function paper(html: string): { srcDoc: string; token: string } {
-  const nonce = crypto.randomUUID();
+export function paper(html: string): { srcDoc: string; token: string } {
   const token = crypto.randomUUID();
   const body = withoutRefresh(html);
   const srcDoc = `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; img-src https: http: data:; style-src 'unsafe-inline' https:; font-src https: data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '${REPORTER_HASH}'; img-src https: http: data:; style-src 'unsafe-inline' https:; font-src https: data:">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="light">
 <base target="_blank">
-<script nonce="${nonce}">${REPORTER.replace("TOKEN", JSON.stringify(token))}</script>
+<script data-token="${token}">${REPORTER}</script>
 <style>
 html { background: Canvas; color: CanvasText; height: auto !important; min-height: 0 !important; }
 body { margin: 0; padding: 20px 24px; font: 14px/1.5 -apple-system, system-ui, sans-serif; overflow-wrap: break-word; height: auto !important; min-height: 0 !important; }

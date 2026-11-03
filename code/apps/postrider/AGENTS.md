@@ -517,7 +517,13 @@ Like the ask field's, what it needs is kept in memory.
   Inbox, notifications and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
   for this Mac, with `code/kit/desktop`, and Claude Code to answer; `main.rs` notifies with
-  `code/kit/notify`; `files.rs` opens a mail's files.
+  `code/kit/notify`; `files.rs` opens a mail's files. Its window's
+  Content-Security-Policy is in `tauri.conf.json`. A mail's frame has it
+  too, so the frame's script is allowed there by its hash
+  (`REPORTER_HASH` in `message.tsx`; a test fails when they part). A new
+  kind of load (another host, a worker, wasm) needs its directive there,
+  or the installed app blocks it. `dev:desktop` shows Vite's page, which
+  gets no policy, so try a built app.
 - `migrations`: SQL schema, applied by the server on start. They're
   embedded in `crates/sync` when it builds; its `build.rs` rebuilds it
   when one is added.
