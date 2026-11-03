@@ -124,8 +124,9 @@ clips (Mondo Robotics' `100vh`, or `position: absolute` to every edge), is
 as tall as that box's content: the box grows with the frame, and one that
 doesn't is a box of the mail's own size and stays. A frame 0 tall is shown
 70% of the window tall until it says more, and so is one that says no
-height in 2 seconds; a mail with neither HTML nor text says so. Each mail
-opened logs how it's built, never its words (`message::structure`, at
+height in 2 seconds. A mail whose HTML, once loaded, shows no text and no
+picture (hidden text, a pixel, a picture that didn't load) shows its text
+instead, and a mail with nothing to show says so. Each mail opened logs how it's built, never its words (`message::structure`, at
 debug; a warning when it has nothing to show).
 
 Only the Inbox is followed and kept, and what conversations need of Sent

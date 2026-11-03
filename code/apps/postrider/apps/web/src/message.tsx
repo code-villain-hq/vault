@@ -435,11 +435,9 @@ function Said({
       )}
       {message &&
         (message.html?.trim() ? (
-          <MailHtml html={message.html} />
-        ) : message.text.trim() ? (
-          <div className="letter-text">{linked(message.text)}</div>
+          <MailHtml html={message.html} instead={<MailText text={message.text} />} />
         ) : (
-          <p className="letter-none">Postrider can't show this mail's text.</p>
+          <MailText text={message.text} />
         ))}
     </section>
   );
@@ -607,6 +605,12 @@ function linked(text: string): ReactNode[] {
   return parts;
 }
 
+/** A mail's text, or that it has none to show. */
+function MailText({ text }: { text: string }) {
+  if (!text.trim()) return <p className="letter-none">Postrider can't show this mail's text.</p>;
+  return <div className="letter-text">{linked(text)}</div>;
+}
+
 /**
  * A mail's HTML, on paper of its own: in a frame of no origin, where none of
  * the mail's scripts, forms or pop-ups run, that loads pictures and styles
@@ -617,12 +621,14 @@ function linked(text: string): ReactNode[] {
  * links open in the browser, and Esc, J, K and the arrows work while it
  * has focus: the arrows move to the next mail there too, not down the page.
  * A frame 0 tall, or one that says no height in time (`SILENT_AFTER`), is
- * still shown, and scrolls, until it says more.
+ * still shown, and scrolls, until it says more. One that says it shows
+ * nothing, no text and no picture, gives way to `instead`.
  */
-function MailHtml({ html }: { html: string }) {
+function MailHtml({ html, instead }: { html: string; instead: ReactNode }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number>();
   const [silent, setSilent] = useState(false);
+  const [emptyOne, setEmptyOne] = useState<string>();
   const srcDoc = useMemo(() => paper(html), [html]);
 
   useEffect(() => {
@@ -637,6 +643,8 @@ function MailHtml({ html }: { html: string }) {
       const said = event.data as FrameMessage;
       if (typeof said.height === "number") {
         setHeight(said.height);
+      } else if (said.empty === true) {
+        setEmptyOne(frame.current.srcdoc);
       } else if (typeof said.link === "string") {
         // Only a whole address: the frame's relative ones would be the app's.
         const link = said.link.trim();
@@ -661,6 +669,7 @@ function MailHtml({ html }: { html: string }) {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  if (emptyOne === srcDoc) return instead;
   return (
     <div className="paper">
       <iframe
@@ -680,6 +689,7 @@ const SILENT_AFTER = 2000;
 /** What the frame's script tells the page. */
 type FrameMessage = {
   height?: unknown;
+  empty?: unknown;
   link?: unknown;
   key?: unknown;
   metaKey?: unknown;
@@ -706,7 +716,8 @@ html:root, html:root > body { height: auto !important; min-height: 0 !important;
  * itself in a box as tall as the frame, which scrolls or clips, is as tall
  * as what that box holds, if the box grows with the frame: one that didn't
  * is the mail's own size, and its height stays. Nothing is said before the
- * mail is read, so a 0 is the mail's.
+ * mail is read, so a 0 is the mail's. Loaded with no text and no picture
+ * to show, it says it's empty.
  */
 const REPORTER = `
 const say = (message) => parent.postMessage(message, "*");
@@ -754,7 +765,22 @@ addEventListener("DOMContentLoaded", () => {
   tall();
 });
 addEventListener("resize", tall);
-addEventListener("load", tall);
+const seen = { visibilityProperty: true, opacityProperty: true, checkVisibilityCSS: true, checkOpacity: true };
+const shows = () => {
+  if (typeof document.body.checkVisibility !== "function") return true;
+  const texts = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let text = texts.nextNode(); text; text = texts.nextNode()) {
+    if (text.data.trim() && text.parentElement?.checkVisibility(seen)) return true;
+  }
+  return [...document.body.querySelectorAll("img, svg, video, canvas, picture, object, embed, input, button, [background], [style*='url(']")].some((picture) => {
+    const { width, height } = picture.getBoundingClientRect();
+    return width > 2 && height > 2 && picture.checkVisibility(seen);
+  });
+};
+addEventListener("load", () => {
+  tall();
+  if (!shows()) say({ empty: true });
+});
 document.addEventListener("click", (event) => {
   const link = event.target instanceof Element && event.target.closest("a[href]");
   if (!link) return;
