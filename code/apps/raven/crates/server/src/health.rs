@@ -3,7 +3,7 @@
 //! it listens on. An app is down when its last two checks failed, and
 //! needs a look when it missed only the last one, or when level 2 sees
 //! failing calls or an action slower than its own last week. Old records
-//! are cleared out here too.
+//! are cleared out here too, apart from the checks, so they never wait on it.
 
 use std::time::{Duration, Instant};
 
@@ -13,11 +13,16 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::metrics::{self, ActionStats};
+use crate::telemetry::timed;
 
 const EVERY: Duration = Duration::from_secs(30);
 const TIMEOUT: Duration = Duration::from_secs(5);
 /// What Raven keeps of calls, logs and checks.
 const KEEP_DAYS: i32 = 30;
+/// How often old records are cleared out.
+const CLEAR_EVERY: Duration = Duration::from_secs(60 * 60);
+/// Rows cleared per statement, so no delete holds its locks for long.
+const CLEAR_BATCH: i64 = 5_000;
 
 /// Checks every app with a health URL, now and every half minute. Raven
 /// itself answers at `self_url`.
@@ -29,7 +34,6 @@ pub async fn watch(pool: PgPool, self_url: String) {
         .build()
         .expect("an HTTP client with default settings builds");
     let mut ticks = tokio::time::interval(EVERY);
-    let mut last_cleanup: Option<Instant> = None;
     loop {
         ticks.tick().await;
         let apps: Vec<(Uuid, String)> = match sqlx::query_as(
@@ -68,14 +72,64 @@ pub async fn watch(pool: PgPool, self_url: String) {
             }
         });
         futures::future::join_all(checks).await;
+    }
+}
 
-        if last_cleanup.is_none_or(|t| t.elapsed() > Duration::from_secs(60 * 60)) {
-            last_cleanup = Some(Instant::now());
-            if let Err(e) = clean_up(&pool).await {
-                tracing::warn!(error = %e, "couldn't clear out old records");
-            }
+/// Clears out records older than [`KEEP_DAYS`], now and every hour. It runs
+/// beside [`watch`], so the checks never wait on it.
+pub async fn clear_out(pool: PgPool) {
+    let mut ticks = tokio::time::interval(CLEAR_EVERY);
+    ticks.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        ticks.tick().await;
+        if let Err(e) = clear_old(&pool, CLEAR_BATCH).await {
+            tracing::warn!(error = %e, "couldn't clear out old records");
         }
     }
+}
+
+/// What [`clear_old`] runs, a batch at a time: each finds its rows by time
+/// alone (`spans_started_at`, `logs_at`, `health_checks_checked_at`).
+const CLEAR: [(&str, &str); 3] = [
+    (
+        "clear old calls",
+        "DELETE FROM spans WHERE id = ANY(ARRAY(SELECT id FROM spans \
+         WHERE started_at < now() - make_interval(days => $1) LIMIT $2))",
+    ),
+    (
+        "clear old logs",
+        "DELETE FROM logs WHERE id = ANY(ARRAY(SELECT id FROM logs \
+         WHERE at < now() - make_interval(days => $1) LIMIT $2))",
+    ),
+    (
+        "clear old checks",
+        "DELETE FROM health_checks WHERE id = ANY(ARRAY(SELECT id FROM health_checks \
+         WHERE checked_at < now() - make_interval(days => $1) LIMIT $2))",
+    ),
+];
+
+/// Deletes what's older than [`KEEP_DAYS`], at most `batch` rows per
+/// statement, each in its own short transaction. Returns how many went.
+async fn clear_old(pool: &PgPool, batch: i64) -> Result<u64, sqlx::Error> {
+    let mut cleared = 0;
+    for (name, sql) in CLEAR {
+        loop {
+            let done = timed(
+                name,
+                sql,
+                sqlx::query(sql).bind(KEEP_DAYS).bind(batch).execute(pool),
+            )
+            .await?
+            .rows_affected();
+            cleared += done;
+            if done < batch as u64 {
+                break;
+            }
+            // Let the checks and the writer in between batches.
+            tokio::task::yield_now().await;
+        }
+    }
+    Ok(cleared)
 }
 
 struct Check {
@@ -112,17 +166,6 @@ async fn check(client: &reqwest::Client, url: &str) -> Check {
             }),
         },
     }
-}
-
-async fn clean_up(pool: &PgPool) -> Result<(), sqlx::Error> {
-    for sql in [
-        "DELETE FROM spans WHERE started_at < now() - make_interval(days => $1)",
-        "DELETE FROM logs WHERE at < now() - make_interval(days => $1)",
-        "DELETE FROM health_checks WHERE checked_at < now() - make_interval(days => $1)",
-    ] {
-        sqlx::query(sql).bind(KEEP_DAYS).execute(pool).await?;
-    }
-    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -289,5 +332,127 @@ impl ActionStats {
         self.normal_p95_ms
             .filter(|n| *n > 0.0)
             .map_or(1.0, |n| self.p95_ms / n)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Forge, in a workspace of its own, with `old` calls, logs and checks
+    /// from 31 days ago and `new` ones from now.
+    async fn with_records(pool: &PgPool, old: i64, new: i64) -> Uuid {
+        let (workspace, app) = (Uuid::now_v7(), Uuid::now_v7());
+        sqlx::query("INSERT INTO workspaces (id, name, url_key) VALUES ($1, 'Studio', 'studio')")
+            .bind(workspace)
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO apps (id, workspace_id, key, name, position) VALUES ($1, $2, 'forge', 'Forge', 1)",
+        )
+        .bind(app)
+        .bind(workspace)
+        .execute(pool)
+        .await
+        .unwrap();
+        for (count, days) in [(old, 31), (new, 0)] {
+            sqlx::query(
+                "INSERT INTO spans (app_id, trace_id, span_id, name, kind, started_at, duration_ms) \
+                 SELECT $1, 't' || i, 's' || i, 'GET /', 'server', now() - make_interval(days => $3), 1 \
+                 FROM generate_series(1, $2) i",
+            )
+            .bind(app)
+            .bind(count)
+            .bind(days)
+            .execute(pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO logs (app_id, at, level, message) \
+                 SELECT $1, now() - make_interval(days => $3), 'info', 'line' FROM generate_series(1, $2)",
+            )
+            .bind(app)
+            .bind(count)
+            .bind(days)
+            .execute(pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO health_checks (app_id, checked_at, ok, duration_ms) \
+                 SELECT $1, now() - make_interval(days => $3), true, 1 FROM generate_series(1, $2)",
+            )
+            .bind(app)
+            .bind(count)
+            .bind(days)
+            .execute(pool)
+            .await
+            .unwrap();
+        }
+        app
+    }
+
+    async fn counts(pool: &PgPool) -> (i64, i64, i64) {
+        sqlx::query_as(
+            "SELECT (SELECT count(*) FROM spans), (SELECT count(*) FROM logs), \
+             (SELECT count(*) FROM health_checks)",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn clears_what_is_older_than_thirty_days_in_batches(pool: PgPool) {
+        with_records(&pool, 25, 7).await;
+        // Batches of 10 take three statements a table, the last a short one.
+        assert_eq!(clear_old(&pool, 10).await.unwrap(), 75);
+        assert_eq!(counts(&pool).await, (7, 7, 7));
+        // Exactly a batch's worth still ends.
+        with_records_more(&pool, 10).await;
+        assert_eq!(clear_old(&pool, 10).await.unwrap(), 30);
+        assert_eq!(counts(&pool).await, (7, 7, 7));
+        assert_eq!(clear_old(&pool, 10).await.unwrap(), 0);
+    }
+
+    /// `count` more old rows a table, for the app already there.
+    async fn with_records_more(pool: &PgPool, count: i64) {
+        const SQL: [&str; 3] = [
+            "INSERT INTO spans (app_id, trace_id, span_id, name, kind, started_at, duration_ms) \
+             SELECT (SELECT id FROM apps), 'o', 'o', 'GET /', 'server', now() - interval '40 days', 1 \
+             FROM generate_series(1, $1)",
+            "INSERT INTO logs (app_id, at, level, message) SELECT (SELECT id FROM apps), \
+             now() - interval '40 days', 'info', 'old' FROM generate_series(1, $1)",
+            "INSERT INTO health_checks (app_id, checked_at, ok, duration_ms) SELECT (SELECT id FROM apps), \
+             now() - interval '40 days', true, 1 FROM generate_series(1, $1)",
+        ];
+        for sql in SQL {
+            sqlx::query(sql).bind(count).execute(pool).await.unwrap();
+        }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn clearing_finds_old_rows_by_time_alone(pool: PgPool) {
+        with_records(&pool, 50, 20_000).await;
+        sqlx::raw_sql("ANALYZE spans; ANALYZE logs; ANALYZE health_checks")
+            .execute(&pool)
+            .await
+            .unwrap();
+        for ((_, sql), index) in
+            CLEAR
+                .iter()
+                .zip(["spans_started_at", "logs_at", "health_checks_checked_at"])
+        {
+            let plan: Vec<String> =
+                sqlx::query_scalar(sqlx::AssertSqlSafe(format!("EXPLAIN {sql}")))
+                    .bind(KEEP_DAYS)
+                    .bind(CLEAR_BATCH)
+                    .fetch_all(&pool)
+                    .await
+                    .unwrap();
+            let plan = plan.join("\n");
+            assert!(plan.contains(index), "{plan}");
+            assert!(!plan.contains("Seq Scan"), "{plan}");
+        }
     }
 }

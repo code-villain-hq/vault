@@ -16,7 +16,8 @@ const GRACE: Duration = Duration::from_secs(3);
 
 /// Runs Raven on `listener`, with its workers, until `shutdown` resolves:
 /// the sync feed, the writer for the calls it records (`records`, from its
-/// [`telemetry::Recorder`]) and the health checks. The server binary and
+/// [`telemetry::Recorder`]), the health checks and the clearing out of old
+/// records. The server binary and
 /// the desktop app both start it this way.
 pub async fn serve(
     state: AppState,
@@ -45,6 +46,7 @@ pub async fn serve(
     ));
     workers.spawn(telemetry::write(state.pool.clone(), records));
     workers.spawn(health::watch(state.pool.clone(), self_url));
+    workers.spawn(health::clear_out(state.pool.clone()));
 
     // With each connection's address, for limits per client.
     let service = app(state, web_dir).into_make_service_with_connect_info::<SocketAddr>();
