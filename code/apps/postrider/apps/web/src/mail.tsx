@@ -209,11 +209,12 @@ const FoldersContext = createContext<FoldersState>({
 });
 
 /**
- * The workspace's folders with what's unread in them, read live: asked
- * when the sidebar shows, when the Inbox changes (an account connected,
- * mail came), when a folder's list or its unread mail is opened, after a
- * sync, when an answer moved mail, and every minute while the app shows,
- * for mail filed or read elsewhere.
+ * The workspace's folders with what's unread in them, as this Mac keeps
+ * them: asked when the sidebar shows, when the server says something
+ * changed (an account connected, mail came, the keeper read a folder),
+ * when a folder's list or its unread mail is opened, after a sync, when an
+ * answer moved mail, and every minute while the app shows. Each asking
+ * has the server look at the folders again.
  */
 function FoldersProvider({
   version,

@@ -111,7 +111,12 @@ export function forgetListed(from: From, key: string) {
  * for what this Mac has of it, shown at once the first time, until the
  * servers answer.
  */
-function useListing(from: From, path: string | undefined, again = 0, here?: string) {
+function useListing(
+  from: From,
+  path: string | undefined,
+  again: number | string = 0,
+  here?: string,
+) {
   const { workspace, place } = useWorkspace();
   const { refresh } = useFolders();
   const { synced } = useInbox();
@@ -162,14 +167,16 @@ function useListing(from: From, path: string | undefined, again = 0, here?: stri
 /** A folder's newest mail, every account's, in the list column. */
 export function FolderList({ folder, open }: { folder: string; open: string | undefined }) {
   const { folders, minutes } = useFolders();
+  const version = useInbox().inbox?.version;
   const shown = folders.find((f) => f.key.toLowerCase() === folder.toLowerCase());
   const name = shown?.name ?? folder;
   const from = useMemo(() => ({ folder }), [folder]);
-  // Read again with the sidebar's counts, for mail filed or read elsewhere.
+  // This Mac's copy, read again with the sidebar's counts and whenever the
+  // server kept something new of it, for mail filed or read elsewhere.
   const { listing, error, waiting } = useListing(
     from,
     `/folders/${encodeURIComponent(folder)}`,
-    minutes,
+    `${minutes}:${version}`,
   );
   return (
     <>

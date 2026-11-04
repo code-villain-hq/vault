@@ -362,6 +362,9 @@ impl Mail {
             .entry(account.id)
             .or_default()
             .push(made.clone());
+        if let Err(e) = self.keep_made(account.id, &made).await {
+            tracing::warn!(address = %account.address, "couldn't keep a folder made: {e}");
+        }
         Ok((made, true))
     }
 
@@ -382,10 +385,21 @@ impl Mail {
             })
         };
         let to = rename(from.clone(), name.to_string()).await?;
-        // Folders inside it moved with it: they're listed again.
-        self.lock_places().remove(&account.id);
+        // Folders inside it moved with it, and what's kept of them: they're
+        // listed again.
+        let moved: Vec<(String, String)> = self
+            .kept_places(account.id)
+            .await?
+            .into_iter()
+            .filter_map(|kept| Some((kept.path.clone(), moved_to(&kept.path, from, &to)?)))
+            .collect();
+        self.move_kept(account.id, &moved).await?;
         self.lock_lines()
             .retain(|(id, path), _| *id != account.id || moved_to(path, from, &to).is_none());
+        if self.relist(account).await.is_err() {
+            self.lock_places().remove(&account.id);
+        }
+        self.keep_now();
         let mut changed = rules.clone();
         for rule in &mut changed {
             if let Some(path) = moved_to(&rule.path, from, &to) {
@@ -397,7 +411,17 @@ impl Mail {
             && let Err(failure) = self.put_rules(account, &changed).await
         {
             // Back where it was, where its rules look for it.
-            let _ = rename(to.clone(), leaf(&from.name).to_string()).await;
+            if rename(to.clone(), leaf(&from.name).to_string())
+                .await
+                .is_ok()
+            {
+                let back: Vec<(String, String)> =
+                    moved.into_iter().map(|(old, new)| (new, old)).collect();
+                let _ = self.move_kept(account.id, &back).await;
+                if self.relist(account).await.is_err() {
+                    self.lock_places().remove(&account.id);
+                }
+            }
             return Err(failure);
         }
         let reading = self.reading_rules(account.id).await?;
@@ -460,9 +484,12 @@ impl Mail {
         if let Some(places) = self.lock_places().get_mut(&account.id) {
             places.retain(|other| other.path != place.path);
         }
+        self.forget_kept_folder(account.id, &place.path).await?;
         self.lock_lines().retain(|(id, path), _| {
             *id != account.id || (*path != place.path && *path != trash.path)
         });
+        // Its mail is in the Trash now.
+        self.keep_now();
         sqlx::query("DELETE FROM reading_rules WHERE account_id = $1 AND path = $2")
             .bind(account.id)
             .bind(&place.path)
@@ -615,6 +642,9 @@ impl Mail {
             for uid in &gone {
                 self.forget_inbox_line(account.id, i64::from(*uid)).await?;
             }
+        } else {
+            let uids: Vec<i64> = gone.iter().copied().map(i64::from).collect();
+            self.forget_kept(account.id, from, &uids).await?;
         }
         if let Some((_, lines)) = self.lock_lines().get_mut(&(account.id, from.to_string())) {
             for uid in &gone {
@@ -663,6 +693,7 @@ impl Mail {
         })
         .await?;
         self.lock_lines().remove(&(account.id, moved.path.clone()));
+        self.keep_now();
         Ok(())
     }
 
@@ -689,8 +720,11 @@ impl Mail {
                 })
             })
             .await?;
-        if removed && let Some(places) = self.lock_places().get_mut(&account.id) {
-            places.retain(|place| place.path != path);
+        if removed {
+            if let Some(places) = self.lock_places().get_mut(&account.id) {
+                places.retain(|place| place.path != path);
+            }
+            self.forget_kept_folder(account.id, path).await?;
         }
         Ok(())
     }

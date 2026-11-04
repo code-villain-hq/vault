@@ -1,5 +1,5 @@
-//! Folders and searches, read live from the servers: every account's
-//! folders, each once by its name or role, at `GET /api/w/{workspace}/folders`;
+//! Folders and searches: every account's folders, each once by its name
+//! or role, at `GET /api/w/{workspace}/folders`;
 //! a folder's newest mail at `/folders/{key}`; what a search finds in all
 //! of them at `/search?q=`; and a mail opened from either at
 //! `/mails/{account}/{uid}?folder=<key>`. A folder's menu marks its mail
@@ -7,13 +7,14 @@
 //! renames it, deletes it (`DELETE /folders/{key}`), and empties the Trash
 //! and Junk (`POST /folders/{key}/empty`).
 //!
-//! Only the Inbox is followed and kept in Postgres. The rest is asked for
-//! when it's shown; what the lists showed is kept in memory, so a folder
-//! opened again reads only its new mail. A search finds what this Mac has
-//! of it first (`/search?q=&here=true`), at once, while the servers are
-//! asked, and an account that can't be asked shows that.
+//! The folders and their newest mail are read from what this Mac keeps of
+//! them (`kept.rs`), at once and offline, while the keeper asks the
+//! servers what changed; a folder not kept yet is read from its server.
+//! A search finds what this Mac has of it first (`/search?q=&here=true`),
+//! at once, while the servers are asked, and an account that can't be
+//! asked shows that.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::Json;
@@ -37,9 +38,6 @@ use crate::message;
 use crate::rules::{Renamed, leaf};
 use crate::state::AppState;
 
-/// How many of a folder's newest mails a list shows, from each account.
-const NEWEST: u32 = 100;
-
 /// How many of the mails a search finds it shows, from each folder.
 const FOUND: usize = 50;
 
@@ -47,24 +45,39 @@ const FOUND: usize = 50;
 const SHOWN: usize = 200;
 
 impl Mail {
-    /// The workspace's folders with what's unread in them: Sent, Archive,
-    /// Drafts, Trash and Junk, then the rest by name.
+    /// The workspace's folders with what's unread in them, as this Mac
+    /// keeps them: Sent, Archive, Drafts, Trash and Junk, then the rest by
+    /// name. The keeper is asked to look again.
     pub async fn folders(self: &Arc<Self>, workspace_id: Uuid) -> Result<Vec<Folder>, AppError> {
+        self.keep_now();
         let accounts = self.accounts(workspace_id).await?;
-        let listed = join_all(accounts.iter().map(|account| self.count_folders(account))).await;
+        let ids: Vec<Uuid> = accounts.iter().map(|account| account.id).collect();
+        let counts = &self.kept_counts(&ids).await?;
+        let listed = join_all(accounts.iter().map(|account| async move {
+            // Offline with nothing kept, an account shows no folders.
+            let places = self.places(account).await.unwrap_or_default();
+            places
+                .into_iter()
+                .map(|place| {
+                    let counted = counts.get(&(account.id, place.path.clone()));
+                    (place, counted.copied().unwrap_or((0, 0)))
+                })
+                .collect::<Vec<_>>()
+        }))
+        .await;
         let mut folders: Vec<Folder> = Vec::new();
         for (place, (unseen, all)) in listed.into_iter().flatten() {
             match folders.iter_mut().find(|folder| place.is(&folder.key)) {
                 Some(folder) => {
-                    folder.unread += i64::from(unseen);
-                    folder.total += i64::from(all);
+                    folder.unread += unseen;
+                    folder.total += all;
                 }
                 None => folders.push(Folder {
                     key: place.key(),
                     name: place.role.map_or_else(|| place.name.clone(), role_name),
                     role: place.role,
-                    unread: i64::from(unseen),
-                    total: i64::from(all),
+                    unread: unseen,
+                    total: all,
                 }),
             }
         }
@@ -72,52 +85,32 @@ impl Mail {
         Ok(folders)
     }
 
-    /// An account's folders with what's unread in each, and all it holds,
-    /// as its server says now. Offline, the folders it had, with nothing
-    /// counted.
-    async fn count_folders(&self, account: &MailAccount) -> Vec<(Place, (u32, u32))> {
-        let counted = self
-            .on_server(account, |session| {
-                Box::pin(async move {
-                    let places = imap::folders(session).await?;
-                    let paths: Vec<String> = places.iter().map(|p| p.path.clone()).collect();
-                    let unseen = imap::unseen(session, &paths).await?;
-                    Ok(places
-                        .into_iter()
-                        .map(|place| {
-                            let counts = unseen.get(&place.path).copied().unwrap_or((0, 0));
-                            (place, counts)
-                        })
-                        .collect::<Vec<_>>())
-                })
-            })
-            .await;
-        match counted {
-            Ok(counted) => {
-                tracing::debug!(address = %account.address, "unread of all: {}", tally(&counted));
-                let places = counted.iter().map(|(place, _)| place.clone()).collect();
-                self.lock_places().insert(account.id, places);
-                counted
-            }
-            Err(failure) => {
-                tracing::info!(address = %account.address, "couldn't list folders: {}", failure.message());
-                self.lock_places()
-                    .get(&account.id)
-                    .map(|places| places.iter().map(|place| (place.clone(), (0, 0))).collect())
-                    .unwrap_or_default()
-            }
-        }
-    }
-
-    /// An account's folders, as its server listed them last, else now.
+    /// An account's folders, as its server listed them last: as kept here
+    /// when Postrider starts, else as it lists them now.
     pub(crate) async fn places(&self, account: &MailAccount) -> Result<Vec<Place>, Failure> {
         if let Some(places) = self.lock_places().get(&account.id) {
             return Ok(places.clone());
         }
+        let kept = self
+            .kept_places(account.id)
+            .await
+            .map_err(|e| Failure::Offline(format!("couldn't read this Mac's copy: {e}")))?;
+        if !kept.is_empty() {
+            // The keeper's, should it have listed them meanwhile.
+            return Ok(self.lock_places().entry(account.id).or_insert(kept).clone());
+        }
+        self.relist(account).await
+    }
+
+    /// An account's folders as its server lists them now, kept.
+    pub(crate) async fn relist(&self, account: &MailAccount) -> Result<Vec<Place>, Failure> {
         let places = self
             .on_server(account, |session| Box::pin(imap::folders(session)))
             .await?;
         self.lock_places().insert(account.id, places.clone());
+        if let Err(e) = self.keep_places(account.id, &places, None).await {
+            tracing::warn!(address = %account.address, "couldn't keep its folders: {e}");
+        }
         Ok(places)
     }
 
@@ -223,7 +216,11 @@ impl Mail {
                         Box::pin(async move { imap::mark_all_read(session, &path).await })
                     })
                     .await?;
-                self.seen_here(&account, &place, &uids, true).await?;
+                if place.path == Place::inbox().path {
+                    self.seen_here(&account, &place, &uids, true).await?;
+                } else {
+                    self.all_kept(account.id, &place.path, false).await?;
+                }
                 Ok::<_, Failure>(Some(Read {
                     account: account.clone(),
                     place,
@@ -303,8 +300,9 @@ impl Mail {
         failed.map_or(Ok(()), Err)
     }
 
-    /// The Inbox's copy of these mails, read or unread as their server has
-    /// them now; any other folder's lines are read from its server.
+    /// This Mac's copy of these mails, read or unread as their server has
+    /// them now: the Inbox's, or the folder's, whose count the keeper
+    /// looks at again.
     async fn seen_here(
         &self,
         account: &MailAccount,
@@ -312,10 +310,15 @@ impl Mail {
         uids: &[u32],
         seen: bool,
     ) -> Result<(), sqlx::Error> {
-        if place.path != Place::inbox().path || uids.is_empty() {
+        if uids.is_empty() {
             return Ok(());
         }
         let uids: Vec<i64> = uids.iter().map(|uid| i64::from(*uid)).collect();
+        if place.path != Place::inbox().path {
+            self.seen_kept(account.id, &place.path, &uids, seen).await?;
+            self.keep_now();
+            return Ok(());
+        }
         let updated =
             sqlx::query("UPDATE inbox_mails SET seen = $3 WHERE account_id = $1 AND uid = ANY($2)")
                 .bind(account.id)
@@ -399,7 +402,8 @@ impl Mail {
                         Box::pin(async move { imap::empty(session, &path).await })
                     })
                     .await?;
-                self.lock_lines().remove(&(account.id, place.path));
+                self.lock_lines().remove(&(account.id, place.path.clone()));
+                self.all_kept(account.id, &place.path, true).await?;
                 Ok::<_, Failure>(gone)
             }
             .await;
@@ -415,21 +419,47 @@ impl Mail {
         failed.map_or(Ok(()), |problem| Err(AppError::refused(problem)))
     }
 
-    /// A folder's newest mail, from every account that has it.
+    /// A folder's newest mail, from every account that has it: as kept
+    /// here, else from its server. An account whose server can't be
+    /// reached says so beside what's kept of it. The keeper is asked to
+    /// look again.
     pub async fn folder(
         self: &Arc<Self>,
         workspace_id: Uuid,
         key: &str,
     ) -> Result<Listing, AppError> {
+        self.keep_now();
         let accounts = self.accounts(workspace_id).await?;
         let read = join_all(accounts.iter().map(|account| async move {
-            match self.place(account, key).await? {
-                Some(place) => self.read(account, &place, None).await,
-                None => Ok(Vec::new()),
+            let Some(place) = self.place(account, key).await? else {
+                return Ok(Vec::new());
+            };
+            let kept = self
+                .kept_listing(account.id, &place)
+                .await
+                .map_err(|e| Failure::Offline(format!("couldn't read this Mac's copy: {e}")))?;
+            match kept {
+                Some(kept) => Ok(kept),
+                None => self.read(account, &place, None).await,
             }
         }))
         .await;
-        Ok(listing(&accounts, read, HashMap::new()))
+        let mut listed = listing(&accounts, read, HashMap::new());
+        for account in &accounts {
+            if listed
+                .problems
+                .iter()
+                .any(|problem| problem.account_id == account.id)
+            {
+                continue;
+            }
+            if let Some(status) = self.status_of(account.id).filter(|status| {
+                matches!(status.state, AccountState::Offline | AccountState::Refused)
+            }) {
+                listed.problems.push(status);
+            }
+        }
+        Ok(listed)
     }
 
     /// The mails with every word of `query` in them, in the Inbox and the
@@ -480,9 +510,9 @@ impl Mail {
     }
 
     /// The mails with every word in what a list shows of them, each
-    /// account's: in the Inbox's copy, and in the lines the lists and
-    /// searches read from the folders a search asks. Their read state is
-    /// the servers' to tell: a folder's line shows read until they answer.
+    /// account's: in the Inbox's copy, in the folders kept here, and in
+    /// the lines searches read from the folders a search asks. A line only
+    /// a search read shows read until the servers answer.
     async fn found_here(
         &self,
         accounts: &[MailAccount],
@@ -528,9 +558,20 @@ impl Mail {
                 found.entry(account_id).or_default().push(mail);
             }
         }
+        let mut kept: HashSet<(Uuid, String, i64)> = HashSet::new();
+        for (account_id, place, line) in self.kept_lines(&ids).await? {
+            if !searched(&place) {
+                continue;
+            }
+            kept.insert((account_id, place.path.clone(), line.uid));
+            let mail = summary(account_id, &place, line);
+            if has_words(&mail, words) {
+                found.entry(account_id).or_default().push(mail);
+            }
+        }
         let places = self.lock_places().clone();
-        let kept = self.lock_lines();
-        for ((account_id, path), (_, lines)) in kept.iter() {
+        let lines = self.lock_lines();
+        for ((account_id, path), (_, lines)) in lines.iter() {
             let place = if *path == inbox.path {
                 inbox.clone()
             } else {
@@ -547,6 +588,9 @@ impl Mail {
             }
             let mails = found.entry(*account_id).or_default();
             for (uid, line) in lines {
+                if kept.contains(&(*account_id, path.clone(), *uid)) {
+                    continue;
+                }
                 // The Inbox's copy has it already, with its read state.
                 if place.path == inbox.path
                     && mails
@@ -569,27 +613,41 @@ impl Mail {
         Ok(found)
     }
 
-    /// A folder's newest mail, or what `query` (an IMAP search) finds in
-    /// it, as the list shows it. Lines read before aren't read again.
+    /// A folder's newest mail, kept here, or what `query` (an IMAP search)
+    /// finds in it, as the list shows it. Lines read or kept before aren't
+    /// read again.
     pub(crate) async fn read(
         &self,
         account: &MailAccount,
         place: &Place,
         query: Option<&str>,
     ) -> Result<Vec<MailSummary>, Failure> {
+        let Some(query) = query else {
+            let (read, _) = self.read_newest(account, place, None).await?;
+            return Ok(read
+                .lines
+                .into_iter()
+                .map(|line| summary(account.id, place, line))
+                .collect());
+        };
         let at = (account.id, place.path.clone());
-        let (validity, known) = self.lock_lines().get(&at).cloned().unwrap_or_default();
+        let (mut validity, mut known) = self.lock_lines().get(&at).cloned().unwrap_or_default();
+        let (kept_validity, kept) = self
+            .kept_summaries(account.id, &place.path)
+            .await
+            .map_err(|e| Failure::Offline(format!("couldn't read this Mac's copy: {e}")))?;
+        if !kept.is_empty() {
+            if kept_validity != validity {
+                known.clear();
+                validity = kept_validity;
+            }
+            known.extend(kept);
+        }
         let read = self
             .on_server(account, |session| {
-                let (path, known, query) =
-                    (place.path.clone(), known.clone(), query.map(str::to_string));
+                let (path, known, query) = (place.path.clone(), known.clone(), query.to_string());
                 Box::pin(async move {
-                    match query {
-                        Some(query) => {
-                            imap::search(session, &path, &query, FOUND, &known, validity).await
-                        }
-                        None => imap::newest(session, &path, NEWEST, &known, validity).await,
-                    }
+                    imap::search(session, &path, &query, FOUND, &known, validity).await
                 })
             })
             .await?;
@@ -611,8 +669,9 @@ impl Mail {
             .collect())
     }
 
-    /// A mail from a folder (or found in the Inbox), opened: read from its
-    /// server each time, and marked read there.
+    /// A mail from a folder (or found in the Inbox), opened: from this
+    /// Mac's copy, else from its server, and marked read there when it
+    /// isn't yet.
     pub async fn open_in(
         self: &Arc<Self>,
         workspace_id: Uuid,
@@ -622,18 +681,23 @@ impl Mail {
     ) -> Result<Message, AppError> {
         let account = self.account(workspace_id, account_id).await?;
         let (place, raw) = self.source_of(&account, Some(key), uid).await?;
-        let known = self
-            .lock_lines()
-            .get(&(account.id, place.path.clone()))
-            .and_then(|(_, lines)| lines.get(&uid).cloned());
+        let kept = self.kept_line(account.id, &place.path, uid).await?;
+        let seen = kept.as_ref().is_some_and(|(line, _)| line.seen);
+        let known = kept.map(|(line, _)| line.summary).or_else(|| {
+            self.lock_lines()
+                .get(&(account.id, place.path.clone()))
+                .and_then(|(_, lines)| lines.get(&uid).cloned())
+        });
         let line = Line {
             uid,
             summary: known.unwrap_or_else(|| imap::summarize(&raw, None)),
             seen: true,
         };
-        let mail = Arc::clone(self);
-        let path = place.path.clone();
-        tokio::spawn(async move { mail.mark_read(account, path, uid).await });
+        if !seen {
+            let mail = Arc::clone(self);
+            let path = place.path.clone();
+            tokio::spawn(async move { mail.mark_read(account, path, uid).await });
+        }
         Ok(message::opened(&raw, summary(account_id, &place, line)))
     }
 }
@@ -654,22 +718,6 @@ struct Read {
 }
 
 /// What the sidebar calls a folder for its role, whatever its server does.
-/// "Archive 0 of 812, Newsletters 3 of 940, own 2 of 61 in 4": an
-/// account's counts, for the log, without its folders' own names.
-fn tally(counted: &[(Place, (u32, u32))]) -> String {
-    let mut own = (0, 0, 0);
-    let mut said: Vec<String> = Vec::new();
-    for (place, (unseen, all)) in counted {
-        match place.role {
-            Some(role) => said.push(format!("{} {unseen} of {all}", role_name(role))),
-            None => own = (own.0 + unseen, own.1 + all, own.2 + 1),
-        }
-    }
-    said.sort();
-    said.push(format!("own {} of {} in {}", own.0, own.1, own.2));
-    said.join(", ")
-}
-
 pub(crate) fn role_name(role: FolderRole) -> String {
     match role {
         FolderRole::Sent => "Sent",
@@ -683,7 +731,7 @@ pub(crate) fn role_name(role: FolderRole) -> String {
 }
 
 /// A line in a folder, as the page gets it. Sent mail names who it went to.
-fn summary(account_id: Uuid, place: &Place, line: Line) -> MailSummary {
+pub(crate) fn summary(account_id: Uuid, place: &Place, line: Line) -> MailSummary {
     let imap::Summary {
         from_name,
         from_address,

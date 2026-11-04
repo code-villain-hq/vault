@@ -443,6 +443,62 @@ fn glance(mut header: Vec<u8>, text: Option<Vec<u8>>) -> Vec<u8> {
     header
 }
 
+/// The whole source of each mail at `uids` in `folder` no bigger than
+/// `at_most` bytes, read without marking anything read, a few at a time.
+/// A mail no longer there, or bigger, is left out; `None` when the
+/// folder's UIDs changed meaning since `validity`.
+pub async fn sources(
+    session: &mut Session,
+    folder: &str,
+    validity: i64,
+    uids: &[i64],
+    at_most: u32,
+) -> Result<Option<HashMap<i64, Vec<u8>>>, Failure> {
+    let mut read = HashMap::new();
+    if uids.is_empty() {
+        return Ok(Some(read));
+    }
+    let mailbox = session.examine(folder).await?;
+    if i64::from(mailbox.uid_validity.unwrap_or(0)) != validity {
+        return Ok(None);
+    }
+    let set = |uids: &[i64]| {
+        uids.iter()
+            .map(i64::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let sized: Vec<Fetch> = session
+        .uid_fetch(set(uids), "(UID RFC822.SIZE)")
+        .await?
+        .try_collect()
+        .await?;
+    let small: Vec<i64> = sized
+        .iter()
+        .filter(|f| f.size.is_some_and(|size| size <= at_most))
+        .filter_map(|f| f.uid.map(i64::from))
+        .filter(|uid| uids.contains(uid))
+        .collect();
+    for batch in small.chunks(SOURCES_AT_ONCE) {
+        let fetches: Vec<Fetch> = session
+            .uid_fetch(set(batch), "(UID BODY.PEEK[])")
+            .await?
+            .try_collect()
+            .await?;
+        for fetch in &fetches {
+            if let (Some(uid), Some(body)) = (fetch.uid.map(i64::from), fetch.body())
+                && batch.contains(&uid)
+            {
+                read.insert(uid, body.to_vec());
+            }
+        }
+    }
+    Ok(Some(read))
+}
+
+/// How many whole mails [`sources`] reads in one FETCH.
+const SOURCES_AT_ONCE: usize = 10;
+
 /// Marks a mail read, as opening it does.
 pub async fn mark_read(session: &mut Session, folder: &str, uid: i64) -> Result<(), Failure> {
     session.select(folder).await?;
@@ -835,15 +891,37 @@ pub async fn folders(session: &mut Session) -> Result<Vec<Place>, Failure> {
     Ok(places(listed))
 }
 
-/// How many of each folder's mails are unread, and how many it holds, by
-/// path. Every STATUS goes in one write and the answers are read as they
-/// come, so the folders cost the server one round trip, not one each (IMAP
-/// lets a client send commands without waiting, RFC 3501 5.5). A folder
-/// the server says no to is left out.
-pub async fn unseen(
+/// What STATUS counts in a folder: all it holds, what's unread, the UID
+/// its next mail gets, and what its UIDs mean. Mail that came, left, or was
+/// read or marked unread elsewhere changes one of them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Counted {
+    pub total: u32,
+    pub unseen: u32,
+    pub next: u32,
+    pub validity: u32,
+}
+
+impl Counted {
+    /// The four as one text, as [`crate::kept`] keeps what its lines were
+    /// read under.
+    pub fn stamp(&self) -> String {
+        format!(
+            "{}:{}:{}:{}",
+            self.validity, self.next, self.total, self.unseen
+        )
+    }
+}
+
+/// What STATUS counts in each folder, by path. Every STATUS goes in one
+/// write and the answers are read as they come, so the folders cost the
+/// server one round trip, not one each (IMAP lets a client send commands
+/// without waiting, RFC 3501 5.5). A folder the server says no to is left
+/// out.
+pub async fn counts(
     session: &mut Session,
     folders: &[String],
-) -> Result<HashMap<String, (u32, u32)>, Failure> {
+) -> Result<HashMap<String, Counted>, Failure> {
     use async_imap::imap_proto::{MailboxDatum, Response, Status, StatusAttribute};
 
     let mut counted = HashMap::new();
@@ -856,7 +934,7 @@ pub async fn unseen(
     for (n, folder) in folders.iter().enumerate() {
         let tag = format!("S{n}");
         commands.push(format!(
-            "{tag} STATUS {} (MESSAGES UNSEEN)",
+            "{tag} STATUS {} (MESSAGES UNSEEN UIDNEXT UIDVALIDITY)",
             quoted(folder)?
         ));
         waiting.insert(tag, folder);
@@ -872,15 +950,17 @@ pub async fn unseen(
         };
         match answer.parsed() {
             Response::MailboxData(MailboxDatum::Status { mailbox, status }) => {
-                let (mut unseen, mut all) = (0, 0);
+                let mut count = Counted::default();
                 for attribute in status {
                     match attribute {
-                        StatusAttribute::Unseen(n) => unseen = *n,
-                        StatusAttribute::Messages(n) => all = *n,
+                        StatusAttribute::Unseen(n) => count.unseen = *n,
+                        StatusAttribute::Messages(n) => count.total = *n,
+                        StatusAttribute::UidNext(n) => count.next = *n,
+                        StatusAttribute::UidValidity(n) => count.validity = *n,
                         _ => {}
                     }
                 }
-                counted.insert(mailbox.to_string(), (unseen, all));
+                counted.insert(mailbox.to_string(), count);
             }
             Response::Done { tag, status, .. } => {
                 if let Some(folder) = waiting.remove(&tag.0)
@@ -1637,9 +1717,9 @@ mod tests {
             write
                 .write_all(
                     b"* 4 EXISTS\r\n\
-                      * STATUS \"Rechnungen 2026\" (MESSAGES 7 UNSEEN 2)\r\n\
+                      * STATUS \"Rechnungen 2026\" (MESSAGES 7 UNSEEN 2 UIDNEXT 12 UIDVALIDITY 5)\r\n\
                       S1 OK done\r\n\
-                      * STATUS Archive (MESSAGES 3 UNSEEN 0)\r\n\
+                      * STATUS Archive (MESSAGES 3 UNSEEN 0 UIDNEXT 4 UIDVALIDITY 5)\r\n\
                       S0 OK done\r\n\
                       S2 NO [NONEXISTENT] no such folder\r\n",
                 )
@@ -1656,18 +1736,26 @@ mod tests {
         .await
         .unwrap();
         let folders = ["Archive", "Rechnungen 2026", "Gone"].map(String::from);
-        let counted = unseen(&mut session, &folders).await.unwrap();
+        let counted = counts(&mut session, &folders).await.unwrap();
         assert_eq!(
             server.await.unwrap(),
             [
-                "S0 STATUS \"Archive\" (MESSAGES UNSEEN)",
-                "S1 STATUS \"Rechnungen 2026\" (MESSAGES UNSEEN)",
-                "S2 STATUS \"Gone\" (MESSAGES UNSEEN)",
+                "S0 STATUS \"Archive\" (MESSAGES UNSEEN UIDNEXT UIDVALIDITY)",
+                "S1 STATUS \"Rechnungen 2026\" (MESSAGES UNSEEN UIDNEXT UIDVALIDITY)",
+                "S2 STATUS \"Gone\" (MESSAGES UNSEEN UIDNEXT UIDVALIDITY)",
             ]
         );
         assert_eq!(counted.len(), 2);
-        assert_eq!(counted["Archive"], (0, 3));
-        assert_eq!(counted["Rechnungen 2026"], (2, 7));
+        let archive = Counted {
+            total: 3,
+            unseen: 0,
+            next: 4,
+            validity: 5,
+        };
+        assert_eq!(counted["Archive"], archive);
+        assert_eq!(counted["Archive"].stamp(), "5:4:3:0");
+        assert_eq!(counted["Rechnungen 2026"].unseen, 2);
+        assert_eq!(counted["Rechnungen 2026"].total, 7);
     }
 
     #[test]

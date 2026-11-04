@@ -138,23 +138,37 @@ picture (hidden text, a pixel, a picture that didn't load) shows its text
 instead, and a mail with nothing to show says so. Each mail opened logs how it's built, never its words (`message::structure`, at
 debug; a warning when it has nothing to show).
 
-Only the Inbox is followed and kept, and what conversations need of Sent
-and Archive (below). The other folders are read when
-they're shown (`folders.rs`): `GET /api/w/{id}/folders` lists every
-account's folders, each once by its role (Sent, Archive, Drafts, Trash,
-Junk) or its name, with what's unread (`STATUS`, every folder's sent at
-once on one connection, `imap::unseen`; logged at debug as counts only); `/folders/{key}` is a folder's
-newest mail; `/search?q=` asks every folder but Drafts, Trash and Junk for
-the mail with every word in it (IMAP `TEXT`). Before the servers answer,
-`/search?q=&here=true` finds the words in what this Mac has already, the
-Inbox's copy and the lines the lists read, by sender, subject and start;
-the page shows that at once, with "Asking the servers…" under it. An
-account that can't be asked shows what this Mac has of it. A mail opened from them is
-`/mails/{account}/{uid}?folder=<key>`, read from its server each time.
-What the lists showed is kept in memory, so a folder opened again reads
-only its new mail. An account keeps up to three connections for this
-(`READERS`), beside its watcher's, and a search reads that many of its
-folders at once. The sidebar asks for the folders again when the Inbox
+Only the Inbox is followed live. Every other folder is kept on this Mac
+(`kept.rs`), so the sidebar and a folder show at once, and offline: its
+name and counts (`kept_folders`), its newest 100 lines (`folder_mails`)
+and the whole text of its newest mail (`folder_sources`). The keeper
+(`kept::keep`, started by `serve.rs`) asks each online account for its
+folders (LIST) and every folder's counts at once on one connection
+(`STATUS` with MESSAGES, UNSEEN, UIDNEXT and UIDVALIDITY, `imap::counts`;
+logged at debug as counts only). It reads a folder's lines again only
+when those counts changed since it last did (`stamp`): new lines whole,
+the flags of those it has. Then it reads ahead the text of the newest
+mail, 50 of the Inbox's and 25 of each other folder's but Drafts, Trash
+and Junk, each up to 1 MB. It runs when an Inbox changes, when the page
+asks for the folders (`keep_now`, as the sync button does), and every
+minute. A change Postrider makes (a move, a mail read, all read, a folder
+emptied, renamed or deleted) changes what's kept as soon as the server
+has done it, then the keeper looks again; offline it fails, as before,
+and nothing waits to be done later. `GET /api/w/{id}/folders` lists
+every account's folders, each once by its role (Sent, Archive, Drafts,
+Trash, Junk) or its name, with what's unread; `/folders/{key}` is a
+folder's newest mail, with each account that can't be asked named above
+it. Both read only Postgres (`folders.rs`). A mail opened from a folder
+is `/mails/{account}/{uid}?folder=<key>`: its kept text, else read from
+its server once and kept. `/search?q=` asks every folder but Drafts,
+Trash and Junk for the mail with every word in it (IMAP `TEXT`). Before
+the servers answer, `/search?q=&here=true` finds the words in what this
+Mac has already, the Inbox's copy, the kept lines and what searches
+read, by sender, subject and start; the page shows that at once, with
+"Asking the servers…" under it. An account that can't be asked shows
+what this Mac has of it. An account keeps up to three connections for
+this (`READERS`), beside its watcher's, and a search reads that many of
+its folders at once. The sidebar asks for the folders again when the Inbox
 changes, when a folder or unread mail is opened, and every minute while
 the app shows; the folder shown reads its mail again with it. Every
 item but Sent, Drafts and Trash shows its unread count, Newsletters too,
@@ -546,7 +560,8 @@ Like the ask field's, what it needs is kept in memory.
   others. Accounts and the calendar are made by the server, after it
   signs in (`POST /accounts`, `/calendar`), never by the web app.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
-  `mail.rs`, the folders and search in `folders.rs`, conversations in
+  `mail.rs`, the folders and search in `folders.rs`, what this Mac keeps
+  of them in `kept.rs`, conversations in
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
   text part numbers its links with, HTML tags or entities; a migration

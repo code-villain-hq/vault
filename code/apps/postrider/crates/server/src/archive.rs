@@ -57,10 +57,14 @@ impl Mail {
         .map_err(refused)?;
         if from.path == "INBOX" {
             self.forget_inbox_line(account.id, uid).await?;
+        } else {
+            self.forget_kept(account.id, &from.path, &[uid]).await?;
         }
         if let Some((_, lines)) = self.lock_lines().get_mut(&(account.id, from.path)) {
             lines.remove(&uid);
         }
+        // What came to the folder it went to.
+        self.keep_now();
         Ok(())
     }
 
@@ -104,6 +108,9 @@ impl Mail {
             .entry(account.id)
             .or_default()
             .push(made.clone());
+        if let Err(e) = self.keep_made(account.id, &made).await {
+            tracing::warn!(address = %account.address, "couldn't keep a folder made: {e}");
+        }
         Ok(made)
     }
 }

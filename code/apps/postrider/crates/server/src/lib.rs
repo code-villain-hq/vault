@@ -17,6 +17,7 @@ pub mod files;
 pub mod folders;
 pub mod imap;
 pub mod judging;
+pub mod kept;
 pub mod local;
 pub mod mail;
 pub mod message;

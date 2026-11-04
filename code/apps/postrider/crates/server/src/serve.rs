@@ -33,6 +33,7 @@ pub async fn serve(
         tracing::error!(error = %e, "couldn't start reading the Inboxes");
     }
     workers.spawn(crate::conversations::keep(mail.clone()));
+    workers.spawn(crate::kept::keep(mail.clone()));
     if let Some(claude_code) = state.claude_code.clone() {
         workers.spawn(crate::reading::sort(mail.clone(), claude_code.clone()));
         workers.spawn(crate::judging::judge(mail.clone(), claude_code));

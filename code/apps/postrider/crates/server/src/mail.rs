@@ -77,11 +77,15 @@ pub struct Mail {
     /// Connections per account for reading (a mail, a folder, a search),
     /// kept between uses, up to [`READERS`]: the watcher's own waits in IDLE.
     readers: Mutex<HashMap<Uuid, Vec<Session>>>,
-    /// Each account's folders, as its server listed them last.
+    /// Each account's folders, as its server listed them last: kept here
+    /// too (`kept.rs`), and read from there when Postrider starts.
     pub(crate) places: Mutex<HashMap<Uuid, Vec<Place>>>,
-    /// What the lists showed of the mail in each account's folders (by
-    /// path), under the folder's UIDVALIDITY, so it isn't read again.
+    /// What searches found in each account's folders (by path), under the
+    /// folder's UIDVALIDITY, so it isn't read again. Each folder's newest
+    /// mail is kept in Postgres (`kept.rs`).
     pub(crate) lines: Mutex<KeptLines>,
+    /// Asks the keeper of the folders (`kept::keep`) to look now.
+    pub(crate) keeping: Notify,
     /// Why setting each account's newsletters aside failed, until it works.
     pub(crate) set_aside_failed: Mutex<HashMap<Uuid, String>>,
     /// What the Newsletters page read of each account's Newsletters (by
@@ -107,6 +111,7 @@ impl Mail {
             readers: Mutex::default(),
             places: Mutex::default(),
             lines: Mutex::default(),
+            keeping: Notify::new(),
             set_aside_failed: Mutex::default(),
             newsletter_headers: Mutex::default(),
             marked: Mutex::default(),
@@ -116,17 +121,22 @@ impl Mail {
 
     /// Starts watching every account. The server does this when it starts.
     pub async fn watch_all(self: &Arc<Self>) -> Result<(), sqlx::Error> {
-        let accounts: Vec<MailAccount> =
+        for account in self.all_accounts().await? {
+            self.watch(account);
+        }
+        Ok(())
+    }
+
+    /// Every workspace's accounts.
+    pub(crate) async fn all_accounts(&self) -> Result<Vec<MailAccount>, sqlx::Error> {
+        Ok(
             sqlx::query_scalar("SELECT to_jsonb(a.*) FROM mail_accounts a ORDER BY position")
                 .fetch_all(&self.pool)
                 .await?
                 .into_iter()
                 .filter_map(|row: serde_json::Value| serde_json::from_value(row).ok())
-                .collect();
-        for account in accounts {
-            self.watch(account);
-        }
-        Ok(())
+                .collect(),
+        )
     }
 
     /// The workspace's accounts, in their order.
@@ -183,9 +193,11 @@ impl Mail {
     /// Asks every account's server now: a watcher waiting in IDLE or
     /// between tries looks at once, and one that was refused tries again.
     /// What's read next goes over new connections, in case the kept ones
-    /// died unnoticed. Done once each account has asked, or after [`SYNC`].
+    /// died unnoticed. The folders kept here are looked at too, without
+    /// waiting for them. Done once each account has asked, or after [`SYNC`].
     pub async fn sync(self: &Arc<Self>, workspace_id: Uuid) -> Result<(), sqlx::Error> {
         let accounts = self.accounts(workspace_id).await?;
+        self.keep_now();
         let mut rounds = self.rounds.subscribe();
         let before = rounds.borrow_and_update().clone();
         for account in &accounts {
@@ -397,7 +409,8 @@ impl Mail {
     }
 
     /// A mail's source, and the folder it's in: the Inbox, or the one `key`
-    /// names. Reading it marks nothing.
+    /// names. From the copy kept here, else from its server, and kept
+    /// while its line is. Reading it marks nothing.
     pub(crate) async fn source_of(
         &self,
         account: &MailAccount,
@@ -418,14 +431,22 @@ impl Mail {
                     account.name
                 ))
             })?;
+        if let Some(raw) = self.kept_source(account.id, &place.path, uid).await? {
+            return Ok((place, raw));
+        }
+        let validity = self
+            .kept_line(account.id, &place.path, uid)
+            .await?
+            .map(|(_, validity)| validity);
         let raw = self
             .on_server(account, |session| {
                 let path = place.path.clone();
-                Box::pin(async move { imap::source(session, &path, None, uid).await })
+                Box::pin(async move { imap::source(session, &path, validity, uid).await })
             })
             .await
             .map_err(refused)?
             .ok_or_else(|| AppError::not_found("This mail isn't in its folder any more."))?;
+        self.keep_source(account.id, &place.path, uid, &raw).await?;
         Ok((place, raw))
     }
 
@@ -555,8 +576,8 @@ impl Mail {
         Ok(())
     }
 
-    /// Marks an opened mail read, on its server, and in the Inbox's copy
-    /// when it's there. Offline, it stays unread until it's opened again.
+    /// Marks an opened mail read, on its server, and in the copy kept here
+    /// of its folder. Offline, it stays unread until it's opened again.
     pub(crate) async fn mark_read(&self, account: MailAccount, folder: String, uid: i64) {
         let marked = self
             .on_server(&account, |session| {
@@ -569,6 +590,9 @@ impl Mail {
             return;
         }
         if folder != "INBOX" {
+            if let Err(e) = self.seen_kept(account.id, &folder, &[uid], true).await {
+                tracing::warn!("couldn't keep a mail read: {e}");
+            }
             return;
         }
         let updated =
@@ -729,6 +753,11 @@ impl Mail {
     fn asked(&self, account_id: Uuid) {
         self.rounds
             .send_modify(|rounds| *rounds.entry(account_id).or_default() += 1);
+    }
+
+    /// Where an account's server stands and why, once its watcher has looked.
+    pub(crate) fn status_of(&self, account_id: Uuid) -> Option<AccountStatus> {
+        self.lock_statuses().get(&account_id).cloned()
     }
 
     /// Where an account's server stands, once its watcher has looked.
