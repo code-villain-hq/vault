@@ -13,7 +13,7 @@ import { Archive, ArrowLeft, FolderInput, Paperclip, Reply, Trash2 } from "lucid
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
 import { ReplyDialog } from "./compose";
-import { forgetListed, markSeen, useListedMails } from "./folders";
+import { markSeen, useListedMails } from "./folders";
 import {
   anchorOf,
   type From,
@@ -29,7 +29,7 @@ import {
 } from "./inbox";
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
-import { MoveDialog } from "./move";
+import { conversationGoing, MoveDialog, openList, useMoveMail } from "./move";
 import { pageName } from "./newsletters";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
 import { useDoings, type Wanted, want } from "./sender";
@@ -52,9 +52,9 @@ import { useWorkspace } from "./workspace";
 export function MailPage() {
   const { account, uid } = useParams({ strict: false }) as { account: string; uid: string };
   const from = useSearch({ strict: false }) as From;
-  const { workspace, place, refusals } = useWorkspace();
-  const { inbox, leave, stay } = useInbox();
-  const { refresh } = useFolders();
+  const { workspace } = useWorkspace();
+  const { inbox } = useInbox();
+  const moveMail = useMoveMail();
   const accounts = useAccounts();
   const navigate = useNavigate();
   const back = useBack(from);
@@ -155,35 +155,7 @@ export function MailPage() {
   const fileAway = (to: "archive" | "trash" | MoveMail) => {
     if (!summary) return;
     if ((to === "archive" && !archivable) || (to === "trash" && !deletable)) return;
-    const going = conversation
-      ? conversation.mails
-          .filter((mail) => mail.folder === null)
-          .map((mail) => ({ mail, folder: undefined }))
-      : [{ mail: summary, folder }];
-    const picked = typeof to === "object";
-    void Promise.allSettled(
-      going.map(({ mail, folder }) => {
-        const fromInbox = (mail.folder ?? "inbox").toLowerCase() === "inbox";
-        if (fromInbox) leave(mail.account_id, mail.uid);
-        if (listed) forgetListed(from, key);
-        const query = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
-        return api(
-          "POST",
-          `/api/w/${workspace.id}/mails/${mail.account_id}/${mail.uid}/${picked ? "move" : to}${query}`,
-          picked ? to : undefined,
-          place,
-        ).catch((problem: unknown) => {
-          if (fromInbox) stay(mail.account_id, mail.uid);
-          throw problem;
-        });
-      }),
-    ).then((done) => {
-      refresh();
-      const refused = done.find((one) => one.status === "rejected");
-      if (refused) {
-        refusals.dispatchEvent(new CustomEvent("refused", { detail: messageOf(refused.reason) }));
-      }
-    });
+    moveMail(conversationGoing(conversation) ?? [{ mail: summary, folder }], to, from);
     const next = mails[index + 1] ?? mails[index - 1];
     if (index >= 0 && next) rememberOpened(mailKey(next));
     back.go();
@@ -498,13 +470,13 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
   const { folders } = useFolders();
   const navigate = useNavigate();
   const listed = useListedMails(from);
-  const params = { workspace: workspace.url_key };
+  const go = () => openList(navigate, workspace.url_key, from);
   if (from.q !== undefined) {
     const search = { q: from.q };
     return {
       name: "Search",
       href: `/${workspace.url_key}/search?${new URLSearchParams(search)}`,
-      go: () => void navigate({ to: "/$workspace/search", params, search }),
+      go,
     };
   }
   if (from.sender !== undefined) {
@@ -512,8 +484,7 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
     return {
       name: pageName(workspace.id, sender) ?? (listed[0]?.from_name || sender),
       href: `/${workspace.url_key}/newsletters/${encodeURIComponent(sender)}`,
-      go: () =>
-        void navigate({ to: "/$workspace/newsletters/$sender", params: { ...params, sender } }),
+      go,
     };
   }
   const folder = from.folder;
@@ -522,14 +493,10 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
     return {
       name: shown?.name ?? folder,
       href: `/${workspace.url_key}/folders/${encodeURIComponent(folder)}`,
-      go: () => void navigate({ to: "/$workspace/folders/$folder", params: { ...params, folder } }),
+      go,
     };
   }
-  return {
-    name: "Inbox",
-    href: `/${workspace.url_key}`,
-    go: () => void navigate({ to: "/$workspace", params }),
-  };
+  return { name: "Inbox", href: `/${workspace.url_key}`, go };
 }
 
 /** One of the open mail's tools, in its top bar. */

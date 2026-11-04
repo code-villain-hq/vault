@@ -4,9 +4,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { FIRST_HOUR, HOURS, hoursIntoTrack, inLanes, nextUp } from "./day";
+import { carry, putDown } from "./drag";
 import { SearchField } from "./folders";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
+import { conversationGoing, openList } from "./move";
 import { listOf, NoneShown, pick, ShownControl, useShown } from "./shown";
 import { buttonClass, Empty } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
@@ -133,7 +135,8 @@ export function useRowsShown(from: From, rows: Row[], open: string | undefined):
  * it (`open`, its key), the mail takes the keys and the list follows it.
  * One that leaves the list, filed away, leaves them on the mail that takes
  * its place. The Inbox lists `conversations`, the others `mails`, as
- * its filter shows them: all, unread or read.
+ * its filter shows them: all, unread or read. A row dragged onto a folder
+ * in the sidebar moves there (`drag.tsx`); the open one closes, as E does.
  */
 export function MailList({
   mails,
@@ -166,6 +169,12 @@ export function MailList({
   if (taking) setFocus({ key: mailKey(taking.mail), at: focused });
   else if (found >= 0 && found !== focus.at) setFocus({ key: focus.key, at: found });
   const setFocusedKey = (key: string) => setFocus({ key, at: focused });
+  // The open mail, moved away, closes on the list, at the next.
+  const closeAt = (index: number) => () => {
+    const next = rows[index + 1] ?? rows[index - 1];
+    if (next) rememberOpened(mailKey(next.mail));
+    openList(navigate, workspace.url_key, from);
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -201,20 +210,24 @@ export function MailList({
   if (rows.length === 0 && listed.length > 0) return <NoneShown list={listOf(from)} />;
   return (
     <ol ref={list} className="mails" aria-label="Mail">
-      {rows.map((row, index) => (
-        <MailRow
-          key={mailKey(row.mail)}
-          mail={row.mail}
-          conversation={row.conversation}
-          own={own}
-          index={index}
-          focused={index === focused}
-          selected={open !== undefined && holds(row, open)}
-          account={byId.get(row.mail.account_id)}
-          now={now}
-          from={from}
-        />
-      ))}
+      {rows.map((row, index) => {
+        const selected = open !== undefined && holds(row, open);
+        return (
+          <MailRow
+            key={mailKey(row.mail)}
+            mail={row.mail}
+            conversation={row.conversation}
+            own={own}
+            index={index}
+            focused={index === focused}
+            selected={selected}
+            account={byId.get(row.mail.account_id)}
+            now={now}
+            from={from}
+            close={selected ? closeAt(index) : undefined}
+          />
+        );
+      })}
     </ol>
   );
 }
@@ -244,6 +257,7 @@ function MailRow({
   account,
   now,
   from,
+  close,
 }: {
   mail: MailSummary;
   conversation: Conversation | undefined;
@@ -254,8 +268,11 @@ function MailRow({
   account: MailAccount | undefined;
   now: Date;
   from: From;
+  /** Closes it, open beside the list, once it's moved away. */
+  close?: () => void;
 }) {
   const { workspace } = useWorkspace();
+  const [dragged, setDragged] = useState(false);
   const all = conversation?.mails ?? [mail];
   const last = all.at(-1) ?? mail;
   const unread = unreadRow({ mail, conversation });
@@ -270,7 +287,18 @@ function MailRow({
         params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
         search={openedFrom(mail, from)}
         onClick={() => rememberOpened(mailKey(mail))}
-        className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""} ${selected ? "selected" : ""}`}
+        onDragStart={(event) => {
+          const going = conversationGoing(conversation) ?? [
+            { mail, folder: mail.folder ?? from.folder },
+          ];
+          carry(event, { going, from, close }, mail.subject || "(no subject)");
+          setDragged(true);
+        }}
+        onDragEnd={() => {
+          putDown();
+          setDragged(false);
+        }}
+        className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""} ${selected ? "selected" : ""} ${dragged ? "opacity-50" : ""}`}
         aria-current={selected ? "true" : undefined}
         style={hue(account?.hue ?? 1)}
         title={account ? `${mail.from_address}, to ${account.name}` : mail.from_address}

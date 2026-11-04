@@ -193,6 +193,13 @@ Every change happens on the account's server; the Inbox follows it there.
 - V moves it (`move.tsx`, `POST /mails/{account}/{uid}/move` with `to`):
   to the Inbox, Archive, Junk or a folder of yours, picked by typing part
   of its name, or to a new one made with that name.
+- A row of a list dragged onto the sidebar (`drag.tsx`) moves there the
+  same way (`useMoveMail` in `move.tsx`, which E, ⌫ and V share): onto
+  the Inbox, Archive, Junk, Trash or a folder of yours, never the one
+  it's in; from the Inbox, its conversation's Inbox mail. An open mail
+  dragged away closes, as E closes it. The desktop window leaves drops to
+  the page (`dragDropEnabled: false` in `tauri.conf.json`, or WebKit's
+  drag never reaches it), and a file dropped on the window does nothing.
 - A folder's name in the top bar renames it (`folders.tsx`,
   `POST /folders/{key}/rename`): in every account that has it, with the
   rules that sort into it, Sieve's and reading ones. Sent, Archive and the

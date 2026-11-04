@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { NewMailProvider, useNewMail } from "./compose";
+import { takesMail, useDrop } from "./drag";
 import { FolderMenu, useCountHidden } from "./folder-menu";
 import { InboxProvider, useFolders, useInbox, useUnread } from "./mail";
 import { isDesktop } from "./platform";
@@ -196,6 +197,8 @@ function Shell() {
 const navLinkBase =
   "nav-link flex h-7 items-center gap-2.5 rounded-md px-2 outline-none hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-accent [&.active]:bg-selected [&.active]:font-bold [&.active]:text-fg [&_svg]:text-muted";
 const navLink = `${navLinkBase} text-fg`;
+// A folder a dragged row is held over, as Almanac shows a lane.
+const dropping = "bg-hover";
 
 function Sidebar() {
   const { pathname } = useLocation();
@@ -284,7 +287,8 @@ function SyncButton() {
  * The Inbox, Newsletters, Sent, Archive, Drafts, Junk and Trash, then the
  * accounts' own folders, each once however many accounts have it, with
  * what's unread in them: not in Sent, Drafts or Trash, where it means
- * nothing.
+ * nothing. A row of a list dropped on the Inbox, Archive, Junk, Trash or
+ * a folder of yours moves there (`drag.tsx`).
  */
 function MailNav() {
   const { workspace } = useWorkspace();
@@ -296,6 +300,7 @@ function MailNav() {
     [unread],
   );
   const inboxMarked = useCountHidden("inbox");
+  const inboxDrop = useDrop("inbox");
   const newslettersMarked = useCountHidden(newsletters?.key ?? "newsletters");
   return (
     <nav aria-label="Mail" className="flex flex-col gap-4">
@@ -305,8 +310,9 @@ function MailNav() {
             to="/$workspace"
             params={{ workspace: workspace.url_key }}
             activeOptions={{ exact: true }}
-            className={`${navLink} ${list === "" ? "active" : ""}`}
+            className={`${navLink} ${list === "" ? "active" : ""} ${inboxDrop.over ? dropping : ""}`}
             title="Inbox (G then I)"
+            {...inboxDrop.handlers}
           >
             <NavIcon icon={Inbox} />
             Inbox
@@ -395,13 +401,15 @@ function FolderLink({
 }) {
   const { workspace } = useWorkspace();
   const marked = useCountHidden(folder.key);
+  const drop = useDrop(folder.key);
   return (
     <FolderMenu folder={folder} own={folder.role === null}>
       <Link
         to="/$workspace/folders/$folder"
         params={{ workspace: workspace.url_key, folder: folder.key }}
-        className={`${navLink} ${open === folder.key.toLowerCase() ? "active" : ""}`}
+        className={`${navLink} ${open === folder.key.toLowerCase() ? "active" : ""} ${drop.over ? dropping : ""}`}
         title={title}
+        {...(takesMail(folder) ? drop.handlers : {})}
       >
         <NavIcon icon={icon} />
         <span className="truncate">{folder.name}</span>

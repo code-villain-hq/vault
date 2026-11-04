@@ -1,11 +1,89 @@
 // "Move to…", from an open mail (V): a folder to pick, by typing part of its
 // name, or a new one to make with the mail in it, as the chat makes them.
+// And the move itself, which E, ⌫, V and a row dropped on a folder share.
 
 import { Dialog } from "@base-ui/react/dialog";
-import type { Folder as MailFolder } from "@postrider/types";
+import type { Conversation, MailSummary, Folder as MailFolder, MoveMail } from "@postrider/types";
+import { useNavigate } from "@tanstack/react-router";
 import { Archive, Folder, FolderPlus, Inbox, MailWarning } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { useFolders } from "./mail";
+import { api, messageOf } from "./api";
+import { forgetListed } from "./folders";
+import { type From, mailKey } from "./inbox";
+import { useFolders, useInbox } from "./mail";
+import { useWorkspace } from "./workspace";
+
+/** A mail on its way, and the key of the folder it's in: undefined for the Inbox. */
+export type Going = { mail: MailSummary; folder: string | undefined };
+
+/** A conversation's Inbox mail, which goes all together; what you sent of it stays in Sent. */
+export function conversationGoing(conversation: Conversation | undefined): Going[] | undefined {
+  return conversation?.mails
+    .filter((mail) => mail.folder === null)
+    .map((mail) => ({ mail, folder: undefined }));
+}
+
+/**
+ * Moves mail to its account's Archive or Trash, or to the folder `to`
+ * names (a key, or a new folder's name), out of the list `from` showed it
+ * in. It leaves the Inbox and that list at once; a server that refuses
+ * says so in the frame's status, and the mail it kept comes back to the
+ * Inbox.
+ */
+export function useMoveMail() {
+  const { workspace, place, refusals } = useWorkspace();
+  const { leave, stay } = useInbox();
+  const { refresh } = useFolders();
+  return (going: Going[], to: "archive" | "trash" | MoveMail, from: From) => {
+    const listed = from.folder !== undefined || from.q !== undefined;
+    const picked = typeof to === "object";
+    void Promise.allSettled(
+      going.map(({ mail, folder }) => {
+        const fromInbox = (mail.folder ?? "inbox").toLowerCase() === "inbox";
+        if (fromInbox) leave(mail.account_id, mail.uid);
+        if (listed) {
+          forgetListed(from, mailKey({ folder, account_id: mail.account_id, uid: mail.uid }));
+        }
+        const query = folder === undefined ? "" : `?${new URLSearchParams({ folder })}`;
+        return api(
+          "POST",
+          `/api/w/${workspace.id}/mails/${mail.account_id}/${mail.uid}/${picked ? "move" : to}${query}`,
+          picked ? to : undefined,
+          place,
+        ).catch((problem: unknown) => {
+          if (fromInbox) stay(mail.account_id, mail.uid);
+          throw problem;
+        });
+      }),
+    ).then((done) => {
+      refresh();
+      const refused = done.find((one) => one.status === "rejected");
+      if (refused) {
+        refusals.dispatchEvent(new CustomEvent("refused", { detail: messageOf(refused.reason) }));
+      }
+    });
+  };
+}
+
+/** Opens the list `from` names: a search, a sender's mail, a folder or the Inbox. */
+export function openList(
+  navigate: ReturnType<typeof useNavigate>,
+  workspace: string,
+  from: From,
+): void {
+  const params = { workspace };
+  if (from.q !== undefined) {
+    void navigate({ to: "/$workspace/search", params, search: { q: from.q } });
+  } else if (from.sender !== undefined) {
+    const sender = from.sender;
+    void navigate({ to: "/$workspace/newsletters/$sender", params: { ...params, sender } });
+  } else if (from.folder !== undefined) {
+    const folder = from.folder;
+    void navigate({ to: "/$workspace/folders/$folder", params: { ...params, folder } });
+  } else {
+    void navigate({ to: "/$workspace", params });
+  }
+}
 
 type Choice = { key: string; label: ReactNode; icon: ReactNode };
 
