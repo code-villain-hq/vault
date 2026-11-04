@@ -944,3 +944,42 @@ mod tests {
         assert!(calendar("http://127.0.0.1:5232").cleaned().is_ok());
     }
 }
+
+/// Where a parcel is, as the newest mail about it says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ParcelState {
+    /// Handed to the carrier, or on its way: what a tracking number says
+    /// when its mail says nothing more.
+    Shipped,
+    /// With the driver, coming today.
+    OutForDelivery,
+    /// Waiting to be picked up: a shop, a locker.
+    PickUp,
+    Delivered,
+}
+
+/// A parcel a mail gave a tracking number for.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Parcel {
+    /// The tracking number, without spaces.
+    pub number: String,
+    /// "DHL", "DPD", "Hermes"…, when the mail or the number tells.
+    pub carrier: Option<String>,
+    /// Where to follow it: the mail's own link, else the carrier's page,
+    /// else a page that finds the carrier itself.
+    pub track_url: String,
+    pub state: ParcelState,
+    /// The newest mail that names it: who sent it, and when.
+    pub mail: MailSummary,
+}
+
+/// `GET /api/w/{workspace}/parcels`: the parcels the mail on this Mac
+/// names, the ones still coming first.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Parcels {
+    pub parcels: Vec<Parcel>,
+}

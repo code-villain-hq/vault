@@ -35,6 +35,7 @@ import {
   Mail,
   MailWarning,
   Newspaper,
+  Package,
   RefreshCw,
   Send,
   SquarePen,
@@ -334,6 +335,16 @@ function MailNav() {
             {!newslettersMarked && <Unread count={newsletters?.unread ?? 0} />}
           </Link>
         </MaybeFolderMenu>
+        <Link
+          to="/$workspace/parcels"
+          params={{ workspace: workspace.url_key }}
+          className={navLink}
+          activeProps={{ className: "active" }}
+          title="Parcels (G then P)"
+        >
+          <NavIcon icon={Package} />
+          Parcels
+        </Link>
         <Link
           to="/$workspace/flagged"
           params={{ workspace: workspace.url_key }}
@@ -647,6 +658,7 @@ function Menus() {
       name: "Newsletters",
       go: () => void navigate({ to: "/$workspace/newsletters", params }),
     },
+    { key: "p", name: "Parcels", go: () => void navigate({ to: "/$workspace/parcels", params }) },
   ];
   for (const [key, folder] of [
     ["s", sent],
@@ -712,6 +724,14 @@ function useCommands(query: string): Command[] {
         hint: "G N",
         icon: <NavIcon icon={Newspaper} />,
         run: () => void navigate({ to: "/$workspace/newsletters", params }),
+      },
+      {
+        id: "parcels",
+        group: "Go to",
+        label: "Parcels",
+        hint: "G P",
+        icon: <NavIcon icon={Package} />,
+        run: () => void navigate({ to: "/$workspace/parcels", params }),
       },
       {
         id: "flagged",

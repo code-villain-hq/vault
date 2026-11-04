@@ -25,7 +25,8 @@ basics too, asked for beyond the storyboard: Cc and Bcc, files, and
 drafts kept in the account's Drafts. Step 4 is built:
 newsletters skip the Inbox for a page of their own (G then N), the ones
 you never open first, and Unsubscribe asks nothing. The week (5) is still
-to come.
+to come. Parcels (G then P), asked for beyond the storyboard, lists the
+tracking numbers your mail gives (below).
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -57,7 +58,7 @@ Run `bun run design:sync` after changing them in the vault.
   http://127.0.0.1:3026). They take any user name with the password
   `dev`. `bun run db:reset` wipes them.
 - `bun run seed`: the storyboard's morning: two accounts (Code Villain and
-  Lazarski) with ten mails (one with a PDF) and a few folders (Sent,
+  Lazarski) with a dozen mails (one with a PDF, two about parcels) and a few folders (Sent,
   Archive, Junk, Trash, Rechnungen…), and their calendars with today's
   events. A folder that has mail isn't filled again.
 - `bun run dev`: the Rust server (:7880) plus the web app (:5178, proxies
@@ -619,6 +620,26 @@ the page does (`pageName`), else as its mail does.
 
 Undo writes the rules back as they were and moves back the mail it moved.
 Like the ask field's, what it needs is kept in memory.
+
+## Parcels
+
+The Parcels page (`parcels.tsx`, `GET /parcels`, `parcels.rs`) lists the
+tracking numbers in the mail this Mac keeps: the Inbox's kept sources and
+the folders' (those a search asks, but Sent). Nothing asks a carrier, and
+no key or account is needed. A number comes from a `ParcelDelivery` the
+mail declares (schema.org JSON-LD), a link to a carrier's page with the
+number in it, a label ("Sendungsnummer:", "Tracking number", grouped
+digits joined), or a format only one carrier writes (`1Z…` UPS, `JJD…`
+DHL, `TBA…` Amazon, a UPU number ending in DE) in a mail about a parcel.
+The carrier is the number's, else the sender's domain, else the one the
+mail alone names. Where it is comes from the mail's words, the subject
+first: on its way, out for delivery, ready to pick up, delivered; a
+parcel keeps the furthest any of its mails said, and its newest mail,
+which the row names and opens. Track opens the mail's own link with the
+number, else the carrier's page (`CARRIERS`), else Parcels' page
+(parcelsapp.com), which finds the carrier itself. Delivered parcels go
+after 7 days, others after 60 without mail. What each mail gave is kept
+in memory, so a mail is read once while the server runs.
 
 ## Layout
 

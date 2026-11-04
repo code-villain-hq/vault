@@ -12,7 +12,7 @@ use crate::error::AppError;
 use crate::state::AppState;
 use crate::{
     accounts, archive, ask, caldav, connect, drafts, files, folders, mail, marks, newsletters,
-    rewrite, send, ws,
+    parcels, rewrite, send, ws,
 };
 
 /// The API, plus the built web app from `web_dir` when given.
@@ -66,6 +66,7 @@ pub fn router(state: AppState) -> Router {
         .route("/marked/{id}/undo", post(folders::undo_read))
         .route("/search", get(folders::search))
         .route("/flagged", get(marks::flagged))
+        .route("/parcels", get(parcels::list))
         .route("/newsletters", get(newsletters::list))
         .route("/newsletters/sender", get(newsletters::sender))
         .route("/newsletters/unsubscribe", post(newsletters::unsubscribe))

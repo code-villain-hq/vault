@@ -977,3 +977,89 @@ body {
   background: color-mix(in srgb, var(--fg) 25%, transparent);
   color: var(--fg);
 }
+
+/* Parcels, the ones still coming first: the shop and its number take what's
+   free; where it is, when its mail came and Track stand at the right. Out
+   for delivery and ready to pick up wear the accent, as they're what needs
+   you; a delivered one goes faint. */
+.parcels {
+  padding: 22px 16px 24px;
+}
+.pc-table {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 140px 84px auto;
+  column-gap: 12px;
+}
+.pc {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  min-height: 52px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+}
+.pc:hover {
+  background: var(--hover);
+}
+.pc .who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pc .name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc .name:focus-visible {
+  text-decoration: underline;
+}
+.pc .num {
+  overflow: hidden;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: var(--type-ui-small-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc .st,
+.pc .lw {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--type-ui-small-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc .st.waiting {
+  color: var(--accent);
+  font-weight: 600;
+}
+.pc .track {
+  gap: 6px;
+}
+.pc.done .name {
+  color: var(--faint);
+  font-weight: 400;
+}
+.pc.done .av {
+  opacity: 0.5;
+}
+/* On a phone where it is and when go under the shop. */
+@media (width < 560px) {
+  .parcels {
+    padding-inline: 4px;
+  }
+  .pc-table {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+  }
+  .pc .st,
+  .pc .lw {
+    grid-column: 2;
+  }
+  .pc .track {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}

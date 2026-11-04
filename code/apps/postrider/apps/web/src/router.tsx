@@ -4,6 +4,7 @@ import { Home, NotFound, WorkspaceLayout } from "./layout";
 import { MailboxLayout, NoMailOpen } from "./mailbox";
 import { MailPage } from "./message";
 import { NewslettersPage } from "./newsletters";
+import { ParcelsPage } from "./parcels";
 import { SenderPane } from "./sender";
 import { AccountsPage } from "./settings";
 
@@ -97,6 +98,12 @@ const newsletters = createRoute({
   path: "/newsletters",
   component: NewslettersPage,
 });
+// Every parcel the mail names, with where it is.
+const parcels = createRoute({
+  getParentRoute: () => workspace,
+  path: "/parcels",
+  component: ParcelsPage,
+});
 const accounts = createRoute({
   getParentRoute: () => workspace,
   path: "/settings/accounts",
@@ -110,6 +117,7 @@ const routeTree = root.addChildren([
   workspace.addChildren([
     mailbox.addChildren([inbox, mail, folder, search, flagged, sender]),
     newsletters,
+    parcels,
     accounts,
   ]),
 ]);

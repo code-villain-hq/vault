@@ -253,6 +253,21 @@ const accounts: {
         read: true,
       },
       {
+        from: "DPD Paketservice <info@dpd.test>",
+        subject: "Ihr Paket kommt heute",
+        body: "Ihr DPD Paket ist heute in Zustellung, zwischen 11:00 und 12:00 Uhr.\nPaketnummer: 09876543210123",
+        day: 0,
+        at: "07:40",
+      },
+      {
+        from: "Manufactum <versand@manufactum.test>",
+        subject: "Ihre Bestellung ist unterwegs",
+        body: "Wir haben Ihr Paket an DHL übergeben.\nSendungsnummer: 0034 0434 1234 5678 9012",
+        day: 2,
+        at: "09:15",
+        read: true,
+      },
+      {
         from: "DB Fernverkehr <buchung@bahn.test>",
         subject: "Ihre Fahrkarte: Berlin → Hamburg, Fr 14. Nov",
         body: "Vielen Dank für Ihre Buchung.",
