@@ -17,7 +17,9 @@ field at the foot of the list, where you ask Postrider something or tell
 it how to sort, and it makes the rule on the mail server, or sorts by
 reading on this Mac what no server rule can tell, says what it did, and
 Undo puts it back. Step 3 is built: C writes a new mail, and "More
-professional" writes yours again before you send it. Step 4 is built:
+professional" writes yours again before you send it. Writing has its
+basics too, asked for beyond the storyboard: Cc and Bcc, files, and
+drafts kept in the account's Drafts. Step 4 is built:
 newsletters skip the Inbox for a page of their own (G then N), the ones
 you never open first, and Unsubscribe asks nothing. The week (5) is still
 to come.
