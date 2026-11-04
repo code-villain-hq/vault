@@ -59,11 +59,13 @@ const inbox = createRoute({ getParentRoute: () => mailbox, path: "/", component:
 const mail = createRoute({
   getParentRoute: () => mailbox,
   path: "/mail/$account/$uid",
-  // The list it was opened from: a folder, by its key, or a search.
+  // The list it was opened from: a folder, by its key, a search, a sender
+  // or Flagged; and the folder it's in.
   validateSearch: (search: Record<string, unknown>): From => ({
     folder: text(search.folder),
     q: text(search.q),
     sender: text(search.sender),
+    flagged: search.flagged === true || search.flagged === "true" ? true : undefined,
   }),
   component: MailPage,
 });
@@ -76,6 +78,12 @@ const search = createRoute({
   getParentRoute: () => mailbox,
   path: "/search",
   validateSearch: (search: Record<string, unknown>): { q?: string } => ({ q: text(search.q) }),
+  component: NoMailOpen,
+});
+// Every account's flagged mail.
+const flagged = createRoute({
+  getParentRoute: () => mailbox,
+  path: "/flagged",
   component: NoMailOpen,
 });
 // What one sender sent, from the Newsletters page: by its address.
@@ -100,7 +108,7 @@ const routeTree = root.addChildren([
   login,
   signedIn,
   workspace.addChildren([
-    mailbox.addChildren([inbox, mail, folder, search, sender]),
+    mailbox.addChildren([inbox, mail, folder, search, flagged, sender]),
     newsletters,
     accounts,
   ]),

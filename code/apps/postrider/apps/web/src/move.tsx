@@ -35,7 +35,7 @@ export function useMoveMail() {
   const { leave, stay } = useInbox();
   const { refresh } = useFolders();
   return (going: Going[], to: "archive" | "trash" | MoveMail, from: From) => {
-    const listed = from.folder !== undefined || from.q !== undefined;
+    const listed = from.folder !== undefined || from.q !== undefined || from.flagged === true;
     const picked = typeof to === "object";
     void Promise.allSettled(
       going.map(({ mail, folder }) => {
@@ -65,14 +65,16 @@ export function useMoveMail() {
   };
 }
 
-/** Opens the list `from` names: a search, a sender's mail, a folder or the Inbox. */
+/** Opens the list `from` names: Flagged, a search, a sender's mail, a folder or the Inbox. */
 export function openList(
   navigate: ReturnType<typeof useNavigate>,
   workspace: string,
   from: From,
 ): void {
   const params = { workspace };
-  if (from.q !== undefined) {
+  if (from.flagged) {
+    void navigate({ to: "/$workspace/flagged", params });
+  } else if (from.q !== undefined) {
     void navigate({ to: "/$workspace/search", params, search: { q: from.q } });
   } else if (from.sender !== undefined) {
     const sender = from.sender;

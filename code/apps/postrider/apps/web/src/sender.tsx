@@ -241,7 +241,8 @@ export function useSenderKeys(sender: string, reading: boolean) {
       // G then I goes to the Inbox: the shortcuts took that I already.
       if (event.defaultPrevented || !shortcutFree(event)) return;
       const key = event.key.toLowerCase();
-      if ((key !== "u" && key !== "i") || !ready) return;
+      // ⇧U marks the focused mail unread (`marks.tsx`).
+      if ((key !== "u" && key !== "i") || event.shiftKey || !ready) return;
       event.preventDefault();
       void (key === "u" ? unsubscribe() : keep());
     };

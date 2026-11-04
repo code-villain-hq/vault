@@ -26,6 +26,7 @@ export type * from "./generated/MailAccountCreate";
 export type * from "./generated/MailAccountPatch";
 export type * from "./generated/MailRef";
 export type * from "./generated/MailSummary";
+export type * from "./generated/MarkMail";
 export type * from "./generated/MarkedRead";
 export type * from "./generated/Me";
 export type * from "./generated/Message";

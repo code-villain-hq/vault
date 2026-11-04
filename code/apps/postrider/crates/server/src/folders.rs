@@ -337,8 +337,14 @@ impl Mail {
                     Ok(()) => {}
                     Err(Failure::Offline(_)) => {
                         let uids: Vec<i64> = read.uids.iter().map(|uid| i64::from(*uid)).collect();
-                        self.queue_seen(read.account.id, &read.place.path, &uids, false)
-                            .await?;
+                        self.queue_marks(
+                            read.account.id,
+                            &read.place.path,
+                            &uids,
+                            Some(false),
+                            None,
+                        )
+                        .await?;
                         self.keep_now();
                     }
                     Err(failure) => return Err(failure),
@@ -588,16 +594,19 @@ impl Mail {
             String,
             DateTime<Utc>,
             bool,
+            bool,
         );
         let rows: Vec<Row> = sqlx::query_as(
-            "SELECT account_id, uid, from_name, from_address, subject, snippet, date, seen \
-             FROM inbox_mails WHERE account_id = ANY($1)",
+            "SELECT account_id, uid, from_name, from_address, subject, snippet, date, seen, \
+             flagged FROM inbox_mails WHERE account_id = ANY($1)",
         )
         .bind(&ids)
         .fetch_all(&self.pool)
         .await?;
         let inbox = Place::inbox();
-        for (account_id, uid, from_name, from_address, subject, snippet, date, seen) in rows {
+        for (account_id, uid, from_name, from_address, subject, snippet, date, seen, flagged) in
+            rows
+        {
             let mail = MailSummary {
                 account_id,
                 folder: Some(inbox.key()),
@@ -608,6 +617,7 @@ impl Mail {
                 snippet,
                 date,
                 seen,
+                flagged,
                 to_name: None,
             };
             if has_words(&mail, words) {
@@ -615,7 +625,7 @@ impl Mail {
             }
         }
         let mut kept: HashSet<(Uuid, String, i64)> = HashSet::new();
-        for (account_id, place, line) in self.kept_lines(&ids).await? {
+        for (account_id, place, line) in self.kept_lines(&ids, false).await? {
             if !searched(&place) {
                 continue;
             }
@@ -659,6 +669,7 @@ impl Mail {
                     uid: *uid,
                     summary: line.clone(),
                     seen: true,
+                    flagged: false,
                 };
                 let mail = summary(*account_id, &place, line);
                 if has_words(&mail, words) {
@@ -739,6 +750,7 @@ impl Mail {
         let (place, raw) = self.source_of(&account, Some(key), uid).await?;
         let kept = self.kept_line(account.id, &place.path, uid).await?;
         let seen = kept.as_ref().is_some_and(|(line, _)| line.seen);
+        let flagged = kept.as_ref().is_some_and(|(line, _)| line.flagged);
         let known = kept.map(|(line, _)| line.summary).or_else(|| {
             self.lock_lines()
                 .get(&(account.id, place.path.clone()))
@@ -748,6 +760,7 @@ impl Mail {
             uid,
             summary: known.unwrap_or_else(|| imap::summarize(&raw, None)),
             seen: true,
+            flagged,
         };
         if !seen {
             let mail = Arc::clone(self);
@@ -825,12 +838,13 @@ pub(crate) fn summary(account_id: Uuid, place: &Place, line: Line) -> MailSummar
         snippet,
         date,
         seen: line.seen,
+        flagged: line.flagged,
         to_name: (place.role == Some(FolderRole::Sent)).then_some(to_name),
     }
 }
 
 /// Whether a search asks the folder: not Drafts, Trash or Junk.
-fn searched(place: &Place) -> bool {
+pub(crate) fn searched(place: &Place) -> bool {
     !matches!(
         place.role,
         Some(FolderRole::Drafts | FolderRole::Trash | FolderRole::Junk)
@@ -1012,6 +1026,7 @@ mod tests {
             snippet: "Den Betrag buchen wir am 5. November ab.".into(),
             date: Utc::now(),
             seen: true,
+            flagged: false,
             to_name: Some("Kristina".into()),
         }
     }

@@ -358,7 +358,7 @@ export function NewslettersPage() {
       } else if (row && ((key === "Enter" && event.target === document.body) || key === "o")) {
         event.preventDefault();
         void navigate(senderMail(workspace.url_key, row));
-      } else if (row && key === "u" && !done.has(senderKey(row))) {
+      } else if (row && key === "u" && !event.shiftKey && !done.has(senderKey(row))) {
         event.preventDefault();
         void unsubscribe([row]);
       } else if (row && key === "i" && !done.has(senderKey(row)) && !event.defaultPrevented) {

@@ -7,7 +7,9 @@ is the approved storyboard; build from it, a step at a time, not beyond it.
 Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
 Trash and the other folders in the sidebar, Search mail (/), All, Unread
 and Read on every list (F), Settings → Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
-R to reply, A to reply to all, F to forward, and its files to open. A folder's name in the top bar renames
+R to reply, A to reply to all, F to forward, ⇧U to mark it unread
+(or read), S to flag it, and its files to open. Flagged, in the
+sidebar, lists every account's flagged mail. A folder's name in the top bar renames
 it; a right click on a sidebar item, or ⇧F10 on it, marks it all read,
 renames or deletes it, or empties Trash and Junk. A mail opens beside its list, in three columns: the
 sidebar, the list, the mail. Esc closes it, J and K or ↓ and ↑ move. A narrow window
@@ -144,7 +146,7 @@ name and counts (`kept_folders`), its newest 100 lines (`folder_mails`)
 and the whole text of its newest mail (`folder_sources`). The keeper
 (`kept::keep`, started by `serve.rs`) asks each online account for its
 folders (LIST) and every folder's counts at once on one connection
-(`STATUS` with MESSAGES, UNSEEN, UIDNEXT and UIDVALIDITY, `imap::counts`;
+(`STATUS` with MESSAGES, UNSEEN, UIDNEXT, UIDVALIDITY and HIGHESTMODSEQ, `imap::counts`;
 logged at debug as counts only). It reads a folder's lines again only
 when those counts changed since it last did (`stamp`): new lines whole,
 the flags of those it has. Then it reads ahead the text of the newest
@@ -156,7 +158,7 @@ emptied, renamed or deleted) changes what's kept as soon as the server
 has done it, then the keeper looks again.
 
 While an account's server can't be reached, moving mail (E, ⌫, V, a
-drag), opening it, Mark all as read and its Undo are done on this Mac's
+drag), opening it, ⇧U and S, Mark all as read and its Undo are done on this Mac's
 copy at once and wait in Postgres for the server (`queued.rs`,
 `queued_mails` and `queued_reads`). The watcher does them as soon as it's
 back in, before it reads the Inbox, and the keeper before it reads the
@@ -257,6 +259,21 @@ Offline, moving and reading wait for it (above).
   account with the rules that sort into it. Empty Trash… and Empty Junk…
   (`POST /folders/{key}/empty`) delete their mail for good. Both ask
   first, Cancel focused.
+- ⇧U marks a mail unread, or read, and S flags it or takes its flag
+  (`marks.rs`, `marks.tsx`, `POST /mails/{account}/{uid}/mark[?folder=]`
+  with `MarkMail`: `seen`, `flagged`), on a list's row and on the open
+  mail, whose toolbar has both. On a conversation's row ⇧U reads all its
+  unread Inbox mail, else marks its newest unread; S takes the flag off
+  all its flagged mail, else flags its newest. The page shows it at
+  once; the Inbox keeps that until its copy is newer than the mark
+  (`mark` in `mail.tsx`), a folder's list is changed in place
+  (`markListed` in `folders.tsx`), and a refusal puts it back. Offline it
+  waits in `queued_mails` (`seen`, `flagged`), as reading does. Flagged
+  (`GET /flagged`, `FlaggedList`) is the Inbox's flagged mail, opened as
+  Inbox mail, and the kept lines' of the folders a search asks, newest
+  first. The Inbox's copy keeps flagged mail however old, and the
+  keeper's stamp counts HIGHESTMODSEQ, so a flag set elsewhere is read.
+  Mail unflagged while Flagged shows stays in it until you leave.
 - R replies (`send.rs`, `compose.tsx`): to the mail's Reply-To, else its
   sender, from the account it came to, in its thread, quoting it. A
   replies to all: to them, and in Cc to whom else the mail went to and
@@ -584,7 +601,7 @@ Like the ask field's, what it needs is kept in memory.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
   `mail.rs`, the folders and search in `folders.rs`, what this Mac keeps
   of them in `kept.rs`, what waits for a server that can't be reached in
-  `queued.rs`, conversations in
+  `queued.rs`, read and flagged marks in `marks.rs`, conversations in
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
   text part numbers its links with, HTML tags or entities; a migration

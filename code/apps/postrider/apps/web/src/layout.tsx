@@ -28,6 +28,7 @@ import {
   Check,
   ChevronsUpDown,
   FilePen,
+  Flag,
   Folder,
   Inbox,
   type LucideIcon,
@@ -331,6 +332,14 @@ function MailNav() {
             {!newslettersMarked && <Unread count={newsletters?.unread ?? 0} />}
           </Link>
         </MaybeFolderMenu>
+        <Link
+          to="/$workspace/flagged"
+          params={{ workspace: workspace.url_key }}
+          className={`${navLink} ${list === FLAGGED ? "active" : ""}`}
+        >
+          <NavIcon icon={Flag} />
+          Flagged
+        </Link>
         {sent && <FolderLink folder={sent} icon={Send} open={list} title="Sent (G then S)" quiet />}
         {archive && (
           <FolderLink folder={archive} icon={Archive} open={list} title="Archive (G then A)" />
@@ -356,14 +365,19 @@ function MaybeFolderMenu({ folder, children }: { folder?: MailFolder; children: 
   return folder ? <FolderMenu folder={folder}>{children}</FolderMenu> : children;
 }
 
+/** `useOpenList` for a mail opened from Flagged: no folder's key has a slash and no space. */
+const FLAGGED = "/flagged";
+
 /**
  * The list an opened mail belongs to, by its folder's key in lower case:
- * "" for the Inbox; undefined on any other page, or for a search.
+ * "" for the Inbox, `FLAGGED` for Flagged; undefined on any other page, or
+ * for a search.
  */
 function useOpenList(): string | undefined {
   const { pathname, search } = useLocation();
   if (!pathname.includes("/mail/")) return undefined;
-  const from = search as { folder?: string; q?: string };
+  const from = search as { folder?: string; q?: string; flagged?: boolean };
+  if (from.flagged) return FLAGGED;
   return from.q === undefined ? (from.folder?.toLowerCase() ?? "") : undefined;
 }
 
@@ -540,6 +554,8 @@ const SECTIONS: ShortcutSection[] = [
     keys: [
       ["J K or ↓ ↑", "Next and previous mail"],
       ["Enter or O", "Open the mail"],
+      ["⇧U", "Mark it unread, or read"],
+      ["S", "Flag it, or unflag it"],
       ["F", "All mail, only unread or only read, with no mail open"],
       ["/", "Search mail"],
     ],
@@ -577,6 +593,8 @@ const SECTIONS: ShortcutSection[] = [
       ["E", "Archive, and open the next"],
       ["⌫", "Delete, and open the next"],
       ["V", "Move to a folder, or a new one"],
+      ["⇧U", "Mark it unread, or read"],
+      ["S", "Flag it, or unflag it"],
       ["Esc", "Close it"],
     ],
   },
@@ -671,6 +689,13 @@ function useCommands(query: string): Command[] {
         hint: "G N",
         icon: <NavIcon icon={Newspaper} />,
         run: () => void navigate({ to: "/$workspace/newsletters", params }),
+      },
+      {
+        id: "flagged",
+        group: "Go to",
+        label: "Flagged",
+        icon: <NavIcon icon={Flag} />,
+        run: () => void navigate({ to: "/$workspace/flagged", params }),
       },
       ...[
         { folder: sent, icon: Send, hint: "G S" },

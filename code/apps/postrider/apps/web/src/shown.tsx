@@ -1,6 +1,6 @@
 // What a list shows: all of it, what's unread or what's read. Each list
 // keeps its own while the app runs: the Inbox, each folder, each sender's
-// mail, the search and the Newsletters page's senders. F, or the control in
+// mail, Flagged, the search and the Newsletters page's senders. F, or the control in
 // the list's top bar, goes from one to the next. What a list showed since
 // its filter was picked stays while you're on it, so mail you open in
 // Unread doesn't leave under you.
@@ -32,6 +32,7 @@ export function show(list: string, to: Shown) {
 
 /** The list a mail list is, by where it was opened from. */
 export function listOf(from: From): string {
+  if (from.flagged) return "flagged";
   if (from.q !== undefined) return "search";
   if (from.sender !== undefined) return `sender:${from.sender.toLowerCase()}`;
   if (from.folder !== undefined) return `folder:${from.folder.toLowerCase()}`;

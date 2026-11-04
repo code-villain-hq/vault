@@ -312,6 +312,8 @@ impl Mail {
                         snippet,
                         date,
                         seen,
+                        // Kept for conversations without its flags.
+                        flagged: false,
                         to_name,
                     };
                     let joins = Joins {
@@ -538,6 +540,7 @@ mod tests {
             snippet: String::new(),
             date: when,
             seen: true,
+            flagged: false,
             to_name: None,
         }
     }

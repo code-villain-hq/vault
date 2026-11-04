@@ -12,8 +12,11 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import {
   Archive,
   ArrowLeft,
+  Flag,
   Forward,
   FolderInput,
+  Mail,
+  MailOpen,
   Paperclip,
   Reply,
   ReplyAll,
@@ -33,11 +36,14 @@ import {
   openedFrom,
   ownAddresses,
   rememberOpened,
+  type Row,
   rowsOf,
+  unreadRow,
   useRowsShown,
 } from "./inbox";
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
+import { flaggedRow, flagToggle, readToggle, useMarkMail } from "./marks";
 import { conversationGoing, MoveDialog, openList, useMoveMail } from "./move";
 import { pageName } from "./newsletters";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
@@ -53,7 +59,8 @@ import { useWorkspace } from "./workspace";
  * while Space and the wheel scroll the mail; E archives it, ⌫ deletes it
  * and V moves it to a folder, the conversation's Inbox mail all at once,
  * and it closes on the list, at the next; R answers it, a conversation's
- * last mail but yours. A newsletter, opened from its sender's list or not,
+ * last mail but yours. ⇧U marks it unread or read, S flags it or not, a
+ * conversation as its row in the Inbox. A newsletter, opened from its sender's list or not,
  * leads with Unsubscribe (U) and Keep in Inbox (I), done in its sender's
  * view (`sender.tsx`). Postrider opens no mail you didn't: opening one
  * marks it read.
@@ -64,11 +71,12 @@ export function MailPage() {
   const { workspace } = useWorkspace();
   const { inbox } = useInbox();
   const moveMail = useMoveMail();
+  const markMail = useMarkMail();
   const accounts = useAccounts();
   const navigate = useNavigate();
   const back = useBack(from);
   const key = mailKey({ folder: from.folder, account_id: account, uid: Number(uid) });
-  const listed = from.folder !== undefined || from.q !== undefined;
+  const listed = from.folder !== undefined || from.q !== undefined || from.flagged === true;
   const listedMails = useListedMails(from);
   const own = useMemo(() => ownAddresses(accounts), [accounts]);
   const folder = from.folder;
@@ -127,6 +135,13 @@ export function MailPage() {
       : summary;
   const answeredKey = answered && (conversation ? mailKey(answered) : key);
   const unfolded = useUnfolded(thread, letters, [key, answeredKey]);
+  // Read or not, flagged or not, as its row in the list says now: a
+  // conversation as its Inbox mail is.
+  const live = letters.find((letter) => letter.key === key)?.mail ?? summary;
+  const row: Row | undefined =
+    conversation && at ? { mail: at, conversation } : live && { mail: live };
+  const unread = row !== undefined && unreadRow(row);
+  const flagged = row !== undefined && flaggedRow(row);
 
   useEffect(() => rememberOpened(key), [key]);
 
@@ -201,7 +216,19 @@ export function MailPage() {
         // G then A goes to Archive: the shortcuts took that A already.
         event.preventDefault();
         setAnswering("all");
-      } else if ((key === "u" || key === "i") && newsletter && !event.defaultPrevented) {
+      } else if (key === "u" && event.shiftKey && row) {
+        event.preventDefault();
+        markMail(readToggle(row));
+      } else if (key === "s" && !event.shiftKey && !event.defaultPrevented && row) {
+        // G then S goes to Sent: the shortcuts took that S already.
+        event.preventDefault();
+        markMail(flagToggle(row));
+      } else if (
+        (key === "u" || key === "i") &&
+        !event.shiftKey &&
+        newsletter &&
+        !event.defaultPrevented
+      ) {
         // G then I goes to the Inbox: the shortcuts took that I already.
         event.preventDefault();
         ask(key === "u" ? "unsubscribe" : "keep");
@@ -277,6 +304,21 @@ export function MailPage() {
                 icon={Forward}
                 label="Forward (F)"
                 onClick={() => setAnswering("forward")}
+              />
+            </>
+          )}
+          {row && !drafting && (
+            <>
+              <ReaderButton
+                icon={unread ? MailOpen : Mail}
+                label={unread ? "Mark as read (⇧U)" : "Mark as unread (⇧U)"}
+                onClick={() => markMail(readToggle(row))}
+              />
+              <ReaderButton
+                icon={Flag}
+                label={flagged ? "Unflag (S)" : "Flag (S)"}
+                on={flagged}
+                onClick={() => markMail(flagToggle(row))}
               />
             </>
           )}
@@ -420,8 +462,8 @@ function Said({
     ).then(
       (answer) => {
         onRead(key, answer);
-        if (folder === undefined) return;
         if (from.current) markSeen(from.current, key);
+        if (folder === undefined) return;
         if (unread.current) refresh();
       },
       (problem: unknown) => {
@@ -516,6 +558,7 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
   const navigate = useNavigate();
   const listed = useListedMails(from);
   const go = () => openList(navigate, workspace.url_key, from);
+  if (from.flagged) return { name: "Flagged", href: `/${workspace.url_key}/flagged`, go };
   if (from.q !== undefined) {
     const search = { q: from.q };
     return {
@@ -548,21 +591,24 @@ function useBack(from: From): { name: string; href: string; go: () => void } {
 function ReaderButton({
   icon: Icon,
   label,
+  on,
   onClick,
 }: {
   icon: typeof Reply;
   label: string;
+  /** A mark the mail has, as a flag: filled, in its colour. */
+  on?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className="ui-button ui-icon-button"
+      className={`ui-button ui-icon-button ${on ? "text-warn" : ""}`}
       aria-label={label}
       title={label}
       onClick={onClick}
     >
-      <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+      <Icon size={16} strokeWidth={1.75} fill={on ? "currentColor" : "none"} aria-hidden="true" />
     </button>
   );
 }

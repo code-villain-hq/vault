@@ -26,6 +26,10 @@ snippet: string, date: string,
  */
 seen: boolean, 
 /**
+ * Flagged (`\Flagged`), to come back to.
+ */
+flagged: boolean, 
+/**
  * Who it went to, in a list of sent mail, where that's what matters.
  */
 to_name: string | null, };

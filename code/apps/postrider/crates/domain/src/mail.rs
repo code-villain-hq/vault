@@ -297,6 +297,9 @@ pub struct MailSummary {
     pub date: DateTime<Utc>,
     /// Read (`\Seen`), on the server.
     pub seen: bool,
+    /// Flagged (`\Flagged`), to come back to.
+    #[serde(default)]
+    pub flagged: bool,
     /// Who it went to, in a list of sent mail, where that's what matters.
     pub to_name: Option<String>,
 }
@@ -722,6 +725,17 @@ pub struct MarkedRead {
 #[ts(export)]
 pub struct RenameFolder {
     pub name: String,
+}
+
+/// A mail marked read or unread, flagged or not: what's left out stays
+/// as it is.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MarkMail {
+    #[ts(optional)]
+    pub seen: Option<bool>,
+    #[ts(optional)]
+    pub flagged: Option<bool>,
 }
 
 /// Where a mail goes: a folder's key, or the name of a new one.

@@ -1,6 +1,7 @@
 import { shortcutFree } from "@code-villain/web";
 import type { AccountStatus, Conversation, Day, MailAccount, MailSummary } from "@postrider/types";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { Flag } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { FIRST_HOUR, HOURS, hoursIntoTrack, inLanes, nextUp } from "./day";
@@ -8,6 +9,7 @@ import { carry, putDown } from "./drag";
 import { SearchField } from "./folders";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
+import { flaggedRow, flagToggle, readToggle, useMarkMail } from "./marks";
 import { conversationGoing, openList } from "./move";
 import { listOf, NoneShown, pick, ShownControl, useShown } from "./shown";
 import { buttonClass, Empty } from "./ui";
@@ -70,11 +72,15 @@ export function isYours(mail: MailSummary, own: Set<string>): boolean {
   return mail.folder === "sent" || own.has(mail.from_address.toLowerCase());
 }
 
-/** Which list a mail was opened from: the Inbox, a folder, or a search. */
-export type From = { folder?: string; q?: string; sender?: string };
+/**
+ * Which list a mail was opened from: the Inbox, a folder, a search, a
+ * sender's mail or Flagged; and the folder it's in, but the Inbox.
+ */
+export type From = { folder?: string; q?: string; sender?: string; flagged?: boolean };
 
 /** The mail page's search for a mail of the list `from`. */
 export function openedFrom(mail: MailSummary, from: From): From {
+  if (from.flagged) return { folder: mail.folder ?? undefined, flagged: true };
   if (from.q !== undefined) return { folder: mail.folder ?? undefined, q: from.q };
   if (from.sender !== undefined) return { folder: from.folder, sender: from.sender };
   return from.folder ? { folder: from.folder } : {};
@@ -134,7 +140,8 @@ export function useRowsShown(from: From, rows: Row[], open: string | undefined):
  * through it, Enter or O opens the one they're on. With a mail open beside
  * it (`open`, its key), the mail takes the keys and the list follows it.
  * One that leaves the list, filed away, leaves them on the mail that takes
- * its place. The Inbox lists `conversations`, the others `mails`, as
+ * its place. ⇧U marks the one they're on read or unread, S flags it or
+ * not (`marks.tsx`). The Inbox lists `conversations`, the others `mails`, as
  * its filter shows them: all, unread or read. A row dragged onto a folder
  * in the sidebar moves there (`drag.tsx`); the open one closes, as E does.
  */
@@ -159,6 +166,7 @@ export function MailList({
   const listed = useMemo(() => rowsOf(mails, conversations), [mails, conversations]);
   const rows = useRowsShown(from, listed, open);
   const own = useMemo(() => ownAddresses(byId.values()), [byId]);
+  const markMail = useMarkMail();
   // By key, so new mail at the top doesn't move it to another; where it
   // was, for when it leaves.
   const [focus, setFocus] = useState({ key: open ?? lastOpened, at: 0 });
@@ -187,6 +195,13 @@ export function MailList({
         event.preventDefault();
         const next = rows[Math.min(Math.max(focused + step, 0), rows.length - 1)];
         if (next) setFocusedKey(mailKey(next.mail));
+      } else if (key === "u" && event.shiftKey && rows[focused]) {
+        event.preventDefault();
+        markMail(readToggle(rows[focused]));
+      } else if (key === "s" && !event.shiftKey && !event.defaultPrevented && rows[focused]) {
+        // G then S goes to Sent: the shortcuts took that S already.
+        event.preventDefault();
+        markMail(flagToggle(rows[focused]));
       } else if ((key === "Enter" && event.target === document.body) || key === "o") {
         const mail = rows[focused]?.mail;
         if (!mail) return;
@@ -276,6 +291,7 @@ function MailRow({
   const all = conversation?.mails ?? [mail];
   const last = all.at(-1) ?? mail;
   const unread = unreadRow({ mail, conversation });
+  const flagged = flaggedRow({ mail, conversation });
   const others = [...new Set(all.filter((m) => !isYours(m, own)).map((m) => m.from_name))];
   // Sent mail names who it went to.
   const who = conversation ? others.join(", ") || mail.from_name : (mail.to_name ?? mail.from_name);
@@ -298,7 +314,7 @@ function MailRow({
           putDown();
           setDragged(false);
         }}
-        className={`mail ${unread ? "unread" : ""} ${focused ? "focused" : ""} ${selected ? "selected" : ""} ${dragged ? "opacity-50" : ""}`}
+        className={`mail ${unread ? "unread" : ""} ${flagged ? "flagged" : ""} ${focused ? "focused" : ""} ${selected ? "selected" : ""} ${dragged ? "opacity-50" : ""}`}
         aria-current={selected ? "true" : undefined}
         style={hue(account?.hue ?? 1)}
         title={account ? `${mail.from_address}, to ${account.name}` : mail.from_address}
@@ -318,6 +334,16 @@ function MailRow({
           {mailTime(last.date, now)}
         </time>
         <span className="subject">{mail.subject || "(no subject)"}</span>
+        {flagged && (
+          <Flag
+            className="flag"
+            size={13}
+            strokeWidth={1.75}
+            fill="currentColor"
+            role="img"
+            aria-label="Flagged"
+          />
+        )}
         {last.snippet && <span className="snippet">{snippet}</span>}
       </Link>
     </li>

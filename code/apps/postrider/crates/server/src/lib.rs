@@ -20,6 +20,7 @@ pub mod judging;
 pub mod kept;
 pub mod local;
 pub mod mail;
+pub mod marks;
 pub mod message;
 pub mod newsletters;
 pub mod preview;

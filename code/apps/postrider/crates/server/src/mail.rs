@@ -295,6 +295,7 @@ impl Mail {
             String,
             DateTime<Utc>,
             bool,
+            bool,
             String,
             Option<Vec<String>>,
             Vec<String>,
@@ -302,7 +303,7 @@ impl Mail {
         );
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT m.account_id, m.uid, m.from_name, m.from_address, m.subject, m.snippet, \
-             m.date, m.seen, m.message_id, m.refs, m.to_addresses, m.reply_to \
+             m.date, m.seen, m.flagged, m.message_id, m.refs, m.to_addresses, m.reply_to \
              FROM inbox_mails m JOIN mail_accounts a ON a.id = m.account_id \
              WHERE a.workspace_id = $1 ORDER BY m.date DESC, m.uid DESC LIMIT $2",
         )
@@ -322,6 +323,7 @@ impl Mail {
                     snippet,
                     date,
                     seen,
+                    flagged,
                     message_id,
                     refs,
                     to_addresses,
@@ -337,6 +339,7 @@ impl Mail {
                         snippet,
                         date,
                         seen,
+                        flagged,
                         to_name: None,
                     };
                     let joins = Joins {
@@ -378,16 +381,16 @@ impl Mail {
         uid: i64,
     ) -> Result<Message, AppError> {
         let account = self.account(workspace_id, account_id).await?;
-        type Row = (String, String, String, String, DateTime<Utc>, bool);
+        type Row = (String, String, String, String, DateTime<Utc>, bool, bool);
         let row: Option<Row> = sqlx::query_as(
-            "SELECT from_name, from_address, subject, snippet, date, seen FROM inbox_mails \
-             WHERE account_id = $1 AND uid = $2",
+            "SELECT from_name, from_address, subject, snippet, date, seen, flagged \
+             FROM inbox_mails WHERE account_id = $1 AND uid = $2",
         )
         .bind(account_id)
         .bind(uid)
         .fetch_optional(&self.pool)
         .await?;
-        let Some((from_name, from_address, subject, snippet, date, seen)) = row else {
+        let Some((from_name, from_address, subject, snippet, date, seen, flagged)) = row else {
             return Err(AppError::not_found(
                 "This mail isn't in the Inbox any more.",
             ));
@@ -409,6 +412,7 @@ impl Mail {
             snippet,
             date,
             seen: true,
+            flagged,
             to_name: None,
         };
         Ok(message::opened(&raw, summary))
@@ -634,7 +638,10 @@ impl Mail {
             }
         }
         if waits {
-            if let Err(e) = self.queue_seen(account.id, &folder, &[uid], true).await {
+            if let Err(e) = self
+                .queue_marks(account.id, &folder, &[uid], Some(true), None)
+                .await
+            {
                 tracing::warn!("couldn't keep a mail read for its server: {e}");
                 return;
             }

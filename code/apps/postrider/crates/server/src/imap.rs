@@ -223,8 +223,9 @@ pub async fn sync_inbox(
         changed = kept.is_some();
     }
 
-    // The newest mails, by sequence number, with whether they're read.
-    let mut on_server: HashMap<i64, bool> = HashMap::new();
+    // The newest mails, by sequence number, and those flagged however old,
+    // with whether they're read and flagged.
+    let mut on_server: HashMap<i64, (bool, bool)> = HashMap::new();
     if mailbox.exists > 0 {
         let first = mailbox.exists.saturating_sub(KEEP - 1).max(1);
         let fetches: Vec<Fetch> = session
@@ -234,25 +235,41 @@ pub async fn sync_inbox(
             .await?;
         for fetch in &fetches {
             if let Some(uid) = fetch.uid {
-                on_server.insert(i64::from(uid), is_seen(fetch));
+                on_server.insert(i64::from(uid), (is_seen(fetch), is_flagged(fetch)));
+            }
+        }
+        let newest: Vec<i64> = on_server.keys().copied().collect();
+        let flagged = flagged_besides(session, &newest).await?;
+        if !flagged.is_empty() {
+            let fetches: Vec<Fetch> = session
+                .uid_fetch(uid_list(&flagged), "(UID FLAGS)")
+                .await?
+                .try_collect()
+                .await?;
+            for fetch in &fetches {
+                if let Some(uid) = fetch.uid {
+                    on_server.insert(i64::from(uid), (is_seen(fetch), is_flagged(fetch)));
+                }
             }
         }
     }
 
-    let kept: HashMap<i64, bool> =
-        sqlx::query_as::<_, (i64, bool)>("SELECT uid, seen FROM inbox_mails WHERE account_id = $1")
-            .bind(account_id)
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .collect();
+    let kept: HashMap<i64, (bool, bool)> = sqlx::query_as::<_, (i64, bool, bool)>(
+        "SELECT uid, seen, flagged FROM inbox_mails WHERE account_id = $1",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|(uid, seen, flagged)| (uid, (seen, flagged)))
+    .collect();
 
     // What waits for the server (`queued.rs`) stays as it was done here:
     // a mail moved away isn't copied back, one moved here keeps its line,
-    // and one marked read or unread stays so.
-    let waiting: Vec<(i64, bool, bool)> = sqlx::query_as(
-        "SELECT uid, to_path IS NOT NULL, seen IS NOT NULL FROM queued_mails \
-         WHERE account_id = $1 AND path = 'INBOX' AND uid_validity = $2",
+    // and one marked read or unread, flagged or not, stays so.
+    let waiting: Vec<(i64, bool, bool, bool)> = sqlx::query_as(
+        "SELECT uid, to_path IS NOT NULL, seen IS NOT NULL, flagged IS NOT NULL \
+         FROM queued_mails WHERE account_id = $1 AND path = 'INBOX' AND uid_validity = $2",
     )
     .bind(account_id)
     .bind(validity)
@@ -260,6 +277,7 @@ pub async fn sync_inbox(
     .await?;
     let moved_away: HashSet<i64> = waiting.iter().filter(|w| w.1).map(|w| w.0).collect();
     let marked: HashSet<i64> = waiting.iter().filter(|w| w.2).map(|w| w.0).collect();
+    let flag_marked: HashSet<i64> = waiting.iter().filter(|w| w.3).map(|w| w.0).collect();
     let moved_here: HashSet<i64> = sqlx::query_scalar(
         "SELECT placeholder FROM queued_mails WHERE account_id = $1 AND to_path = 'INBOX'",
     )
@@ -276,7 +294,7 @@ pub async fn sync_inbox(
     .bind(validity)
     .fetch_one(pool)
     .await?;
-    for (uid, seen) in &mut on_server {
+    for (uid, (seen, _)) in &mut on_server {
         *seen |= *uid < read_below;
     }
 
@@ -295,23 +313,39 @@ pub async fn sync_inbox(
         changed = true;
     }
 
-    // Read or unread somewhere else since.
-    let (flipped, flipped_seen): (Vec<i64>, Vec<bool>) = on_server
-        .iter()
-        .filter(|(uid, seen)| {
-            !marked.contains(uid) && kept.get(uid).is_some_and(|was| was != *seen)
-        })
-        .map(|(uid, seen)| (*uid, *seen))
-        .unzip();
+    // Read or unread, flagged or not, somewhere else since.
+    let mut flipped: Vec<(i64, bool, bool)> = Vec::new();
+    for (uid, (seen, flagged)) in &on_server {
+        let Some(&(was_seen, was_flagged)) = kept.get(uid) else {
+            continue;
+        };
+        let seen = if marked.contains(uid) {
+            was_seen
+        } else {
+            *seen
+        };
+        let flagged = if flag_marked.contains(uid) {
+            was_flagged
+        } else {
+            *flagged
+        };
+        if (seen, flagged) != (was_seen, was_flagged) {
+            flipped.push((*uid, seen, flagged));
+        }
+    }
     if !flipped.is_empty() {
+        let uids: Vec<i64> = flipped.iter().map(|f| f.0).collect();
+        let seen: Vec<bool> = flipped.iter().map(|f| f.1).collect();
+        let flagged: Vec<bool> = flipped.iter().map(|f| f.2).collect();
         sqlx::query(
-            "UPDATE inbox_mails m SET seen = f.seen \
-             FROM unnest($2::bigint[], $3::bool[]) AS f(uid, seen) \
+            "UPDATE inbox_mails m SET seen = f.seen, flagged = f.flagged \
+             FROM unnest($2::bigint[], $3::bool[], $4::bool[]) AS f(uid, seen, flagged) \
              WHERE m.account_id = $1 AND m.uid = f.uid",
         )
         .bind(account_id)
-        .bind(&flipped)
-        .bind(&flipped_seen)
+        .bind(&uids)
+        .bind(&seen)
+        .bind(&flagged)
         .execute(pool)
         .await?;
         changed = true;
@@ -351,9 +385,10 @@ pub async fn sync_inbox(
             sqlx::query(
                 "INSERT INTO inbox_mails \
                  (account_id, uid, from_name, from_address, subject, snippet, date, seen, \
-                 message_id, refs, to_addresses, reply_to) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
-                 ON CONFLICT (account_id, uid) DO UPDATE SET seen = EXCLUDED.seen",
+                 message_id, refs, to_addresses, reply_to, flagged) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) \
+                 ON CONFLICT (account_id, uid) DO UPDATE \
+                 SET seen = EXCLUDED.seen, flagged = EXCLUDED.flagged",
             )
             .bind(account_id)
             .bind(uid)
@@ -367,6 +402,7 @@ pub async fn sync_inbox(
             .bind(&summary.threading.refs)
             .bind(&summary.threading.to_addresses)
             .bind(&summary.threading.reply_to)
+            .bind(is_flagged(fetch))
             .execute(pool)
             .await?;
             changed = true;
@@ -673,26 +709,16 @@ pub async fn select_queued(
 }
 
 /// Does what waited for one mail of the folder selected: marks it read or
-/// unread, then moves it. Whether its server took it.
+/// unread, flagged or not, then moves it. Whether its server took it.
 pub async fn replay_mail(
     session: &mut Session,
     uid: i64,
     seen: Option<bool>,
+    flagged: Option<bool>,
     to: Option<&str>,
 ) -> Result<bool, Failure> {
     let done = async {
-        if let Some(seen) = seen {
-            let flags = if seen {
-                "+FLAGS.SILENT (\\Seen)"
-            } else {
-                "-FLAGS.SILENT (\\Seen)"
-            };
-            session
-                .uid_store(uid.to_string(), flags)
-                .await?
-                .try_collect::<Vec<_>>()
-                .await?;
-        }
+        store_marks(session, uid, seen, flagged).await?;
         if let Some(to) = to {
             session.uid_mv(uid.to_string(), to).await?;
         }
@@ -700,6 +726,41 @@ pub async fn replay_mail(
     }
     .await;
     took(done)
+}
+
+/// Marks one mail of `folder` read or unread, flagged or not: what's
+/// `None` stays as it is. Its server's NO is [`Failure::Refused`].
+pub async fn mark(
+    session: &mut Session,
+    folder: &str,
+    uid: i64,
+    seen: Option<bool>,
+    flagged: Option<bool>,
+) -> Result<(), Failure> {
+    session.select(folder).await.map_err(answered)?;
+    store_marks(session, uid, seen, flagged)
+        .await
+        .map_err(answered)
+}
+
+/// Sets or takes away `\Seen` and `\Flagged` on one mail of the folder
+/// selected.
+async fn store_marks(
+    session: &mut Session,
+    uid: i64,
+    seen: Option<bool>,
+    flagged: Option<bool>,
+) -> Result<(), async_imap::error::Error> {
+    for (on, flag) in [(seen, "\\Seen"), (flagged, "\\Flagged")] {
+        let Some(on) = on else { continue };
+        let sign = if on { '+' } else { '-' };
+        session
+            .uid_store(uid.to_string(), format!("{sign}FLAGS.SILENT ({flag})"))
+            .await?
+            .try_collect::<Vec<_>>()
+            .await?;
+    }
+    Ok(())
 }
 
 /// Marks read every unread mail of the folder selected under UID `below`:
@@ -1022,23 +1083,31 @@ pub async fn folders(session: &mut Session) -> Result<Vec<Place>, Failure> {
 
 /// What STATUS counts in a folder: all it holds, what's unread, the UID
 /// its next mail gets, and what its UIDs mean. Mail that came, left, or was
-/// read or marked unread elsewhere changes one of them.
+/// read or marked unread elsewhere changes one of them; with CONDSTORE
+/// (RFC 7162), `modseq` changes with any flag too, so a mail flagged
+/// elsewhere is read again.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Counted {
     pub total: u32,
     pub unseen: u32,
     pub next: u32,
     pub validity: u32,
+    pub modseq: u64,
 }
 
 impl Counted {
-    /// The four as one text, as [`crate::kept`] keeps what its lines were
+    /// The counts as one text, as [`crate::kept`] keeps what its lines were
     /// read under.
     pub fn stamp(&self) -> String {
-        format!(
+        let counts = format!(
             "{}:{}:{}:{}",
             self.validity, self.next, self.total, self.unseen
-        )
+        );
+        if self.modseq == 0 {
+            counts
+        } else {
+            format!("{counts}:{}", self.modseq)
+        }
     }
 }
 
@@ -1046,10 +1115,12 @@ impl Counted {
 /// write and the answers are read as they come, so the folders cost the
 /// server one round trip, not one each (IMAP lets a client send commands
 /// without waiting, RFC 3501 5.5). A folder the server says no to is left
-/// out.
+/// out. `modseq` asks for HIGHESTMODSEQ too, which only a server with
+/// CONDSTORE knows.
 pub async fn counts(
     session: &mut Session,
     folders: &[String],
+    modseq: bool,
 ) -> Result<HashMap<String, Counted>, Failure> {
     use async_imap::imap_proto::{MailboxDatum, Response, Status, StatusAttribute};
 
@@ -1062,8 +1133,9 @@ pub async fn counts(
     let mut commands = Vec::new();
     for (n, folder) in folders.iter().enumerate() {
         let tag = format!("S{n}");
+        let more = if modseq { " HIGHESTMODSEQ" } else { "" };
         commands.push(format!(
-            "{tag} STATUS {} (MESSAGES UNSEEN UIDNEXT UIDVALIDITY)",
+            "{tag} STATUS {} (MESSAGES UNSEEN UIDNEXT UIDVALIDITY{more})",
             quoted(folder)?
         ));
         waiting.insert(tag, folder);
@@ -1086,6 +1158,7 @@ pub async fn counts(
                         StatusAttribute::Messages(n) => count.total = *n,
                         StatusAttribute::UidNext(n) => count.next = *n,
                         StatusAttribute::UidValidity(n) => count.validity = *n,
+                        StatusAttribute::HighestModSeq(n) => count.modseq = *n,
                         _ => {}
                     }
                 }
@@ -1262,6 +1335,7 @@ pub struct Line {
     pub uid: i64,
     pub summary: Summary,
     pub seen: bool,
+    pub flagged: bool,
 }
 
 /// Mails read from a folder, under its UIDVALIDITY.
@@ -1293,6 +1367,7 @@ pub async fn newest(
             .iter()
             .filter_map(|f| f.uid.map(i64::from))
             .collect();
+        uids.extend(flagged_besides(session, &uids).await?);
     }
     let empty = HashMap::new();
     let known = if validity == known_validity {
@@ -1302,6 +1377,27 @@ pub async fn newest(
     };
     let lines = lines(session, &uids, known).await?;
     Ok(Lines { validity, lines })
+}
+
+/// The flagged mails of the folder selected that `uids` doesn't have,
+/// however old: so the Flagged list has them all.
+/// UIDs as an IMAP set: `4,8,15`.
+fn uid_list(uids: &[i64]) -> String {
+    uids.iter()
+        .map(i64::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+async fn flagged_besides(session: &mut Session, uids: &[i64]) -> Result<Vec<i64>, Failure> {
+    let flagged: HashSet<u32> = session.uid_search("FLAGGED").await?;
+    let mut besides: Vec<i64> = flagged
+        .into_iter()
+        .map(i64::from)
+        .filter(|uid| !uids.contains(uid))
+        .collect();
+    besides.sort_unstable();
+    Ok(besides)
 }
 
 /// The newest `count` mails in a folder that `query` (an IMAP search, as
@@ -1437,9 +1533,12 @@ async fn lines(
         .await?
         .try_collect()
         .await?;
-    let seen: HashMap<i64, bool> = fetches
+    let marks: HashMap<i64, (bool, bool)> = fetches
         .iter()
-        .filter_map(|f| f.uid.map(|uid| (i64::from(uid), is_seen(f))))
+        .filter_map(|f| {
+            f.uid
+                .map(|uid| (i64::from(uid), (is_seen(f), is_flagged(f))))
+        })
         .collect();
     let mut read: HashMap<i64, Summary> = HashMap::new();
     let missing: Vec<i64> = uids
@@ -1468,10 +1567,12 @@ async fn lines(
         .iter()
         .filter_map(|uid| {
             let summary = known.get(uid).or_else(|| read.get(uid))?.clone();
+            let (seen, flagged) = *marks.get(uid)?;
             Some(Line {
                 uid: *uid,
                 summary,
-                seen: *seen.get(uid)?,
+                seen,
+                flagged,
             })
         })
         .collect())
@@ -1581,6 +1682,10 @@ async fn fetch_headers(
 
 fn is_seen(fetch: &Fetch) -> bool {
     fetch.flags().any(|flag| flag == Flag::Seen)
+}
+
+fn is_flagged(fetch: &Fetch) -> bool {
+    fetch.flags().any(|flag| flag == Flag::Flagged)
 }
 
 /// What the list shows of a mail.
@@ -1865,7 +1970,7 @@ mod tests {
         .await
         .unwrap();
         let folders = ["Archive", "Rechnungen 2026", "Gone"].map(String::from);
-        let counted = counts(&mut session, &folders).await.unwrap();
+        let counted = counts(&mut session, &folders, false).await.unwrap();
         assert_eq!(
             server.await.unwrap(),
             [
@@ -1880,6 +1985,7 @@ mod tests {
             unseen: 0,
             next: 4,
             validity: 5,
+            modseq: 0,
         };
         assert_eq!(counted["Archive"], archive);
         assert_eq!(counted["Archive"].stamp(), "5:4:3:0");

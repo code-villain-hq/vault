@@ -300,6 +300,7 @@ mod tests {
             snippet: String::new(),
             date: Utc::now(),
             seen: false,
+            flagged: false,
             to_name: None,
         }
     }

@@ -1171,6 +1171,7 @@ pub(crate) fn as_read(raw: &[u8], account_id: Uuid, at_most: usize) -> String {
         snippet: String::new(),
         date: Utc::now(),
         seen: true,
+        flagged: false,
         to_name: None,
     };
     let opened = message::read(raw, summary);

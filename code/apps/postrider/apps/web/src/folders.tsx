@@ -1,5 +1,12 @@
 import { shortcutFree } from "@code-villain/web";
-import type { Folder, FolderLink, Listing, RenameFolder } from "@postrider/types";
+import type {
+  Folder,
+  FolderLink,
+  Listing,
+  MailSummary,
+  MarkMail,
+  RenameFolder,
+} from "@postrider/types";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -25,7 +32,7 @@ const watchers = new Set<() => void>();
 let version = 0;
 
 function keep(key: string, listing: Listing, here = false) {
-  listings.set(key, listing);
+  listings.set(key, key === FLAGGED ? withStaying(listing) : listing);
   if (here) partial.add(key);
   else partial.delete(key);
   version += 1;
@@ -37,7 +44,11 @@ function watch(watcher: () => void) {
   return () => void watchers.delete(watcher);
 }
 
+/** The Flagged list's key: no folder's, whatever its name. */
+const FLAGGED = "flagged";
+
 function listKey(from: From): string {
+  if (from.flagged) return FLAGGED;
   if (from.q !== undefined) return `search:${from.q}`;
   if (from.sender !== undefined) return `sender:${from.sender.toLowerCase()}`;
   return `folder:${from.folder?.toLowerCase()}`;
@@ -66,6 +77,85 @@ export function markSeen(from: From, key: string) {
     },
     partial.has(listKey(from)),
   );
+}
+
+/** Whether two lines are the same mail: the Inbox's has no folder, or "inbox". */
+function sameMail(a: MailSummary, b: MailSummary): boolean {
+  return (
+    a.account_id === b.account_id &&
+    a.uid === b.uid &&
+    (a.folder ?? "inbox").toLowerCase() === (b.folder ?? "inbox").toLowerCase()
+  );
+}
+
+/**
+ * A mail marked read or unread, flagged or not (`marks.tsx`), in every list
+ * kept here that shows it, at once; and how to put them back, should its
+ * server refuse.
+ */
+export function markListed(mail: MailSummary, marks: MarkMail): () => void {
+  const was = new Map<string, MailSummary>();
+  for (const [key, listing] of listings) {
+    const found = listing.mails.find((m) => sameMail(m, mail));
+    if (!found) continue;
+    was.set(key, found);
+    keep(
+      key,
+      {
+        ...listing,
+        mails: listing.mails.map((m) =>
+          m === found
+            ? { ...m, seen: marks.seen ?? m.seen, flagged: marks.flagged ?? m.flagged }
+            : m,
+        ),
+      },
+      partial.has(key),
+    );
+  }
+  // Unflagged while the Flagged list shows, it stays there until you leave
+  // it, so S again flags it back.
+  const flagged = was.get(FLAGGED);
+  if (flaggedShown > 0 && flagged && marks.flagged === false) {
+    staying.set(mailKey(flagged), { ...flagged, flagged: false });
+  } else if (marks.flagged) {
+    for (const [key, stays] of staying) if (sameMail(stays, mail)) staying.delete(key);
+  }
+  return () => {
+    for (const [key, old] of was) {
+      const listing = listings.get(key);
+      if (!listing) continue;
+      keep(
+        key,
+        {
+          ...listing,
+          mails: listing.mails.map((m) =>
+            sameMail(m, old) ? { ...m, seen: old.seen, flagged: old.flagged } : m,
+          ),
+        },
+        partial.has(key),
+      );
+    }
+    if (marks.flagged === false) staying.delete(mailKey(mail));
+  };
+}
+
+/** The mail unflagged while the Flagged list shows, by key: it stays on it. */
+const staying = new Map<string, MailSummary>();
+/** How many Flagged lists show (one, or none). */
+let flaggedShown = 0;
+
+/** The Flagged list, with what was unflagged on it since it showed, newest first. */
+function withStaying(listing: Listing): Listing {
+  const listed = new Set(listing.mails.map(mailKey));
+  const stays = [...staying.values()].filter((mail) => !listed.has(mailKey(mail)));
+  if (!stays.length) return listing;
+  return {
+    ...listing,
+    // As the server orders it: newest first, then by UID.
+    mails: [...listing.mails, ...stays].sort(
+      (a, b) => b.date.localeCompare(a.date) || b.uid - a.uid,
+    ),
+  };
 }
 
 /** Every mail a folder's list shows, read: as when it was marked read at once. */
@@ -189,6 +279,46 @@ export function FolderList({ folder, open }: { folder: string; open: string | un
       </PageHeader>
       <PageBody>
         <Mails from={from} open={open} listing={listing} error={error} waiting={waiting} />
+      </PageBody>
+    </>
+  );
+}
+
+/**
+ * Every account's flagged mail, newest first, in the list column: the
+ * Inbox's, and the folders' a search asks (not Drafts, Trash or Junk), as
+ * this Mac keeps them. S unflags one; it stays until you leave the list.
+ */
+export function FlaggedList({ open }: { open: string | undefined }) {
+  const { minutes } = useFolders();
+  const version = useInbox().inbox?.version;
+  const from = useMemo(() => ({ flagged: true }), []);
+  useEffect(() => {
+    flaggedShown += 1;
+    return () => {
+      flaggedShown -= 1;
+      staying.clear();
+      const listing = listings.get(FLAGGED);
+      if (listing)
+        listings.set(FLAGGED, { ...listing, mails: listing.mails.filter((m) => m.flagged) });
+    };
+  }, []);
+  const { listing, error, waiting } = useListing(from, "/flagged", `${minutes}:${version}`);
+  return (
+    <>
+      <PageHeader title="Flagged">
+        <ShownControl list={listOf(from)} />
+        <SearchField />
+      </PageHeader>
+      <PageBody>
+        <Mails
+          from={from}
+          open={open}
+          listing={listing}
+          error={error}
+          waiting={waiting}
+          none="Nothing flagged."
+        />
       </PageBody>
     </>
   );

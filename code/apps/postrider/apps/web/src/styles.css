@@ -394,6 +394,18 @@ input.crumb-name {
 .mail .subject {
   grid-area: subject;
 }
+/* Flagged: a flag at the subject's end, under when it came. */
+.mail.flagged {
+  grid-template-areas:
+    "dot av who count when"
+    ". av subject subject flag"
+    ". . snippet snippet snippet";
+}
+.mail .flag {
+  grid-area: flag;
+  justify-self: end;
+  color: var(--warn);
+}
 .mail .snippet {
   grid-area: snippet;
   color: var(--faint);

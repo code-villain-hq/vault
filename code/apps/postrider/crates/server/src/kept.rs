@@ -136,7 +136,8 @@ impl Mail {
                 Box::pin(async move {
                     let places = imap::folders(session).await?;
                     let paths: Vec<String> = places.iter().map(|p| p.path.clone()).collect();
-                    let counts = imap::counts(session, &paths).await?;
+                    let modseq = session.capabilities().await?.has_str("CONDSTORE");
+                    let counts = imap::counts(session, &paths, modseq).await?;
                     Ok((places, counts))
                 })
             })
@@ -407,7 +408,7 @@ impl Mail {
         }
         let rows: Vec<KeptRow> = sqlx::query_as(
             "SELECT uid, message_id, from_name, from_address, to_name, subject, snippet, date, \
-             seen FROM folder_mails WHERE account_id = $1 AND path = $2 \
+             seen, flagged FROM folder_mails WHERE account_id = $1 AND path = $2 \
              ORDER BY date DESC, uid DESC LIMIT $3",
         )
         .bind(account_id)
@@ -422,10 +423,12 @@ impl Mail {
         ))
     }
 
-    /// Every kept line of the accounts' folders, with its folder.
+    /// Every kept line of the accounts' folders, with its folder; only the
+    /// flagged ones with `flagged_only`.
     pub(crate) async fn kept_lines(
         &self,
         account_ids: &[Uuid],
+        flagged_only: bool,
     ) -> Result<Vec<(Uuid, Place, Line)>, sqlx::Error> {
         type Row = (
             Uuid,
@@ -441,14 +444,16 @@ impl Mail {
             String,
             DateTime<Utc>,
             bool,
+            bool,
         );
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT m.account_id, f.path, f.name, f.role, m.uid, m.message_id, m.from_name, \
-             m.from_address, m.to_name, m.subject, m.snippet, m.date, m.seen \
+             m.from_address, m.to_name, m.subject, m.snippet, m.date, m.seen, m.flagged \
              FROM folder_mails m JOIN kept_folders f USING (account_id, path) \
-             WHERE m.account_id = ANY($1)",
+             WHERE m.account_id = ANY($1) AND (m.flagged OR NOT $2)",
         )
         .bind(account_ids)
+        .bind(flagged_only)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows
@@ -468,6 +473,7 @@ impl Mail {
                     snippet,
                     date,
                     seen,
+                    flagged,
                 )| {
                     let row = (
                         uid,
@@ -479,6 +485,7 @@ impl Mail {
                         snippet,
                         date,
                         seen,
+                        flagged,
                     );
                     (account_id, place(path, name, role.as_deref()), line(row))
                 },
@@ -504,7 +511,7 @@ impl Mail {
         };
         let rows: Vec<KeptRow> = sqlx::query_as(
             "SELECT uid, message_id, from_name, from_address, to_name, subject, snippet, date, \
-             seen FROM folder_mails WHERE account_id = $1 AND path = $2",
+             seen, flagged FROM folder_mails WHERE account_id = $1 AND path = $2",
         )
         .bind(account_id)
         .bind(path)
@@ -538,11 +545,12 @@ impl Mail {
             String,
             DateTime<Utc>,
             bool,
+            bool,
             i64,
         );
         let row: Option<Row> = sqlx::query_as(
             "SELECT m.uid, m.message_id, m.from_name, m.from_address, m.to_name, m.subject, \
-             m.snippet, m.date, m.seen, f.uid_validity \
+             m.snippet, m.date, m.seen, m.flagged, f.uid_validity \
              FROM folder_mails m JOIN kept_folders f USING (account_id, path) \
              WHERE m.account_id = $1 AND m.path = $2 AND m.uid = $3",
         )
@@ -562,6 +570,7 @@ impl Mail {
                 snippet,
                 date,
                 seen,
+                flagged,
                 validity,
             )| {
                 let row = (
@@ -574,6 +583,7 @@ impl Mail {
                     snippet,
                     date,
                     seen,
+                    flagged,
                 );
                 (line(row), validity)
             },
@@ -677,6 +687,30 @@ impl Mail {
         Ok(())
     }
 
+    /// A folder's kept mail flagged or not, as its server has it now.
+    pub(crate) async fn flagged_kept(
+        &self,
+        account_id: Uuid,
+        path: &str,
+        uid: i64,
+        flagged: bool,
+    ) -> Result<(), sqlx::Error> {
+        let changed = sqlx::query(
+            "UPDATE folder_mails SET flagged = $4 \
+             WHERE account_id = $1 AND path = $2 AND uid = $3 AND flagged <> $4",
+        )
+        .bind(account_id)
+        .bind(path)
+        .bind(uid)
+        .bind(flagged)
+        .execute(&self.pool)
+        .await?;
+        if changed.rows_affected() > 0 {
+            self.bump();
+        }
+        Ok(())
+    }
+
     /// A folder whose every mail was marked read, or that was emptied
     /// (`gone`): so it's kept.
     pub(crate) async fn all_kept(
@@ -752,7 +786,8 @@ impl Mail {
         let uids: Vec<i64> = read.lines.iter().map(|line| line.uid).collect();
         // What waits for the server (`queued.rs`) stays as it was done
         // here: a mail moved here keeps its line, one moved away isn't
-        // kept again, and one marked read or unread stays so.
+        // kept again, and one marked read or unread, flagged or not, stays
+        // so.
         let gone = sqlx::query(
             "DELETE FROM folder_mails m WHERE account_id = $1 AND path = $2 \
              AND NOT uid = ANY($3) AND NOT EXISTS (SELECT 1 FROM queued_mails q \
@@ -772,20 +807,33 @@ impl Mail {
         };
         let dates: Vec<DateTime<Utc>> = read.lines.iter().map(|line| line.summary.date).collect();
         let seen: Vec<bool> = read.lines.iter().map(|line| line.seen).collect();
+        let flagged: Vec<bool> = read.lines.iter().map(|line| line.flagged).collect();
         let kept = sqlx::query(
-            "INSERT INTO folder_mails (account_id, path, uid, message_id, from_name, \
-             from_address, to_name, subject, snippet, date, seen) \
-             SELECT $1, $2, l.* FROM UNNEST($3::bigint[], $4::text[], $5::text[], $6::text[], \
-             $7::text[], $8::text[], $9::text[], $10::timestamptz[], $11::boolean[]) \
-             AS l(uid, message_id, from_name, from_address, to_name, subject, snippet, date, seen) \
+            "WITH l AS (SELECT l.uid, l.message_id, l.from_name, l.from_address, l.to_name, \
+               l.subject, l.snippet, l.date, \
+               CASE WHEN k.uid IS NULL OR (NOT EXISTS (SELECT 1 FROM queued_mails q \
+                   WHERE q.account_id = $1 AND q.path = $2 AND q.uid = l.uid \
+                   AND q.seen IS NOT NULL) \
+                 AND NOT EXISTS (SELECT 1 FROM queued_reads r WHERE r.account_id = $1 \
+                   AND r.path = $2 AND l.uid < r.below AND NOT l.seen)) \
+               THEN l.seen ELSE k.seen END AS seen, \
+               CASE WHEN k.uid IS NULL OR NOT EXISTS (SELECT 1 FROM queued_mails q \
+                   WHERE q.account_id = $1 AND q.path = $2 AND q.uid = l.uid \
+                   AND q.flagged IS NOT NULL) \
+               THEN l.flagged ELSE k.flagged END AS flagged \
+             FROM UNNEST($3::bigint[], $4::text[], $5::text[], $6::text[], $7::text[], \
+               $8::text[], $9::text[], $10::timestamptz[], $11::boolean[], $12::boolean[]) \
+               AS l(uid, message_id, from_name, from_address, to_name, subject, snippet, date, \
+               seen, flagged) \
+             LEFT JOIN folder_mails k ON k.account_id = $1 AND k.path = $2 AND k.uid = l.uid) \
+             INSERT INTO folder_mails (account_id, path, uid, message_id, from_name, \
+             from_address, to_name, subject, snippet, date, seen, flagged) \
+             SELECT $1, $2, l.* FROM l \
              WHERE NOT EXISTS (SELECT 1 FROM queued_mails q WHERE q.account_id = $1 \
                AND q.path = $2 AND q.uid = l.uid AND q.to_path IS NOT NULL) \
-             ON CONFLICT (account_id, path, uid) DO UPDATE SET seen = EXCLUDED.seen \
-             WHERE folder_mails.seen <> EXCLUDED.seen AND NOT EXISTS (SELECT 1 \
-               FROM queued_mails q WHERE q.account_id = $1 AND q.path = $2 \
-               AND q.uid = folder_mails.uid AND q.seen IS NOT NULL) \
-             AND NOT EXISTS (SELECT 1 FROM queued_reads r WHERE r.account_id = $1 \
-               AND r.path = $2 AND folder_mails.uid < r.below AND NOT EXCLUDED.seen)",
+             ON CONFLICT (account_id, path, uid) \
+             DO UPDATE SET seen = EXCLUDED.seen, flagged = EXCLUDED.flagged \
+             WHERE folder_mails.seen <> EXCLUDED.seen OR folder_mails.flagged <> EXCLUDED.flagged",
         )
         .bind(account_id)
         .bind(&place.path)
@@ -798,6 +846,7 @@ impl Mail {
         .bind(column(|s| &s.snippet))
         .bind(&dates)
         .bind(&seen)
+        .bind(&flagged)
         .execute(&mut *tx)
         .await?;
         changed |= kept.rows_affected() > 0;
@@ -929,7 +978,7 @@ impl Mail {
 }
 
 /// A kept line: its UID, Message-ID, who sent it and to whom, its
-/// subject, start and date, and whether it's read.
+/// subject, start and date, and whether it's read and flagged.
 type KeptRow = (
     i64,
     String,
@@ -940,10 +989,12 @@ type KeptRow = (
     String,
     DateTime<Utc>,
     bool,
+    bool,
 );
 
 fn line(row: KeptRow) -> Line {
-    let (uid, message_id, from_name, from_address, to_name, subject, snippet, date, seen) = row;
+    let (uid, message_id, from_name, from_address, to_name, subject, snippet, date, seen, flagged) =
+        row;
     Line {
         uid,
         summary: Summary {
@@ -957,6 +1008,7 @@ fn line(row: KeptRow) -> Line {
             threading: imap::Threading::default(),
         },
         seen,
+        flagged,
     }
 }
 

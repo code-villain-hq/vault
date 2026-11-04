@@ -38,6 +38,7 @@ struct Held {
     snippet: String,
     date: DateTime<Utc>,
     seen: bool,
+    flagged: bool,
     refs: Option<Vec<String>>,
     to_addresses: Vec<String>,
     reply_to: String,
@@ -114,39 +115,45 @@ impl Mail {
         Ok(moved)
     }
 
-    /// Keeps mails marked read or unread for their server: those this
-    /// Mac's copy shows in the folder at `path`. The copy itself is the
-    /// caller's to change.
-    pub(crate) async fn queue_seen(
+    /// Keeps mails marked read or unread, flagged or not, for their
+    /// server: those this Mac's copy shows in the folder at `path`. What's
+    /// `None` stays as it waits. The copy itself is the caller's to change.
+    pub(crate) async fn queue_marks(
         &self,
         account_id: Uuid,
         path: &str,
         uids: &[i64],
-        seen: bool,
+        seen: Option<bool>,
+        flagged: Option<bool>,
     ) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
         // Mails moved here: their server has them where they were.
         sqlx::query(
-            "UPDATE queued_mails SET seen = $4 \
+            "UPDATE queued_mails SET seen = coalesce($4, seen), flagged = coalesce($5, flagged) \
              WHERE account_id = $1 AND to_path = $2 AND placeholder = ANY($3)",
         )
         .bind(account_id)
         .bind(path)
         .bind(uids)
         .bind(seen)
+        .bind(flagged)
         .execute(&mut *tx)
         .await?;
         if let Some(validity) = validity_of(&mut tx, account_id, path).await? {
             sqlx::query(
-                "INSERT INTO queued_mails (account_id, path, uid, uid_validity, seen) \
-                 SELECT $1, $2, uid, $5, $4 FROM unnest($3::bigint[]) AS u(uid) WHERE uid > 0 \
-                 ON CONFLICT (account_id, path, uid) DO UPDATE SET seen = EXCLUDED.seen",
+                "INSERT INTO queued_mails (account_id, path, uid, uid_validity, seen, flagged) \
+                 SELECT $1, $2, uid, $5, $4, $6 FROM unnest($3::bigint[]) AS u(uid) \
+                 WHERE uid > 0 \
+                 ON CONFLICT (account_id, path, uid) DO UPDATE \
+                 SET seen = coalesce(EXCLUDED.seen, queued_mails.seen), \
+                 flagged = coalesce(EXCLUDED.flagged, queued_mails.flagged)",
             )
             .bind(account_id)
             .bind(path)
             .bind(uids)
             .bind(seen)
             .bind(validity)
+            .bind(flagged)
             .execute(&mut *tx)
             .await?;
         }
@@ -443,16 +450,24 @@ async fn replay(
     session: &mut Session,
 ) -> Result<Replayed, Failure> {
     let mut replayed = Replayed::default();
-    type Row = (String, i64, i64, Option<bool>, Option<String>, Option<i64>);
+    type Row = (
+        String,
+        i64,
+        i64,
+        Option<bool>,
+        Option<bool>,
+        Option<String>,
+        Option<i64>,
+    );
     let mails: Vec<Row> = sqlx::query_as(
-        "SELECT path, uid, uid_validity, seen, to_path, placeholder FROM queued_mails \
+        "SELECT path, uid, uid_validity, seen, flagged, to_path, placeholder FROM queued_mails \
          WHERE account_id = $1 ORDER BY path, uid_validity, at",
     )
     .bind(account_id)
     .fetch_all(pool)
     .await?;
     let mut selected: Option<(String, i64, bool)> = None;
-    for (path, uid, validity, seen, to, placeholder) in mails {
+    for (path, uid, validity, seen, flagged, to, placeholder) in mails {
         let there = match &selected {
             Some((at, under, there)) if *at == path && *under == validity => *there,
             _ => {
@@ -461,7 +476,7 @@ async fn replay(
                 there
             }
         };
-        let took = there && imap::replay_mail(session, uid, seen, to.as_deref()).await?;
+        let took = there && imap::replay_mail(session, uid, seen, flagged, to.as_deref()).await?;
         let mut tx = pool.begin().await?;
         if !took {
             tracing::info!(path, uid, "let go of a change its server refused");
@@ -542,6 +557,7 @@ async fn shift(
              coalesce(from_name, '') AS from_name, coalesce(from_address, '') AS from_address, \
              coalesce(to_name, '') AS to_name, coalesce(subject, '') AS subject, \
              coalesce(snippet, '') AS snippet, coalesce(date, now()) AS date, false AS seen, \
+             false AS flagged, \
              refs, coalesce(to_addresses, '{}') AS to_addresses, \
              coalesce(reply_to, '') AS reply_to \
              FROM queued_mails WHERE account_id = $1 AND placeholder = $2",
@@ -552,6 +568,7 @@ async fn shift(
         .await?;
         held = Held {
             seen: held.seen,
+            flagged: held.flagged,
             raw: held.raw,
             ..was
         };
@@ -569,7 +586,8 @@ async fn shift(
         .await?;
         sqlx::query(
             "DELETE FROM queued_mails \
-             WHERE account_id = $1 AND path = $2 AND uid = $3 AND seen IS NULL",
+             WHERE account_id = $1 AND path = $2 AND uid = $3 AND seen IS NULL \
+             AND flagged IS NULL",
         )
         .bind(account_id)
         .bind(&path)
@@ -647,7 +665,7 @@ async fn take(
         let held: Option<Held> = sqlx::query_as(
             "DELETE FROM inbox_mails WHERE account_id = $1 AND uid = $2 \
              RETURNING message_id, from_name, from_address, '' AS to_name, subject, snippet, \
-             date, seen, refs, to_addresses, reply_to",
+             date, seen, flagged, refs, to_addresses, reply_to",
         )
         .bind(account_id)
         .bind(uid)
@@ -666,7 +684,7 @@ async fn take(
     let held: Option<Held> = sqlx::query_as(
         "DELETE FROM folder_mails WHERE account_id = $1 AND path = $2 AND uid = $3 \
          RETURNING message_id, from_name, from_address, to_name, subject, snippet, date, seen, \
-         NULL::text[] AS refs, '{}'::text[] AS to_addresses, '' AS reply_to",
+         flagged, NULL::text[] AS refs, '{}'::text[] AS to_addresses, '' AS reply_to",
     )
     .bind(account_id)
     .bind(path)
@@ -703,8 +721,8 @@ async fn put(
     if path == INBOX {
         sqlx::query(
             "INSERT INTO inbox_mails (account_id, uid, from_name, from_address, subject, \
-             snippet, date, seen, message_id, refs, to_addresses, reply_to) \
-             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12 \
+             snippet, date, seen, message_id, refs, to_addresses, reply_to, flagged) \
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13 \
              WHERE EXISTS (SELECT 1 FROM inboxes WHERE account_id = $1) \
              ON CONFLICT DO NOTHING",
         )
@@ -720,6 +738,7 @@ async fn put(
         .bind(&held.refs)
         .bind(&held.to_addresses)
         .bind(&held.reply_to)
+        .bind(held.flagged)
         .execute(&mut *db)
         .await?;
         if let Some(raw) = &held.raw {
@@ -738,8 +757,8 @@ async fn put(
     }
     let kept = sqlx::query(
         "INSERT INTO folder_mails (account_id, path, uid, message_id, from_name, from_address, \
-         to_name, subject, snippet, date, seen) \
-         SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11 \
+         to_name, subject, snippet, date, seen, flagged) \
+         SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12 \
          WHERE EXISTS (SELECT 1 FROM kept_folders WHERE account_id = $1 AND path = $2) \
          ON CONFLICT DO NOTHING",
     )
@@ -754,6 +773,7 @@ async fn put(
     .bind(&held.snippet)
     .bind(held.date)
     .bind(held.seen)
+    .bind(held.flagged)
     .execute(&mut *db)
     .await?;
     if kept.rows_affected() == 0 {

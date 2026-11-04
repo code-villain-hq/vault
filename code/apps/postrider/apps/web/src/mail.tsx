@@ -1,4 +1,11 @@
-import type { AccountStatus, Folder, Inbox, MailAccount, MailSummary } from "@postrider/types";
+import type {
+  AccountStatus,
+  Folder,
+  Inbox,
+  MailAccount,
+  MailSummary,
+  MarkMail,
+} from "@postrider/types";
 import {
   createContext,
   type CSSProperties,
@@ -32,6 +39,11 @@ type InboxState = {
   leave: (accountId: string, uid: number) => void;
   /** Puts it back, when its server refused. */
   stay: (accountId: string, uid: number) => void;
+  /**
+   * Shows an Inbox mail marked at once, read or unread, flagged or not;
+   * the answer says whether its server took it (`marks.tsx`).
+   */
+  mark: (accountId: string, uid: number, marks: MarkMail) => (took: boolean) => void;
   /** Asks every account's server now, as the sync button does. */
   sync: () => void;
   /** A sync is on its way. */
@@ -44,6 +56,7 @@ const Context = createContext<InboxState>({
   offline: false,
   leave: () => undefined,
   stay: () => undefined,
+  mark: () => () => undefined,
   sync: () => undefined,
   syncing: false,
   synced: 0,
@@ -58,6 +71,13 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const { workspace, place } = useWorkspace();
   const [state, setState] = useState<{ inbox?: Inbox; offline: boolean }>({ offline: false });
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
+  // Marks shown before the Inbox has them: until its server answered, then
+  // until the Inbox changes again (`until`, its version then).
+  const [marked, setMarked] = useState<ReadonlyMap<string, Marked>>(new Map());
+  const version = state.inbox?.version ?? 0;
+  const versionNow = useRef(version);
+  versionNow.current = version;
+  const marks = useRef(0);
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(0);
   const asked = useRef(false);
@@ -107,6 +127,34 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+  const mark = useCallback((accountId: string, uid: number, wanted: MarkMail) => {
+    const key = `${accountId}:${uid}`;
+    marks.current += 1;
+    const token = marks.current;
+    setMarked((was) =>
+      new Map(was).set(key, { ...was.get(key), ...wanted, until: undefined, token }),
+    );
+    return (took: boolean) =>
+      setMarked((was) => {
+        const mine = was.get(key);
+        // A later mark of the same mail took its place.
+        if (mine?.token !== token) return was;
+        const next = new Map(was);
+        if (took) next.set(key, { ...mine, until: versionNow.current });
+        else next.delete(key);
+        return next;
+      });
+  }, []);
+  // Once the Inbox has changed since, it has them.
+  useEffect(() => {
+    setMarked((was) => {
+      const gone = [...was].filter(([, m]) => m.until !== undefined && m.until < version);
+      if (!gone.length) return was;
+      const next = new Map(was);
+      for (const [key] of gone) next.delete(key);
+      return next;
+    });
+  }, [version]);
   // The server answers once every account has asked its server; the Inbox
   // has what they said by then, and the rest is read again after.
   const sync = useCallback(() => {
@@ -127,16 +175,22 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     // Only the Inbox's mail leaves: what you sent of a conversation stays in Sent.
     const stays = (mail: MailSummary) =>
       mail.folder !== null || !leaving.has(`${mail.account_id}:${mail.uid}`);
+    const at = state.inbox?.version ?? 0;
+    const marks = (mail: MailSummary): MailSummary => {
+      const m = mail.folder === null ? marked.get(`${mail.account_id}:${mail.uid}`) : undefined;
+      if (!m || (m.until !== undefined && m.until < at)) return mail;
+      return { ...mail, seen: m.seen ?? mail.seen, flagged: m.flagged ?? mail.flagged };
+    };
     const inbox = state.inbox && {
       ...state.inbox,
-      mails: state.inbox.mails.filter(stays),
+      mails: state.inbox.mails.filter(stays).map(marks),
       conversations: state.inbox.conversations.flatMap((conversation) => {
-        const mails = conversation.mails.filter(stays);
+        const mails = conversation.mails.filter(stays).map(marks);
         return mails.some((mail) => mail.folder === null) ? [{ mails }] : [];
       }),
     };
-    return { inbox, offline: state.offline, leave, stay, sync, syncing, synced };
-  }, [state, leaving, leave, stay, sync, syncing, synced]);
+    return { inbox, offline: state.offline, leave, stay, mark, sync, syncing, synced };
+  }, [state, leaving, marked, leave, stay, mark, sync, syncing, synced]);
   useNewMailNotices(state.inbox);
 
   return (
@@ -147,6 +201,9 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     </Context.Provider>
   );
 }
+
+/** A mark the Inbox doesn't have yet, and its version once its server took it. */
+type Marked = MarkMail & { until?: number; token: number };
 
 /** More new mail at once than this is one notification. */
 const NOTICES = 3;
