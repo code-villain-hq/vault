@@ -1068,6 +1068,13 @@ function Writer({
         }}
         className="compose-text"
       />
+      {sender?.signature.trim() && (
+        // Signed as it's sent, by the account it goes from (send.rs):
+        // shown here so you see it, not written into your words.
+        <p className="compose-signature" title="Your signature, from Settings → Accounts">
+          {`-- \n${sender.signature}`}
+        </p>
+      )}
       {files.length > 0 && (
         <FilesGoing
           files={files}

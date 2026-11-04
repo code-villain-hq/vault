@@ -811,6 +811,17 @@ input.crumb-name {
   resize: none;
   outline: none;
 }
+/* The signature the mail goes with, under your words: quiet, as it's
+   added and not yours to write here. */
+.compose-signature {
+  margin-top: -8px;
+  padding-bottom: 12px;
+  color: var(--faint);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: none;
+}
 .compose-foot {
   display: flex;
   align-items: center;

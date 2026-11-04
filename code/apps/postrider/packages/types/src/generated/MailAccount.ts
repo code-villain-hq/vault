@@ -32,4 +32,9 @@ hue: number,
 /**
  * Where it sits among the accounts.
  */
-position: number, created_at: string, updated_at: string, };
+position: number, 
+/**
+ * What mail sent from it is signed with, below a "-- " line. Empty:
+ * nothing.
+ */
+signature: string, created_at: string, updated_at: string, };

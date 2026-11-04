@@ -34,7 +34,7 @@ use lettre::message::{Attachment, Mailbox, Mailboxes, MessageBuilder, MultiPart,
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use mail_parser::MessageParser;
-use postrider_domain::{Attach, MailAccount, NewUpload, Outgoing, Upload, Validate};
+use postrider_domain::{Attach, MailAccount, NewUpload, Outgoing, Upload, Validate, signed};
 use uuid::Uuid;
 
 use crate::auth::Member;
@@ -124,9 +124,15 @@ impl Mail {
         let sender = self.account(workspace_id, outgoing.from_account).await?;
         let from = self.sender(&sender, user_id).await?;
         let gathered = self.gather(workspace_id, user_id, outgoing).await?;
+        // Signed as it goes, by the account it goes from: its draft keeps
+        // only your words, so picking another account signs with its.
+        let signed = Outgoing {
+            text: signed(&outgoing.text, &sender.signature),
+            ..outgoing.clone()
+        };
         let written = write(
             from,
-            outgoing,
+            &signed,
             &gathered.below,
             &gathered.files,
             Purpose::Send,

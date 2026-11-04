@@ -35,6 +35,9 @@ pub struct MailAccount {
     pub hue: i32,
     /// Where it sits among the accounts.
     pub position: i32,
+    /// What mail sent from it is signed with, below a "-- " line. Empty:
+    /// nothing.
+    pub signature: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -64,7 +67,8 @@ impl Validate for MailAccountCreate {
     }
 }
 
-/// What a client may change of an account: its name and its hue.
+/// What a client may change of an account: its name, its hue and its
+/// signature.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export, optional_fields)]
@@ -72,13 +76,43 @@ pub struct MailAccountPatch {
     pub name: Option<String>,
     pub hue: Option<i32>,
     pub position: Option<i32>,
+    pub signature: Option<String>,
 }
 
 impl Validate for MailAccountPatch {
     fn validate(&self) -> Result<(), ValidationError> {
         self.name.as_deref().map(account_name).transpose()?;
         self.hue.map(hue).transpose()?;
+        self.signature.as_deref().map(signature).transpose()?;
         Ok(())
+    }
+}
+
+/// The most a signature may hold, in characters.
+pub const SIGNATURE_CHARS: usize = 2_000;
+
+fn signature(value: &str) -> Result<(), ValidationError> {
+    if value.chars().count() > SIGNATURE_CHARS {
+        return invalid(format!(
+            "A signature holds up to {SIGNATURE_CHARS} characters."
+        ));
+    }
+    Ok(())
+}
+
+/// `text` signed with `signature`: below it, after the "-- " line mail
+/// apps know a signature by. An empty signature signs nothing; with no
+/// text, the mail starts with it.
+pub fn signed(text: &str, signature: &str) -> String {
+    let signature = signature.trim_matches(['\r', '\n']).trim_end();
+    if signature.trim().is_empty() {
+        return text.to_string();
+    }
+    let text = text.trim_end();
+    if text.is_empty() {
+        format!("-- \n{signature}")
+    } else {
+        format!("{text}\n\n-- \n{signature}")
     }
 }
 
@@ -893,6 +927,22 @@ pub struct KeptInInbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_signature_goes_below_the_text() {
+        assert_eq!(
+            signed("Thanks.\n\n", "Michael\n"),
+            "Thanks.\n\n-- \nMichael"
+        );
+        assert_eq!(signed("", "Michael"), "-- \nMichael");
+        assert_eq!(signed("Thanks.", "  \n"), "Thanks.");
+        let long = "x".repeat(SIGNATURE_CHARS + 1);
+        let patch = MailAccountPatch {
+            signature: Some(long),
+            ..Default::default()
+        };
+        assert!(patch.validate().is_err());
+    }
 
     fn connect(address: &str, host: &str) -> MailAccountConnect {
         MailAccountConnect {

@@ -7,7 +7,7 @@ import type {
   MailAccountConnect,
   ServerCalendar,
 } from "@postrider/types";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { api } from "./api";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, useAccounts, useAccountStatus } from "./mail";
@@ -127,8 +127,75 @@ function AccountRow({ account }: { account: MailAccount }) {
         {state === "offline" && " Postrider tries again."}
       </p>
       {state === "refused" && <Reconnect account={account} />}
+      <Signature account={account} />
       <ErrorMessage>{error}</ErrorMessage>
     </li>
+  );
+}
+
+/**
+ * What mail sent from the account is signed with. Kept as the name is,
+ * when you leave the field; Esc puts back what it was.
+ */
+function Signature({ account }: { account: MailAccount }) {
+  const { sync } = useWorkspace();
+  const [text, setText] = useState(account.signature);
+  const [error, setError] = useState<string | null>(null);
+  const cancelled = useRef(false);
+  const id = useId();
+
+  // Changed elsewhere while not being written here, it shows that.
+  const [was, setWas] = useState(account.signature);
+  if (was !== account.signature) {
+    setWas(account.signature);
+    setText(account.signature);
+  }
+
+  const save = () => {
+    const kept = text.replace(/\s+$/, "");
+    if (cancelled.current || kept === account.signature) {
+      cancelled.current = false;
+      setText(account.signature);
+      return;
+    }
+    setError(null);
+    try {
+      sync.update("MailAccount", account.id, { signature: kept });
+      setText(kept);
+    } catch (problem) {
+      setError(messageOf(problem));
+      setText(account.signature);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-xs font-medium text-muted">
+        Signature
+      </label>
+      <textarea
+        id={id}
+        value={text}
+        rows={Math.min(Math.max(text.split("\n").length, 2), 8)}
+        placeholder={account.name}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            cancelled.current = true;
+            e.currentTarget.blur();
+          }
+        }}
+        className="ui-field resize-none rounded-md px-3 py-2 leading-relaxed"
+      />
+      <p className="text-xs text-faint">
+        {account.signature
+          ? "Below what you send from this account, after a “-- ” line."
+          : "Mail from this account goes unsigned."}
+      </p>
+      <ErrorMessage>{error}</ErrorMessage>
+    </div>
   );
 }
 

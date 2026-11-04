@@ -880,6 +880,7 @@ mod tests {
             username: address.into(),
             hue,
             position: 0,
+            signature: String::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

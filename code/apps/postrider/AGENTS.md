@@ -351,6 +351,13 @@ Offline, moving and reading wait for it (above).
   the account they wrote to, unless you pick another, and else from the
   account the last new mail went from. Commas or semicolons part
   addresses, and one that isn't whole is named.
+- Each account has a signature (`MailAccount.signature`, Settings →
+  Accounts, kept when you leave the field; empty signs nothing). It goes
+  on as the mail is sent (`signed()` in `send_mail`), below your words
+  after a "-- " line and above any quote, by the account it goes from.
+  The writer shows it under the text, not in it, so drafts and More
+  professional keep only your words and picking another account signs
+  with its.
 - More professional (`rewrite.rs`, `POST /rewrite`), beside Send in a
   reply and a new mail, has Claude Code on this Mac write yours again, in
   your language, with every fact kept and no tools. A reply's mail comes
