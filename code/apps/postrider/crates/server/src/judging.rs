@@ -198,7 +198,7 @@ async fn unjudged(
         "SELECT uid, key FROM ( \
            SELECT uid, date, \
              CASE WHEN message_id = '' THEN 'uid ' || uid ELSE message_id END AS key \
-           FROM inbox_mails WHERE account_id = $1 AND uid <> ALL($2) \
+           FROM inbox_mails WHERE account_id = $1 AND uid > 0 AND uid <> ALL($2) \
          ) m \
          WHERE NOT EXISTS (SELECT 1 FROM newsletter_judged j \
            WHERE j.account_id = $1 AND j.message_id = m.key) \

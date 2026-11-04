@@ -270,6 +270,11 @@ pub struct AccountStatus {
     pub state: AccountState,
     /// What went wrong, in the server's words, when offline or refused.
     pub message: Option<String>,
+    /// How many changes made here wait for its server, as while it can't
+    /// be reached.
+    #[ts(type = "number")]
+    #[serde(default)]
+    pub waiting: i64,
 }
 
 /// A mail, as a list shows it: the Inbox, a folder, or what a search found.

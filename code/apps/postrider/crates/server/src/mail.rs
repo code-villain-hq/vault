@@ -97,6 +97,9 @@ pub struct Mail {
     /// Files added to mails being written, by the id adding them gave,
     /// until their mail goes or a day has passed (`send::upload`).
     pub(crate) uploads: Mutex<HashMap<Uuid, Uploaded>>,
+    /// Held while what waited for a server is done there (`queued.rs`), so
+    /// the watcher and the keeper never both do it.
+    pub(crate) replaying: tokio::sync::Mutex<()>,
 }
 
 impl Mail {
@@ -116,6 +119,7 @@ impl Mail {
             newsletter_headers: Mutex::default(),
             marked: Mutex::default(),
             uploads: Mutex::default(),
+            replaying: tokio::sync::Mutex::default(),
         }
     }
 
@@ -269,7 +273,7 @@ impl Mail {
         .bind(workspace_id)
         .fetch_all(&self.pool)
         .await?;
-        let accounts = {
+        let mut accounts: Vec<AccountStatus> = {
             let statuses = self.lock_statuses();
             ids.iter()
                 .map(|id| {
@@ -277,6 +281,7 @@ impl Mail {
                         account_id: *id,
                         state: AccountState::Connecting,
                         message: None,
+                        waiting: 0,
                     })
                 })
                 .collect()
@@ -354,6 +359,7 @@ impl Mail {
                 .collect();
         let filed = self.filed(workspace_id).await?;
         let conversations = conversations::conversations(inbox, filed, &own);
+        self.count_waiting(&mut accounts).await?;
         Ok(Inbox {
             version,
             accounts,
@@ -438,10 +444,13 @@ impl Mail {
             .kept_line(account.id, &place.path, uid)
             .await?
             .map(|(_, validity)| validity);
+        let (path, at, validity) = self
+            .on_server_at(account, &place.path, uid, validity)
+            .await?;
         let raw = self
             .on_server(account, |session| {
-                let path = place.path.clone();
-                Box::pin(async move { imap::source(session, &path, validity, uid).await })
+                let path = path.clone();
+                Box::pin(async move { imap::source(session, &path, validity, at).await })
             })
             .await
             .map_err(refused)?
@@ -471,9 +480,13 @@ impl Mail {
         if let Some(raw) = kept {
             return Ok(raw);
         }
+        let (path, at, validity) = self
+            .on_server_at(account, "INBOX", uid, Some(validity))
+            .await?;
         let raw = self
             .on_server(account, |session| {
-                Box::pin(imap::source(session, "INBOX", Some(validity), uid))
+                let path = path.clone();
+                Box::pin(async move { imap::source(session, &path, validity, at).await })
             })
             .await
             .map_err(|failure| AppError::refused(failure.message()))?
@@ -490,6 +503,26 @@ impl Mail {
         .execute(&self.pool)
         .await?;
         Ok(raw)
+    }
+
+    /// Where its server has a mail this Mac's copy shows in the folder at
+    /// `path`, under `uid` and the folder's UIDVALIDITY: there, unless it
+    /// was moved while its server couldn't be reached (`queued.rs`).
+    async fn on_server_at(
+        &self,
+        account: &MailAccount,
+        path: &str,
+        uid: i64,
+        validity: Option<i64>,
+    ) -> Result<(String, i64, Option<i64>), AppError> {
+        if uid > 0 {
+            return Ok((path.to_string(), uid, validity));
+        }
+        let (path, uid, validity) = self
+            .origin(account.id, uid)
+            .await?
+            .ok_or_else(|| AppError::not_found("This mail isn't here any more."))?;
+        Ok((path, uid, Some(validity)))
     }
 
     /// The header and the start of each of these mails, for judging and
@@ -577,17 +610,35 @@ impl Mail {
     }
 
     /// Marks an opened mail read, on its server, and in the copy kept here
-    /// of its folder. Offline, it stays unread until it's opened again.
+    /// of its folder. While its server can't be reached, that waits for it
+    /// (`queued.rs`).
     pub(crate) async fn mark_read(&self, account: MailAccount, folder: String, uid: i64) {
-        let marked = self
-            .on_server(&account, |session| {
-                let folder = folder.clone();
-                Box::pin(async move { imap::mark_read(session, &folder, uid).await })
-            })
-            .await;
-        if let Err(failure) = marked {
-            tracing::info!(address = %account.address, "couldn't mark read: {}", failure.message());
-            return;
+        let mut waits = self.waits(account.id, &folder, uid).await.unwrap_or(true);
+        if !waits {
+            let marked = self
+                .on_server(&account, |session| {
+                    let folder = folder.clone();
+                    Box::pin(async move { imap::mark_read(session, &folder, uid).await })
+                })
+                .await;
+            match marked {
+                Ok(()) => {}
+                Err(Failure::Offline(why)) => {
+                    tracing::info!(address = %account.address, "couldn't mark read, so it waits: {why}");
+                    waits = true;
+                }
+                Err(failure) => {
+                    tracing::info!(address = %account.address, "couldn't mark read: {}", failure.message());
+                    return;
+                }
+            }
+        }
+        if waits {
+            if let Err(e) = self.queue_seen(account.id, &folder, &[uid], true).await {
+                tracing::warn!("couldn't keep a mail read for its server: {e}");
+                return;
+            }
+            self.keep_now();
         }
         if folder != "INBOX" {
             if let Err(e) = self.seen_kept(account.id, &folder, &[uid], true).await {
@@ -709,6 +760,15 @@ impl Mail {
         let began = Instant::now();
         let mut session = self.sign_in(account).await?;
         let idle = session.capabilities().await?.has_str("IDLE");
+        // What was done while it couldn't be reached, before the Inbox is
+        // read: a connection that broke meanwhile breaks the read too.
+        if let Err(failure) = self.replay_over(account, &mut session).await {
+            tracing::info!(
+                address = %account.address,
+                "couldn't do what waited for its server: {}",
+                failure.message()
+            );
+        }
         if imap::sync_inbox(&mut session, &self.pool, account.id).await? {
             self.bump();
         }
@@ -772,6 +832,7 @@ impl Mail {
             account_id,
             state,
             message,
+            waiting: 0,
         };
         self.lock_statuses().insert(account_id, status);
         self.bump();

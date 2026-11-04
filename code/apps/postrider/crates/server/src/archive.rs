@@ -2,6 +2,8 @@
 //! `POST /api/w/{workspace}/mails/{account}/{uid}/archive[?folder=<key>]`,
 //! ⌫ to its Trash, at `…/trash`, and V to a folder you pick, at `…/move`.
 //! An account without the folder gets one, beside its other folders.
+//! While its server can't be reached, the move waits for it
+//! (`queued.rs`), and the mail shows where it went at once.
 
 use std::sync::Arc;
 
@@ -49,18 +51,36 @@ impl Mail {
         if from.path == to.path {
             return Ok(());
         }
-        self.on_server(&account, |session| {
-            let (from, to) = (from.path.clone(), to.path.clone());
-            Box::pin(async move { imap::move_mail(session, &from, uid, &to).await })
-        })
-        .await
-        .map_err(refused)?;
+        if !self.waits(account.id, &from.path, uid).await? {
+            let moved = self
+                .on_server(&account, |session| {
+                    let (from, to) = (from.path.clone(), to.path.clone());
+                    Box::pin(async move { imap::move_mail(session, &from, uid, &to).await })
+                })
+                .await;
+            match moved {
+                Ok(()) => return self.moved(&account, &from, uid).await,
+                Err(Failure::Offline(why)) => {
+                    tracing::info!(address = %account.address, "couldn't move a mail, so it waits: {why}");
+                }
+                Err(failure) => return Err(refused(failure)),
+            }
+        }
+        if !self.queue_move(account.id, &from, uid, &to).await? {
+            return Err(AppError::not_found("This mail isn't here any more."));
+        }
+        self.keep_now();
+        Ok(())
+    }
+
+    /// A mail its server moved, gone from where this Mac's copy showed it.
+    async fn moved(&self, account: &MailAccount, from: &Place, uid: i64) -> Result<(), AppError> {
         if from.path == "INBOX" {
             self.forget_inbox_line(account.id, uid).await?;
         } else {
             self.forget_kept(account.id, &from.path, &[uid]).await?;
         }
-        if let Some((_, lines)) = self.lock_lines().get_mut(&(account.id, from.path)) {
+        if let Some((_, lines)) = self.lock_lines().get_mut(&(account.id, from.path.clone())) {
             lines.remove(&uid);
         }
         // What came to the folder it went to.

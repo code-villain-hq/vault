@@ -83,6 +83,18 @@ impl From<async_imap::error::Error> for Failure {
     }
 }
 
+/// What a server answered to something done to mail: its NO or BAD as
+/// refused, as trying again won't help; anything else as offline, so what
+/// was done waits for it (`queued.rs`).
+fn answered(e: async_imap::error::Error) -> Failure {
+    match e {
+        async_imap::error::Error::No(words) | async_imap::error::Error::Bad(words) => {
+            Failure::Refused(words)
+        }
+        e => e.into(),
+    }
+}
+
 impl From<sqlx::Error> for Failure {
     fn from(e: sqlx::Error) -> Self {
         Failure::Offline(format!("couldn't keep the Inbox: {e}"))
@@ -235,10 +247,43 @@ pub async fn sync_inbox(
             .into_iter()
             .collect();
 
+    // What waits for the server (`queued.rs`) stays as it was done here:
+    // a mail moved away isn't copied back, one moved here keeps its line,
+    // and one marked read or unread stays so.
+    let waiting: Vec<(i64, bool, bool)> = sqlx::query_as(
+        "SELECT uid, to_path IS NOT NULL, seen IS NOT NULL FROM queued_mails \
+         WHERE account_id = $1 AND path = 'INBOX' AND uid_validity = $2",
+    )
+    .bind(account_id)
+    .bind(validity)
+    .fetch_all(pool)
+    .await?;
+    let moved_away: HashSet<i64> = waiting.iter().filter(|w| w.1).map(|w| w.0).collect();
+    let marked: HashSet<i64> = waiting.iter().filter(|w| w.2).map(|w| w.0).collect();
+    let moved_here: HashSet<i64> = sqlx::query_scalar(
+        "SELECT placeholder FROM queued_mails WHERE account_id = $1 AND to_path = 'INBOX'",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect();
+    let read_below: i64 = sqlx::query_scalar(
+        "SELECT coalesce(max(below), 0) FROM queued_reads \
+         WHERE account_id = $1 AND path = 'INBOX' AND uid_validity = $2",
+    )
+    .bind(account_id)
+    .bind(validity)
+    .fetch_one(pool)
+    .await?;
+    for (uid, seen) in &mut on_server {
+        *seen |= *uid < read_below;
+    }
+
     // Gone from the server, or no longer among the newest.
     let gone: Vec<i64> = kept
         .keys()
-        .filter(|uid| !on_server.contains_key(uid))
+        .filter(|uid| !on_server.contains_key(uid) && !moved_here.contains(uid))
         .copied()
         .collect();
     if !gone.is_empty() {
@@ -253,7 +298,9 @@ pub async fn sync_inbox(
     // Read or unread somewhere else since.
     let (flipped, flipped_seen): (Vec<i64>, Vec<bool>) = on_server
         .iter()
-        .filter(|(uid, seen)| kept.get(uid).is_some_and(|was| was != *seen))
+        .filter(|(uid, seen)| {
+            !marked.contains(uid) && kept.get(uid).is_some_and(|was| was != *seen)
+        })
         .map(|(uid, seen)| (*uid, *seen))
         .unzip();
     if !flipped.is_empty() {
@@ -273,7 +320,7 @@ pub async fn sync_inbox(
     // New mail: read its header and the start of its text.
     let mut new: Vec<i64> = on_server
         .keys()
-        .filter(|uid| !kept.contains_key(uid))
+        .filter(|uid| !kept.contains_key(uid) && !moved_away.contains(uid))
         .copied()
         .collect();
     new.sort_unstable();
@@ -315,7 +362,7 @@ pub async fn sync_inbox(
             .bind(&summary.subject)
             .bind(&summary.snippet)
             .bind(summary.date)
-            .bind(is_seen(fetch))
+            .bind(is_seen(fetch) || uid < read_below)
             .bind(&summary.message_id)
             .bind(&summary.threading.refs)
             .bind(&summary.threading.to_addresses)
@@ -501,10 +548,11 @@ const SOURCES_AT_ONCE: usize = 10;
 
 /// Marks a mail read, as opening it does.
 pub async fn mark_read(session: &mut Session, folder: &str, uid: i64) -> Result<(), Failure> {
-    session.select(folder).await?;
+    session.select(folder).await.map_err(answered)?;
     session
         .uid_store(uid.to_string(), "+FLAGS.SILENT (\\Seen)")
-        .await?
+        .await
+        .map_err(answered)?
         .try_collect::<Vec<_>>()
         .await?;
     Ok(())
@@ -520,8 +568,18 @@ pub async fn mark_all_read(
     session: &mut Session,
     folder: &str,
 ) -> Result<(u32, Vec<u32>), Failure> {
-    let mailbox = session.select(folder).await?;
-    let mut uids: Vec<u32> = session.uid_search("UNSEEN").await?.into_iter().collect();
+    let mailbox = session.select(folder).await.map_err(answered)?;
+    let uids = read_all(session, "UNSEEN").await.map_err(answered)?;
+    Ok((mailbox.uid_validity.unwrap_or(0), uids))
+}
+
+/// Marks read what `search` finds unread in the folder selected: the mails
+/// it marked.
+async fn read_all(
+    session: &mut Session,
+    search: &str,
+) -> Result<Vec<u32>, async_imap::error::Error> {
+    let mut uids: Vec<u32> = session.uid_search(search).await?.into_iter().collect();
     uids.sort_unstable();
     for some in uids.chunks(STORED) {
         session
@@ -530,7 +588,7 @@ pub async fn mark_all_read(
             .try_collect::<Vec<_>>()
             .await?;
     }
-    Ok((mailbox.uid_validity.unwrap_or(0), uids))
+    Ok(uids)
 }
 
 /// Marks the mails [`mark_all_read`] marked unread again, unless the
@@ -593,9 +651,80 @@ pub async fn move_mail(
     uid: i64,
     to: &str,
 ) -> Result<(), Failure> {
-    session.select(from).await?;
-    session.uid_mv(uid.to_string(), to).await?;
+    session.select(from).await.map_err(answered)?;
+    session
+        .uid_mv(uid.to_string(), to)
+        .await
+        .map_err(answered)?;
     Ok(())
+}
+
+/// Selects a folder to do there what waited for its server: `false` when
+/// it's gone, or its UIDs were numbered anew since `validity`.
+pub async fn select_queued(
+    session: &mut Session,
+    folder: &str,
+    validity: i64,
+) -> Result<bool, Failure> {
+    match session.select(folder).await {
+        Ok(mailbox) => Ok(i64::from(mailbox.uid_validity.unwrap_or(0)) == validity),
+        Err(e) => took(Err(e)),
+    }
+}
+
+/// Does what waited for one mail of the folder selected: marks it read or
+/// unread, then moves it. Whether its server took it.
+pub async fn replay_mail(
+    session: &mut Session,
+    uid: i64,
+    seen: Option<bool>,
+    to: Option<&str>,
+) -> Result<bool, Failure> {
+    let done = async {
+        if let Some(seen) = seen {
+            let flags = if seen {
+                "+FLAGS.SILENT (\\Seen)"
+            } else {
+                "-FLAGS.SILENT (\\Seen)"
+            };
+            session
+                .uid_store(uid.to_string(), flags)
+                .await?
+                .try_collect::<Vec<_>>()
+                .await?;
+        }
+        if let Some(to) = to {
+            session.uid_mv(uid.to_string(), to).await?;
+        }
+        Ok(())
+    }
+    .await;
+    took(done)
+}
+
+/// Marks read every unread mail of the folder selected under UID `below`:
+/// the mails it marked, or `None` when its server refused.
+pub async fn read_below(session: &mut Session, below: i64) -> Result<Option<Vec<u32>>, Failure> {
+    if below <= 1 {
+        return Ok(Some(Vec::new()));
+    }
+    match read_all(session, &format!("UNSEEN UID 1:{}", below - 1)).await {
+        Ok(uids) => Ok(Some(uids)),
+        Err(e) => took(Err(e)).map(|_| None),
+    }
+}
+
+/// Whether the server took what waited for it: its NO or BAD is `false`,
+/// and what it refused is let go; anything else is offline, and waits.
+fn took(done: Result<(), async_imap::error::Error>) -> Result<bool, Failure> {
+    match done {
+        Ok(()) => Ok(true),
+        Err(async_imap::error::Error::No(words) | async_imap::error::Error::Bad(words)) => {
+            tracing::info!("its server refused what waited for it: {words}");
+            Ok(false)
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Marks a mail answered, as sending its reply does.

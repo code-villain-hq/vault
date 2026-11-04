@@ -5,4 +5,9 @@ export type AccountStatus = { account_id: string, state: AccountState,
 /**
  * What went wrong, in the server's words, when offline or refused.
  */
-message: string | null, };
+message: string | null, 
+/**
+ * How many changes made here wait for its server, as while it can't
+ * be reached.
+ */
+waiting: number, };

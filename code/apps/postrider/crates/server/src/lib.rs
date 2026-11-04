@@ -24,6 +24,7 @@ pub mod message;
 pub mod newsletters;
 pub mod preview;
 mod proof;
+pub mod queued;
 pub mod reading;
 pub mod rewrite;
 pub mod routes;

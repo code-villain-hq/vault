@@ -1207,6 +1207,7 @@ pub async fn list(
                     Failure::Refused(_) => AccountState::Refused,
                 },
                 message: Some(failure.message()),
+                waiting: 0,
             }),
         }
     }

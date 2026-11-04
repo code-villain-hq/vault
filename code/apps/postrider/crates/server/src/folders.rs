@@ -35,6 +35,7 @@ use crate::error::AppError;
 use crate::imap::{self, Failure, Line, Place};
 use crate::mail::{Mail, READERS};
 use crate::message;
+use crate::queued::ReadHere;
 use crate::rules::{Renamed, leaf};
 use crate::state::AppState;
 
@@ -197,8 +198,10 @@ impl Mail {
 
     /// Marks every unread mail in the folder `key` names read, in every
     /// account that has it, each in one STORE, and in the Inbox's copy.
-    /// One account refusing puts back those marked before it. What it
-    /// marked waits for Undo, by the id it answers with.
+    /// One account refusing puts back those marked before it; one that
+    /// can't be reached is marked here, and its server waits for it
+    /// (`queued.rs`). What it marked waits for Undo, by the id it answers
+    /// with.
     pub async fn mark_all_read(
         self: &Arc<Self>,
         workspace_id: Uuid,
@@ -210,12 +213,32 @@ impl Mail {
                 let Some(place) = self.place(&account, key).await? else {
                     return Ok(None);
                 };
-                let (validity, uids) = self
-                    .on_server(&account, |session| {
+                let marked = if self.state_of(account.id) == Some(AccountState::Online) {
+                    self.on_server(&account, |session| {
                         let path = place.path.clone();
                         Box::pin(async move { imap::mark_all_read(session, &path).await })
                     })
-                    .await?;
+                    .await
+                } else {
+                    Err(Failure::Offline(String::new()))
+                };
+                let (validity, uids) = match marked {
+                    Ok(marked) => marked,
+                    Err(Failure::Offline(_)) => {
+                        let Some(here) = self.queue_read(account.id, &place.path).await? else {
+                            return Ok(None);
+                        };
+                        self.keep_now();
+                        return Ok(Some(Read {
+                            account: account.clone(),
+                            place,
+                            validity: here.validity,
+                            uids: Vec::new(),
+                            queued: Some(here),
+                        }));
+                    }
+                    Err(failure) => return Err(failure),
+                };
                 if place.path == Place::inbox().path {
                     self.seen_here(&account, &place, &uids, true).await?;
                 } else {
@@ -226,6 +249,7 @@ impl Mail {
                     place,
                     validity,
                     uids,
+                    queued: None,
                 }))
             }
             .await;
@@ -241,7 +265,14 @@ impl Mail {
                 }
             }
         }
-        let count = marked.iter().map(|read| read.uids.len()).sum::<usize>();
+        let count = marked
+            .iter()
+            .map(|read| {
+                read.queued
+                    .as_ref()
+                    .map_or(read.uids.len(), |here| here.uids.len())
+            })
+            .sum::<usize>();
         let id = Uuid::now_v7();
         self.lock_marked().insert(
             id,
@@ -274,20 +305,44 @@ impl Mail {
         Ok(())
     }
 
-    /// Marks unread again what marking read marked, in every account that
-    /// can be reached; why one couldn't, if one couldn't.
+    /// Marks unread again what marking read marked, in every account; one
+    /// that can't be reached is marked here, and its server waits for it
+    /// (`queued.rs`). Why one couldn't, if one couldn't.
     async fn mark_unread(&self, marked: &[Read]) -> Result<(), String> {
         let mut failed = None;
-        for read in marked.iter().filter(|read| !read.uids.is_empty()) {
+        for read in marked {
             let done = async {
-                self.on_server(&read.account, |session| {
-                    let (path, uids) = (read.place.path.clone(), read.uids.clone());
-                    let validity = read.validity;
-                    Box::pin(
-                        async move { imap::mark_unread(session, &path, validity, &uids).await },
-                    )
-                })
-                .await?;
+                if let Some(here) = &read.queued {
+                    // Still waiting: it was never marked on its server.
+                    self.unqueue_read(read.account.id, &read.place.path, here)
+                        .await?;
+                    return Ok(());
+                }
+                if read.uids.is_empty() {
+                    return Ok(());
+                }
+                let unmarked = if self.state_of(read.account.id) == Some(AccountState::Online) {
+                    self.on_server(&read.account, |session| {
+                        let (path, uids) = (read.place.path.clone(), read.uids.clone());
+                        let validity = read.validity;
+                        Box::pin(
+                            async move { imap::mark_unread(session, &path, validity, &uids).await },
+                        )
+                    })
+                    .await
+                } else {
+                    Err(Failure::Offline(String::new()))
+                };
+                match unmarked {
+                    Ok(()) => {}
+                    Err(Failure::Offline(_)) => {
+                        let uids: Vec<i64> = read.uids.iter().map(|uid| i64::from(*uid)).collect();
+                        self.queue_seen(read.account.id, &read.place.path, &uids, false)
+                            .await?;
+                        self.keep_now();
+                    }
+                    Err(failure) => return Err(failure),
+                }
                 self.seen_here(&read.account, &read.place, &read.uids, false)
                     .await?;
                 Ok::<_, Failure>(())
@@ -459,6 +514,7 @@ impl Mail {
                 listed.problems.push(status);
             }
         }
+        self.count_waiting(&mut listed.problems).await?;
         Ok(listed)
     }
 
@@ -709,12 +765,30 @@ pub(crate) struct Marked {
 }
 
 /// An account's folder marked read: under which UIDVALIDITY, and which
-/// of its mails.
+/// of its mails its server marked; here only, while that waits for its
+/// server (`queued`, `queued.rs`).
 struct Read {
     account: MailAccount,
     place: Place,
     validity: u32,
     uids: Vec<u32>,
+    queued: Option<ReadHere>,
+}
+
+impl Mail {
+    /// A folder marked read while its server couldn't be reached, marked
+    /// there now: Undo puts back what its server marked.
+    pub(crate) fn marked_on_server(&self, id: Uuid, validity: u32, uids: Vec<u32>) {
+        for marked in self.lock_marked().values_mut() {
+            for read in &mut marked.marked {
+                if read.queued.as_ref().is_some_and(|here| here.id == id) {
+                    read.queued = None;
+                    read.validity = validity;
+                    read.uids.clone_from(&uids);
+                }
+            }
+        }
+    }
 }
 
 /// What the sidebar calls a folder for its role, whatever its server does.
@@ -804,6 +878,7 @@ pub(crate) fn listing(
                         Failure::Refused(_) => AccountState::Refused,
                     },
                     message: Some(failure.message()),
+                    waiting: 0,
                 });
             }
         }

@@ -367,6 +367,8 @@ export function AccountProblems({
             <span>
               Can't reach {account.name}. {status.message ?? "Its server didn't answer."} Postrider
               tries again.
+              {status.waiting > 0 &&
+                ` ${status.waiting} ${status.waiting === 1 ? "change waits" : "changes wait"} for it.`}
             </span>
           )}
         </li>

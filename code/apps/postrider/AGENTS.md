@@ -113,7 +113,7 @@ is taken as gone, as one the Mac slept through is, and opened again.
 A mail opens with `GET /api/w/{id}/mails/{account}/{uid}`: the server
 fetches its source over IMAP once and keeps it (`mail_sources`, gone with
 its line in the Inbox), so it opens again offline, and marks it read on
-the server. Only you opening a mail marks it read: every other fetch, the
+the server, or offline, once it's back (`queued.rs`). Only you opening a mail marks it read: every other fetch, the
 lists, snippets, conversations, judging, sorting and search, uses
 `BODY.PEEK`, and Postrider opens no mail by itself. `message.rs` reads the source: who it went to, its text, its
 HTML with inline pictures written in, its attachments. The page shows the
@@ -153,8 +153,28 @@ and Junk, each up to 1 MB. It runs when an Inbox changes, when the page
 asks for the folders (`keep_now`, as the sync button does), and every
 minute. A change Postrider makes (a move, a mail read, all read, a folder
 emptied, renamed or deleted) changes what's kept as soon as the server
-has done it, then the keeper looks again; offline it fails, as before,
-and nothing waits to be done later. `GET /api/w/{id}/folders` lists
+has done it, then the keeper looks again.
+
+While an account's server can't be reached, moving mail (E, ⌫, V, a
+drag), opening it, Mark all as read and its Undo are done on this Mac's
+copy at once and wait in Postgres for the server (`queued.rs`,
+`queued_mails` and `queued_reads`). The watcher does them as soon as it's
+back in, before it reads the Inbox, and the keeper before it reads the
+folders, one replay at a time. Until then the Inbox's copy and the
+keeper leave what was done here as it is. A mail moved shows in its new
+folder under a UID below zero, its line and text along, until the keeper
+reads that folder from the server; moved back, it's where it was, and
+only what else was done to it waits. All read marks, on the server, what
+was unread under the UIDNEXT this Mac last knew, so mail that came since
+stays unread; mail moved there while it waited is marked with it. What
+the server refuses then (the mail gone meanwhile, the folder deleted) is
+let go, and the mail shows where its server has it. The account's line
+above a list says how many changes wait (`AccountStatus.waiting`).
+Renaming, deleting, emptying or making a folder (a new one to move to,
+or Archive or Trash where the account has none yet), sending and keeping
+drafts still need the server.
+
+`GET /api/w/{id}/folders` lists
 every account's folders, each once by its role (Sent, Archive, Drafts,
 Trash, Junk) or its name, with what's unread; `/folders/{key}` is a
 folder's newest mail, with each account that can't be asked named above
@@ -201,6 +221,7 @@ reached, the page shows it, "Offline · as of 10:52".
 ## What changes mail
 
 Every change happens on the account's server; the Inbox follows it there.
+Offline, moving and reading wait for it (above).
 
 - E archives and ⌫ deletes (`archive.rs`): the mail moves to its
   account's Archive or Trash (made when there's none), and the list comes
@@ -228,7 +249,8 @@ Every change happens on the account's server; the Inbox follows it there.
   \Seen with one `UID STORE` per account (in chunks of 5,000), and the
   Inbox's copy with it; Undo, where the count was for 30 seconds,
   (`POST /marked/{id}/undo`) unsets it on the same UIDs, unless the
-  folder's UIDVALIDITY changed. On Newsletters it takes the whole folder,
+  folder's UIDVALIDITY changed; before a queued one reached the server,
+  it takes it back here. On Newsletters it takes the whole folder,
   so its page counts all of it opened. Rename… opens the top bar's field.
   Delete folder… (`DELETE /folders/{key}`, your own folders, none with
   folders in it) moves its mail to the Trash, then deletes it in every
@@ -561,7 +583,8 @@ Like the ask field's, what it needs is kept in memory.
   signs in (`POST /accounts`, `/calendar`), never by the web app.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
   `mail.rs`, the folders and search in `folders.rs`, what this Mac keeps
-  of them in `kept.rs`, conversations in
+  of them in `kept.rs`, what waits for a server that can't be reached in
+  `queued.rs`, conversations in
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
   text part numbers its links with, HTML tags or entities; a migration

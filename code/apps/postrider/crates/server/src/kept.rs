@@ -13,7 +13,8 @@
 //! in one round trip; only a folder whose count changed is read again, and
 //! of it only what this Mac doesn't have yet. What Postrider does to mail
 //! (opening, moving, marking read) changes the copy here as soon as the
-//! server has done it, and the keeper looks again.
+//! server has done it, and the keeper looks again; while it can't be
+//! reached, at once (`queued.rs`), and the keeper does it there first.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -70,6 +71,16 @@ pub async fn keep(mail: Arc<Mail>) {
         let mut counted = Vec::new();
         let mut changed = false;
         for account in &accounts {
+            // What was done while it couldn't be reached goes first, so
+            // what's read next has it.
+            if let Err(problem) = mail.replay(account).await {
+                tracing::info!(
+                    address = %account.address,
+                    "couldn't do what waited for its server: {}",
+                    problem.message()
+                );
+                continue;
+            }
             match mail.count(account).await {
                 Ok((kept, folders)) => {
                     changed |= kept;
@@ -323,12 +334,20 @@ impl Mail {
     ) -> Result<(), sqlx::Error> {
         let mut tx = self.pool.begin().await?;
         for (from, to) in moved {
-            sqlx::query("UPDATE kept_folders SET path = $3 WHERE account_id = $1 AND path = $2")
-                .bind(account_id)
-                .bind(from)
-                .bind(to)
-                .execute(&mut *tx)
-                .await?;
+            // And what waits for the server there (`queued.rs`).
+            for update in [
+                "UPDATE kept_folders SET path = $3 WHERE account_id = $1 AND path = $2",
+                "UPDATE queued_mails SET path = $3 WHERE account_id = $1 AND path = $2",
+                "UPDATE queued_mails SET to_path = $3 WHERE account_id = $1 AND to_path = $2",
+                "UPDATE queued_reads SET path = $3 WHERE account_id = $1 AND path = $2",
+            ] {
+                sqlx::query(update)
+                    .bind(account_id)
+                    .bind(from)
+                    .bind(to)
+                    .execute(&mut *tx)
+                    .await?;
+            }
         }
         tx.commit().await
     }
@@ -731,8 +750,13 @@ impl Mail {
             changed |= gone.rows_affected() > 0;
         }
         let uids: Vec<i64> = read.lines.iter().map(|line| line.uid).collect();
+        // What waits for the server (`queued.rs`) stays as it was done
+        // here: a mail moved here keeps its line, one moved away isn't
+        // kept again, and one marked read or unread stays so.
         let gone = sqlx::query(
-            "DELETE FROM folder_mails WHERE account_id = $1 AND path = $2 AND NOT uid = ANY($3)",
+            "DELETE FROM folder_mails m WHERE account_id = $1 AND path = $2 \
+             AND NOT uid = ANY($3) AND NOT EXISTS (SELECT 1 FROM queued_mails q \
+               WHERE q.account_id = $1 AND q.to_path = $2 AND q.placeholder = m.uid)",
         )
         .bind(account_id)
         .bind(&place.path)
@@ -751,10 +775,17 @@ impl Mail {
         let kept = sqlx::query(
             "INSERT INTO folder_mails (account_id, path, uid, message_id, from_name, \
              from_address, to_name, subject, snippet, date, seen) \
-             SELECT $1, $2, * FROM UNNEST($3::bigint[], $4::text[], $5::text[], $6::text[], \
+             SELECT $1, $2, l.* FROM UNNEST($3::bigint[], $4::text[], $5::text[], $6::text[], \
              $7::text[], $8::text[], $9::text[], $10::timestamptz[], $11::boolean[]) \
+             AS l(uid, message_id, from_name, from_address, to_name, subject, snippet, date, seen) \
+             WHERE NOT EXISTS (SELECT 1 FROM queued_mails q WHERE q.account_id = $1 \
+               AND q.path = $2 AND q.uid = l.uid AND q.to_path IS NOT NULL) \
              ON CONFLICT (account_id, path, uid) DO UPDATE SET seen = EXCLUDED.seen \
-             WHERE folder_mails.seen <> EXCLUDED.seen",
+             WHERE folder_mails.seen <> EXCLUDED.seen AND NOT EXISTS (SELECT 1 \
+               FROM queued_mails q WHERE q.account_id = $1 AND q.path = $2 \
+               AND q.uid = folder_mails.uid AND q.seen IS NOT NULL) \
+             AND NOT EXISTS (SELECT 1 FROM queued_reads r WHERE r.account_id = $1 \
+               AND r.path = $2 AND folder_mails.uid < r.below AND NOT EXCLUDED.seen)",
         )
         .bind(account_id)
         .bind(&place.path)
@@ -797,8 +828,8 @@ impl Mail {
                 .map_err(db)?;
         if let Some(validity) = validity {
             let wanted: Vec<i64> = sqlx::query_scalar(
-                "SELECT uid FROM (SELECT uid, date FROM inbox_mails WHERE account_id = $1 \
-                   ORDER BY date DESC, uid DESC LIMIT $2) m \
+                "SELECT uid FROM (SELECT uid, date FROM inbox_mails \
+                   WHERE account_id = $1 AND uid > 0 ORDER BY date DESC, uid DESC LIMIT $2) m \
                  WHERE NOT EXISTS (SELECT 1 FROM mail_sources s \
                    WHERE s.account_id = $1 AND s.uid = m.uid)",
             )
@@ -838,7 +869,7 @@ impl Mail {
         for (path, _, validity) in folders {
             let wanted: Vec<i64> = sqlx::query_scalar(
                 "SELECT uid FROM (SELECT uid FROM folder_mails WHERE account_id = $1 \
-                   AND path = $2 ORDER BY date DESC, uid DESC LIMIT $3) m \
+                   AND path = $2 AND uid > 0 ORDER BY date DESC, uid DESC LIMIT $3) m \
                  WHERE NOT EXISTS (SELECT 1 FROM folder_sources s \
                    WHERE s.account_id = $1 AND s.path = $2 AND s.uid = m.uid)",
             )

@@ -166,7 +166,7 @@ async fn sort_account(
                SELECT uid, date, \
                  CASE WHEN message_id = '' THEN 'uid ' || uid ELSE message_id END AS key \
                FROM inbox_mails \
-               WHERE account_id = $1 AND date >= $2 AND uid <> ALL($3) \
+               WHERE account_id = $1 AND date >= $2 AND uid > 0 AND uid <> ALL($3) \
              ) m \
              WHERE NOT EXISTS (SELECT 1 FROM reading_read r \
                WHERE r.account_id = $1 AND r.message_id = m.key) \
