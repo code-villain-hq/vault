@@ -559,6 +559,93 @@ pub async fn put(session: &mut Session, folder: &str, raw: &[u8]) -> Result<(), 
     Ok(())
 }
 
+/// Puts a draft in Drafts: read, and marked a draft, as mail apps keep
+/// theirs.
+pub async fn put_draft(session: &mut Session, folder: &str, raw: &[u8]) -> Result<(), Failure> {
+    session
+        .append(folder, Some("(\\Seen \\Draft)"), None, raw)
+        .await?;
+    Ok(())
+}
+
+/// The UIDs of the mails in the folder selected with the Message-ID `id`,
+/// as a set to name them by: `None` when there's none.
+async fn with_id(session: &mut Session, id: &str) -> Result<Option<String>, Failure> {
+    let mut uids: Vec<u32> = session
+        .uid_search(format!("HEADER Message-ID {}", quoted(id)?))
+        .await?
+        .into_iter()
+        .collect();
+    uids.sort_unstable();
+    Ok((!uids.is_empty()).then(|| {
+        uids.iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    }))
+}
+
+/// The source of the mail in `folder` with the Message-ID `id`, and its
+/// UID: a draft, found again after it was kept. `None` when it's gone.
+pub async fn source_by_id(
+    session: &mut Session,
+    folder: &str,
+    id: &str,
+) -> Result<Option<Vec<u8>>, Failure> {
+    session.examine(folder).await?;
+    let Some(uids) = with_id(session, id).await? else {
+        return Ok(None);
+    };
+    let fetches: Vec<Fetch> = session
+        .uid_fetch(uids, "(UID BODY.PEEK[])")
+        .await?
+        .try_collect()
+        .await?;
+    Ok(fetches
+        .iter()
+        .max_by_key(|f| f.uid)
+        .and_then(|f| f.body())
+        .map(<[u8]>::to_vec))
+}
+
+/// Deletes the mails in `folder` with the Message-ID `id` for good: a
+/// draft kept anew since, or sent. A server without UID EXPUNGE (RFC 4315)
+/// expunges the folder.
+pub async fn delete_by_id(session: &mut Session, folder: &str, id: &str) -> Result<(), Failure> {
+    session.select(folder).await?;
+    let Some(uids) = with_id(session, id).await? else {
+        return Ok(());
+    };
+    session
+        .uid_store(&uids, "+FLAGS.SILENT (\\Deleted)")
+        .await?
+        .try_collect::<Vec<_>>()
+        .await?;
+    let expunged = match session.uid_expunge(&uids).await {
+        Ok(stream) => stream.try_collect::<Vec<_>>().await.map(drop),
+        Err(e) => Err(e),
+    };
+    if expunged.is_err() {
+        session.expunge().await?.try_collect::<Vec<_>>().await?;
+    }
+    Ok(())
+}
+
+/// Moves the mails in `from` with the Message-ID `id` to `to`: a draft
+/// thrown away, to Trash.
+pub async fn move_by_id(
+    session: &mut Session,
+    from: &str,
+    id: &str,
+    to: &str,
+) -> Result<(), Failure> {
+    session.select(from).await?;
+    if let Some(uids) = with_id(session, id).await? {
+        session.uid_mv(uids, to).await?;
+    }
+    Ok(())
+}
+
 /// Makes a folder called `name`, for `role` if it has one, beside the
 /// account's others: under `INBOX.` where its server keeps them so. It's
 /// subscribed, so the account's other mail apps show it too. One made

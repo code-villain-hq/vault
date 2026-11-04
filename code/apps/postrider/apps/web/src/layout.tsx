@@ -587,7 +587,8 @@ const SECTIONS: ShortcutSection[] = [
       ["⌘Enter", "Send"],
       ["⇧⌘A", "Add files"],
       ["⌘Z", "Back to yours, after More professional"],
-      ["Esc", "Close it, keeping what you wrote"],
+      ["⇧⌘⌫", "Throw it away, to Trash"],
+      ["Esc", "Close it, keeping what you wrote in Drafts"],
     ],
   },
 ];

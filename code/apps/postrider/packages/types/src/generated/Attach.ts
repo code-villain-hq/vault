@@ -3,4 +3,4 @@
 /**
  * A file a mail you write takes along.
  */
-export type Attach = { "kind": "kept", index: number, } | { "kind": "added", upload: string, };
+export type Attach = { "kind": "kept", index: number, } | { "kind": "added", upload: string, } | { "kind": "drafted", index: number, };

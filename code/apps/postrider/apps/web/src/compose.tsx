@@ -7,23 +7,28 @@
 // words back. Files come with the paperclip (⇧⌘A), dropped on the mail or
 // pasted into it; each goes ahead with `POST /uploads`, and a forward takes
 // its mail's along until you leave one out. It all goes to `POST /mails`
-// (`send.rs`).
+// (`send.rs`). What you write is kept in its account's Drafts as you go,
+// each time the writing pauses and as the dialog closes (`POST /drafts`,
+// `drafts.rs`), so it's there after Postrider quits; a draft opened from
+// Drafts opens here to write on, and ⇧⌘⌫ throws one away, to Trash.
 
 import { Dialog } from "@base-ui/react/dialog";
 import { CreateDialog, shortcutFree } from "@code-villain/web";
 import type {
   Attach,
+  DraftRef,
   MailRef,
   MailSummary,
   Message,
   NewUpload,
+  Draft as OpenedDraft,
   Outgoing,
   Party,
   Rewrite,
   Rewritten,
   Upload,
 } from "@postrider/types";
-import { ChevronDown, Paperclip, Sparkles, Undo2, X } from "lucide-react";
+import { ChevronDown, Paperclip, Sparkles, Trash2, Undo2, X } from "lucide-react";
 import {
   createContext,
   type ReactNode,
@@ -36,7 +41,8 @@ import {
 } from "react";
 import { api, messageOf } from "./api";
 import { initial, mailKey, ownAddresses } from "./inbox";
-import { hue, useAccounts, useInbox } from "./mail";
+import { hue, useAccounts, useFolders, useInbox } from "./mail";
+import type { Place } from "./server";
 import { Button, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
@@ -49,8 +55,9 @@ type Lines = { to: string; cc: string; bcc: string; subject: string };
 const NO_LINES: Lines = { to: "", cc: "", bcc: "", subject: "" };
 
 /**
- * What was written and not sent, by how it answers which mail, or "new":
- * Esc keeps it until the page reloads. `yours` is your text while
+ * What was written and not sent, by how it answers which mail, "new", or
+ * the draft it was opened as: Esc keeps it here, as Drafts keeps it once
+ * the page reloads. `yours` is your text while
  * Postrider's stands in its place; `wroteTo` is the account the person a
  * new mail goes to wrote to.
  */
@@ -75,6 +82,209 @@ function keep(key: string, next: Draft, began: Lines = NO_LINES) {
   );
   if (draft.text?.trim() || changed || draft.files) drafts.set(key, draft);
   else drafts.delete(key);
+  later(key);
+}
+
+/**
+ * What each draft was kept as in Drafts last: keeping it again takes that
+ * one's place, and sending it deletes it.
+ */
+const savedAs = new Map<string, DraftRef>();
+
+/** Each draft's keeping in Drafts, one after the other: the last, to wait for. */
+const keeping = new Map<string, Promise<void>>();
+
+/** Keepings waiting for the writing to pause. */
+const waiting = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Drafts being sent or thrown away: they're kept no more. */
+const leaving = new Set<string>();
+
+/** How long the writing pauses before what's written is kept in Drafts. */
+const PAUSE_MS = 3000;
+
+type FilesChange = (files: Going[]) => Going[];
+
+/** What keeping a draft needs besides what's written: from its dialog. */
+type Setup = {
+  workspace: string;
+  place: Place;
+  began: Lines;
+  /** The account it goes from, unless you picked one. */
+  from: string;
+  answers?: MailRef;
+  forwards?: MailRef;
+  startFiles: Going[];
+  moved: () => void;
+  /** While its dialog is open: changes the files it shows, and says what failed. */
+  open?: {
+    files: (change: FilesChange, quietly: boolean) => void;
+    failed: (problem: string) => void;
+  };
+};
+const setups = new Map<string, Setup>();
+
+/** What a draft opened from Drafts answers or forwards. */
+const opened = new Map<string, { answers?: MailRef; forwards?: MailRef }>();
+
+/** The mail as written: what changed in its draft, the rest as it began. */
+function outgoingOf(draft: Draft, setup: Setup, files: Attach[]): Outgoing {
+  return {
+    to: draft.to ?? setup.began.to,
+    cc: draft.cc ?? setup.began.cc,
+    bcc: draft.bcc ?? setup.began.bcc,
+    subject: draft.subject ?? setup.began.subject,
+    from_account: draft.from ?? setup.from,
+    text: draft.text ?? "",
+    answers: setup.answers,
+    forwards: setup.forwards,
+    files,
+  };
+}
+
+/** Keeps the draft in Drafts once the writing pauses. */
+function later(key: string) {
+  if (leaving.has(key)) return;
+  clearTimeout(waiting.get(key));
+  waiting.set(
+    key,
+    setTimeout(() => {
+      waiting.delete(key);
+      keepNow(key);
+    }, PAUSE_MS),
+  );
+}
+
+/** Keeps it now if it waits to be kept: as its dialog closes. */
+function flush(key: string) {
+  if (!waiting.has(key)) return;
+  clearTimeout(waiting.get(key));
+  waiting.delete(key);
+  keepNow(key);
+}
+
+/** Waits no longer to keep it, and for a keeping under way. */
+function settle(key: string): Promise<void> {
+  clearTimeout(waiting.get(key));
+  waiting.delete(key);
+  return keeping.get(key) ?? Promise.resolve();
+}
+
+/**
+ * Keeps the draft in its account's Drafts, after any keeping under way, in
+ * place of what it was kept as last; one with nothing left in it is
+ * deleted there. Its files are then named by their place in the new one,
+ * which keeps them however long it takes.
+ */
+function keepNow(key: string) {
+  const run = async () => {
+    const setup = setups.get(key);
+    if (!setup || leaving.has(key)) return;
+    const draft = drafts.get(key);
+    const was = savedAs.get(key);
+    const path = `/api/w/${setup.workspace}/drafts`;
+    if (!draft) {
+      if (!was) return;
+      await api("POST", `${path}/delete`, was, setup.place);
+      savedAs.delete(key);
+      setup.moved();
+      return;
+    }
+    const files = draft.files ?? setup.startFiles;
+    const attached = await Promise.all(
+      files.map((file) =>
+        file.attach
+          ? Promise.resolve(file.attach)
+          : (arriving.get(file.key)?.catch(() => undefined) ?? Promise.resolve(undefined)),
+      ),
+    );
+    const going = files.flatMap((file, index) => {
+      const attach = attached[index];
+      return attach ? [{ key: file.key, attach }] : [];
+    });
+    const outgoing: Outgoing = {
+      ...outgoingOf(
+        draft,
+        setup,
+        going.map((file) => file.attach),
+      ),
+      draft: was,
+    };
+    const kept = await api<DraftRef>("POST", path, outgoing, setup.place);
+    savedAs.set(key, kept);
+    const at = new Map(going.map((file, index) => [file.key, index]));
+    changeFiles(
+      key,
+      (now) =>
+        now.map((file) => {
+          const index = at.get(file.key);
+          if (index === undefined || file.attach?.kind === "kept") return file;
+          return { ...file, attach: { kind: "drafted", index } };
+        }),
+      true,
+    );
+    setup.moved();
+  };
+  const queued = (keeping.get(key) ?? Promise.resolve()).then(run).catch((problem: unknown) => {
+    setups.get(key)?.open?.failed(`Couldn't keep it in Drafts: ${messageOf(problem)}`);
+  });
+  keeping.set(key, queued);
+}
+
+/** Changes a draft's files: in its dialog while it's open, else where it's kept. */
+function changeFiles(key: string, change: FilesChange, quietly = false) {
+  const setup = setups.get(key);
+  if (setup?.open) return setup.open.files(change, quietly);
+  const closed = drafts.get(key);
+  if (!closed?.files) return;
+  drafts.set(key, { ...closed, files: change(closed.files) });
+  if (!quietly) later(key);
+}
+
+/** Forgets a draft sent or thrown away. */
+function forget(key: string) {
+  drafts.delete(key);
+  savedAs.delete(key);
+  setups.delete(key);
+  opened.delete(key);
+  leaving.delete(key);
+}
+
+/**
+ * Takes a draft opened from Drafts as it's written. One still written on
+ * here, under another key, goes on from there: what was written since it
+ * was kept stays.
+ */
+function adopt(key: string, draft: OpenedDraft) {
+  const files: Going[] = draft.files.map((file, index) => ({
+    key: `drafted:${index}`,
+    name: file.name,
+    size: file.size,
+    attach: { kind: "drafted", index },
+  }));
+  const seed: Draft = {
+    to: draft.to,
+    cc: draft.cc,
+    bcc: draft.bcc,
+    subject: draft.subject,
+    text: draft.text,
+    from: draft.draft.account_id,
+    files,
+  };
+  opened.set(key, { answers: draft.answers, forwards: draft.forwards });
+  const other = [...savedAs].find(
+    ([was, ref]) => was !== key && ref.message_id === draft.draft.message_id,
+  )?.[0];
+  if (other === undefined) {
+    drafts.set(key, seed);
+    savedAs.set(key, draft.draft);
+    return;
+  }
+  drafts.set(key, { ...seed, ...drafts.get(other) });
+  savedAs.set(key, draft.draft);
+  const queued = keeping.get(other);
+  if (queued) keeping.set(key, queued);
+  for (const map of [drafts, savedAs, setups, opened, keeping]) map.delete(other);
 }
 
 /**
@@ -82,6 +292,8 @@ function keep(key: string, next: Draft, began: Lines = NO_LINES) {
  * added. `attach` is missing while an added one is on its way.
  */
 type Going = { key: string; name: string; size: number; attach?: Attach };
+
+const NO_FILES: Going[] = [];
 
 /** Added files on their way to the server, by key: what each becomes there. */
 const arriving = new Map<string, Promise<Attach>>();
@@ -130,7 +342,7 @@ export function AnswerDialog({
       {/* What it answers comes first: whom it went to, and its files. */}
       {how &&
         (message ? (
-          <AnswerForm key={how} how={how} summary={summary} message={message} onSent={onClose} />
+          <AnswerForm key={how} how={how} summary={summary} message={message} onDone={onClose} />
         ) : (
           <>
             <Dialog.Title className="sr-only">Reading the mail</Dialog.Title>
@@ -145,14 +357,13 @@ function AnswerForm({
   how,
   summary,
   message,
-  onSent,
+  onDone,
 }: {
   how: Answering;
   summary: MailSummary;
   message: Message;
-  onSent: () => void;
+  onDone: () => void;
 }) {
-  const { workspace, place } = useWorkspace();
   const accounts = useAccounts();
   const draft = `${how}:${mailKey(summary)}`;
   const [began] = useState(() => begin(how, summary, message, ownAddresses(accounts)));
@@ -166,23 +377,15 @@ function AnswerForm({
     };
   });
   const forwarding = how === "forward";
-  const mail: MailRef = {
-    account_id: summary.account_id,
-    uid: summary.uid,
-    folder: summary.folder ?? undefined,
-  };
+  const mail = useMemo<MailRef>(
+    () => ({
+      account_id: summary.account_id,
+      uid: summary.uid,
+      folder: summary.folder ?? undefined,
+    }),
+    [summary.account_id, summary.uid, summary.folder],
+  );
 
-  const send = (text: string, from: string, files: Attach[]) => {
-    const outgoing: Outgoing = {
-      ...lines,
-      from_account: from,
-      text,
-      answers: forwarding ? undefined : mail,
-      forwards: forwarding ? mail : undefined,
-      files,
-    };
-    return api("POST", `/api/w/${workspace.id}/mails`, outgoing, place);
-  };
   // A forward takes its mail's files along.
   const [kept] = useState<Going[]>(() =>
     forwarding
@@ -213,8 +416,9 @@ function AnswerForm({
       needsText={!forwarding}
       focusText={!forwarding}
       startFiles={kept}
-      send={send}
-      onSent={onSent}
+      answers={forwarding ? undefined : mail}
+      forwards={forwarding ? mail : undefined}
+      onDone={onDone}
     >
       <Dialog.Title className="sr-only">{title}</Dialog.Title>
       <AddressLines
@@ -296,27 +500,19 @@ export function NewMailProvider({ children }: { children: ReactNode }) {
     <NewMailContext.Provider value={openNew}>
       {children}
       <CreateDialog open={open} onClose={() => setOpen(false)} width="40rem">
-        <NewMailForm onSent={() => setOpen(false)} />
+        <NewMailForm onDone={() => setOpen(false)} />
       </CreateDialog>
     </NewMailContext.Provider>
   );
 }
 
-function NewMailForm({ onSent }: { onSent: () => void }) {
-  const { workspace, place } = useWorkspace();
+function NewMailForm({ onDone }: { onDone: () => void }) {
   const accounts = useAccounts();
   const kept = drafts.get(NEW);
-  const [lines, setLines] = useState<Lines>({ ...NO_LINES, ...kept });
+  const [lines, setLines] = useState<Lines>(() => linesOf(kept));
   const [wroteTo, setWroteTo] = useState(kept?.wroteTo);
   const known = (id: string | undefined) => accounts.find((a) => a.id === id)?.id;
   const defaultFrom = known(lastFrom) ?? accounts[0]?.id ?? "";
-
-  const send = (text: string, from: string, files: Attach[]) => {
-    const mail: Outgoing = { ...lines, from_account: from, text, files };
-    return api("POST", `/api/w/${workspace.id}/mails`, mail, place).then(() => {
-      lastFrom = from;
-    });
-  };
 
   return (
     <Writer
@@ -328,8 +524,10 @@ function NewMailForm({ onSent }: { onSent: () => void }) {
       about={{ to: lines.to.trim() || undefined, subject: lines.subject.trim() || undefined }}
       ready={addressed(lines)}
       focusText={false}
-      send={send}
-      onSent={onSent}
+      onDone={(sentFrom) => {
+        if (sentFrom) lastFrom = sentFrom;
+        onDone();
+      }}
     >
       <Dialog.Title className="sr-only">New mail</Dialog.Title>
       <AddressLines
@@ -343,6 +541,108 @@ function NewMailForm({ onSent }: { onSent: () => void }) {
           keep(NEW, { wroteTo: person.account_id });
         }}
         autoFocus
+      />
+    </Writer>
+  );
+}
+
+/** The lines a draft holds. */
+function linesOf(draft: Draft | undefined): Lines {
+  return {
+    to: draft?.to ?? "",
+    cc: draft?.cc ?? "",
+    bcc: draft?.bcc ?? "",
+    subject: draft?.subject ?? "",
+  };
+}
+
+/**
+ * A draft opened from Drafts, to write on as it was left: kept again as you
+ * go, sent, or thrown away. It goes from the account whose Drafts holds it
+ * unless you pick another.
+ */
+export function DraftDialog({
+  account,
+  uid,
+  onClose,
+}: {
+  account: string;
+  uid: number;
+  onClose: () => void;
+}) {
+  const { workspace, place } = useWorkspace();
+  const key = `drafted:${account}:${uid}`;
+  const [ready, setReady] = useState(() => drafts.has(key) && opened.has(key));
+  const [problem, setProblem] = useState<string>();
+
+  useEffect(() => {
+    if (ready) return;
+    let live = true;
+    api<OpenedDraft>("GET", `/api/w/${workspace.id}/drafts/${account}/${uid}`, undefined, place)
+      .then((draft) => {
+        if (!live) return;
+        if (!(drafts.has(key) && opened.has(key))) adopt(key, draft);
+        setReady(true);
+      })
+      .catch((failed: unknown) => {
+        if (live) setProblem(messageOf(failed));
+      });
+    return () => {
+      live = false;
+    };
+  }, [ready, workspace.id, account, uid, place, key]);
+
+  return (
+    <CreateDialog open onClose={onClose} width="40rem">
+      {ready ? (
+        <DraftForm draft={key} onDone={onClose} />
+      ) : (
+        <>
+          <Dialog.Title className="sr-only">Opening the draft</Dialog.Title>
+          {problem ? (
+            <div className="p-5">
+              <ErrorMessage>{problem}</ErrorMessage>
+            </div>
+          ) : (
+            <p className="p-5 text-faint">Opening the draft…</p>
+          )}
+        </>
+      )}
+    </CreateDialog>
+  );
+}
+
+function DraftForm({ draft, onDone }: { draft: string; onDone: () => void }) {
+  const kept = drafts.get(draft);
+  const { answers, forwards } = opened.get(draft) ?? {};
+  const [lines, setLines] = useState<Lines>(() => linesOf(kept));
+  const [focusText] = useState(() => addressed(lines));
+  return (
+    <Writer
+      draft={draft}
+      began={NO_LINES}
+      defaultFrom={kept?.from ?? ""}
+      label={answers ? "Your reply" : forwards ? "Your note" : "Your mail"}
+      about={{
+        to: lines.to.trim() || undefined,
+        subject: lines.subject.trim() || undefined,
+        replying: answers,
+      }}
+      ready={addressed(lines)}
+      needsText={!forwards}
+      focusText={focusText}
+      answers={answers}
+      forwards={forwards}
+      onDone={onDone}
+    >
+      <Dialog.Title className="sr-only">{`Draft: ${lines.subject.trim() || "(no subject)"}`}</Dialog.Title>
+      <AddressLines
+        lines={lines}
+        onChange={(next) => {
+          setLines(next);
+          keep(draft, next);
+        }}
+        autoFocus={!focusText}
       />
     </Writer>
   );
@@ -468,7 +768,8 @@ export function bytes(size: number): string {
 
 /**
  * The text, the account it goes from, More professional and Send, under
- * the lines `children` give: whom it goes to and what about.
+ * the lines `children` give: whom it goes to and what about. What's
+ * written is kept in Drafts as the writing pauses and as it closes.
  */
 function Writer({
   draft,
@@ -480,9 +781,10 @@ function Writer({
   ready = true,
   needsText = true,
   focusText = true,
-  startFiles = [],
-  send,
-  onSent,
+  startFiles = NO_FILES,
+  answers,
+  forwards,
+  onDone,
   children,
 }: {
   draft: string;
@@ -502,18 +804,21 @@ function Writer({
   focusText?: boolean;
   /** The files it starts with: a forward's. */
   startFiles?: Going[];
-  /** Sends `text` from the account `from`, with `files`. */
-  send: (text: string, from: string, files: Attach[]) => Promise<unknown>;
-  onSent: () => void;
+  /** The mail it answers, or forwards. */
+  answers?: MailRef;
+  forwards?: MailRef;
+  /** It was sent, from `sentFrom`, or thrown away. */
+  onDone: (sentFrom?: string) => void;
   children: ReactNode;
 }) {
   const { workspace, place } = useWorkspace();
+  const { moved } = useFolders();
   const accounts = useAccounts();
   const kept = drafts.get(draft);
   const [text, setText] = useState(kept?.text ?? "");
   const [from, setFrom] = useState(kept?.from ?? suggestedFrom ?? defaultFrom);
   const [yours, setYours] = useState(kept?.yours);
-  const [busy, setBusy] = useState<"sending" | "rewriting">();
+  const [busy, setBusy] = useState<"sending" | "rewriting" | "throwing">();
   const [error, setError] = useState<string>();
   const sender = accounts.find((a) => a.id === from);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -522,22 +827,35 @@ function Writer({
   const filesNow = useRef(files);
   const picker = useRef<HTMLInputElement>(null);
   const [dropping, setDropping] = useState(false);
-  const mounted = useRef(true);
-
-  // Files change here while it's open, and in the draft once it's closed.
-  const changeFiles = useCallback(
-    (change: (files: Going[]) => Going[]) => {
-      if (!mounted.current) {
-        const closed = drafts.get(draft)?.files;
-        if (closed) keep(draft, { files: change(closed) }, began);
-        return;
-      }
-      filesNow.current = change(filesNow.current);
-      setFiles(filesNow.current);
-      keep(draft, { files: filesNow.current }, began);
-    },
-    [draft, began],
+  const setup: Setup = useMemo(
+    () => ({ workspace: workspace.id, place, began, from, answers, forwards, startFiles, moved }),
+    [workspace.id, place, began, from, answers, forwards, startFiles, moved],
   );
+
+  // What keeping it in Drafts needs, kept current; and while it's open,
+  // its files change here, and what fails shows here.
+  useEffect(() => {
+    setups.set(draft, {
+      ...setup,
+      open: {
+        files: (change, quietly) => {
+          filesNow.current = change(filesNow.current);
+          setFiles(filesNow.current);
+          const now = drafts.get(draft);
+          if (!quietly) keep(draft, { files: filesNow.current }, began);
+          else if (now?.files) drafts.set(draft, { ...now, files: filesNow.current });
+        },
+        failed: setError,
+      },
+    });
+    return () => {
+      const closed = setups.get(draft);
+      if (closed) setups.set(draft, { ...closed, open: undefined });
+    };
+  }, [draft, setup, began]);
+
+  // Closed while it waits to be kept, it's kept at once.
+  useEffect(() => () => flush(draft), [draft]);
 
   // Waits for an added file to arrive, then names it by what it became.
   const follow = useCallback(
@@ -545,24 +863,22 @@ function Writer({
       arriving.get(key)?.then(
         (attach) => {
           arriving.delete(key);
-          changeFiles((now) => now.map((file) => (file.key === key ? { ...file, attach } : file)));
+          const arrived: FilesChange = (now) =>
+            now.map((file) => (file.key === key ? { ...file, attach } : file));
+          changeFiles(draft, arrived, true);
         },
         (problem: unknown) => {
           arriving.delete(key);
-          changeFiles((now) => now.filter((file) => file.key !== key));
-          if (mounted.current) setError(messageOf(problem));
+          changeFiles(draft, (now) => now.filter((file) => file.key !== key));
+          setups.get(draft)?.open?.failed(messageOf(problem));
         },
       );
     },
-    [changeFiles],
+    [draft],
   );
 
   useEffect(() => {
-    mounted.current = true;
     for (const file of filesNow.current) if (!file.attach) follow(file.key);
-    return () => {
-      mounted.current = false;
-    };
   }, [follow]);
 
   const add = (chosen: Iterable<File>) => {
@@ -588,7 +904,7 @@ function Writer({
           })
           .then((added): Attach => ({ kind: "added", upload: added.id })),
       );
-      changeFiles((now) => [...now, { key, name: file.name, size: file.size }]);
+      changeFiles(draft, (now) => [...now, { key, name: file.name, size: file.size }]);
       follow(key);
     }
   };
@@ -598,6 +914,12 @@ function Writer({
   useEffect(() => {
     if (suggestedFrom && !picked.current) setFrom(suggestedFrom);
   }, [suggestedFrom]);
+
+  // Text written before goes on where it ends.
+  useEffect(() => {
+    const at = field.current?.value.length ?? 0;
+    if (focusText) field.current?.setSelectionRange(at, at);
+  }, [focusText]);
 
   const write = (next: string) => {
     setText(next);
@@ -635,16 +957,51 @@ function Writer({
     field.current?.focus();
   };
 
+  // Sending it, or throwing it away, waits for its keeping under way: then
+  // its server knows the draft it deletes, or moves to Trash.
+  const leave = (how: "sending" | "throwing", then: () => Promise<unknown>, sent?: string) => {
+    setBusy(how);
+    setError(undefined);
+    leaving.add(draft);
+    settle(draft)
+      .then(then)
+      .then(
+        () => {
+          forget(draft);
+          moved();
+          onDone(sent);
+        },
+        (problem: unknown) => {
+          leaving.delete(draft);
+          done(problem);
+        },
+      );
+  };
+
   const submit = () => {
     if (busy || !ready || !arrived || (needsText && empty)) return;
-    setBusy("sending");
-    setError(undefined);
-    const going = filesNow.current.flatMap((file) => (file.attach ? [file.attach] : []));
-    send(text, from, going).then(() => {
-      drafts.delete(draft);
-      onSent();
-    }, done);
+    leave(
+      "sending",
+      () => {
+        const going = filesNow.current.flatMap((file) => (file.attach ? [file.attach] : []));
+        const outgoing: Outgoing = {
+          ...outgoingOf(drafts.get(draft) ?? {}, setup, going),
+          draft: savedAs.get(draft),
+        };
+        return api("POST", `/api/w/${workspace.id}/mails`, outgoing, place);
+      },
+      from,
+    );
   };
+
+  const throwAway = () => {
+    if (busy) return;
+    leave("throwing", async () => {
+      const was = savedAs.get(draft);
+      if (was) await api("POST", `/api/w/${workspace.id}/drafts/trash`, was, place);
+    });
+  };
+  const something = drafts.has(draft) || savedAs.has(draft);
 
   return (
     <form
@@ -679,6 +1036,9 @@ function Writer({
         } else if (event.key.toLowerCase() === "a" && command && event.shiftKey) {
           event.preventDefault();
           picker.current?.click();
+        } else if (event.key === "Backspace" && command && event.shiftKey) {
+          event.preventDefault();
+          throwAway();
         } else if (
           event.key.toLowerCase() === "z" &&
           command &&
@@ -698,7 +1058,7 @@ function Writer({
         autoFocus={focusText}
         aria-label={label}
         value={text}
-        readOnly={busy === "rewriting"}
+        readOnly={busy !== undefined}
         onChange={(event) => write(event.target.value)}
         onPaste={(event) => {
           // A file pasted goes with it, as a screenshot would.
@@ -712,7 +1072,7 @@ function Writer({
         <FilesGoing
           files={files}
           onRemove={(key) => {
-            changeFiles((now) => now.filter((file) => file.key !== key));
+            changeFiles(draft, (now) => now.filter((file) => file.key !== key));
             field.current?.focus();
           }}
         />
@@ -760,9 +1120,21 @@ function Writer({
             field.current?.focus();
           }}
         />
+        {something && (
+          <button
+            type="button"
+            className="ui-button ui-icon-button ml-auto"
+            aria-label="Throw it away"
+            title="Throw it away (⇧⌘⌫)"
+            disabled={busy !== undefined}
+            onClick={throwAway}
+          >
+            <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        )}
         <button
           type="button"
-          className="ui-button ui-icon-button ml-auto"
+          className={`ui-button ui-icon-button${something ? "" : " ml-auto"}`}
           aria-label="Add files"
           title="Add files (⇧⌘A)"
           onClick={() => picker.current?.click()}

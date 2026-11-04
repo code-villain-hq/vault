@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
-import { AnswerDialog, type Answering, bytes } from "./compose";
+import { AnswerDialog, type Answering, bytes, DraftDialog } from "./compose";
 import { markSeen, useListedMails } from "./folders";
 import {
   anchorOf,
@@ -117,10 +117,14 @@ export function MailPage() {
   // Its line in the Inbox shows at once; the rest comes from its server.
   const summary: MailSummary | undefined =
     messages[key] ?? letters.find((letter) => letter.key === key)?.mail;
+  // A draft opens to write on, over the page; it isn't answered.
+  const drafting = (summary?.folder ?? folder)?.toLowerCase() === "drafts";
   // A conversation's answer goes to the last who wrote in it but you.
-  const answered = conversation
-    ? (conversation.mails.findLast((mail) => !isYours(mail, own)) ?? conversation.mails.at(-1))
-    : summary;
+  const answered = drafting
+    ? undefined
+    : conversation
+      ? (conversation.mails.findLast((mail) => !isYours(mail, own)) ?? conversation.mails.at(-1))
+      : summary;
   const answeredKey = answered && (conversation ? mailKey(answered) : key);
   const unfolded = useUnfolded(thread, letters, [key, answeredKey]);
 
@@ -312,6 +316,9 @@ export function MailPage() {
           summary={messages[answeredKey] ?? answered}
           message={messages[answeredKey]}
         />
+      )}
+      {drafting && (
+        <DraftDialog key={key} account={account} uid={Number(uid)} onClose={() => back.go()} />
       )}
       <MoveDialog
         open={moving}

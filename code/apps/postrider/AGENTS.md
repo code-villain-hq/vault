@@ -233,10 +233,27 @@ Every change happens on the account's server; the Inbox follows it there.
   the IMAP server with `imap.` read
   as `smtp.`, on 465 with TLS, with the same password; the stand-ins at
   127.0.0.1 use Mailpit on 3025. Bcc goes only in the envelope; the copy
-  in Sent keeps it. The mail answered is marked answered. Esc keeps what
-  you wrote, in memory, until the page reloads; ⌘Enter sends. With a mail
+  in Sent keeps it. The mail answered is marked answered. ⌘Enter sends;
+  Esc closes it, kept in Drafts (below). With a mail
   open, F forwards it before the list beside it can take F for its
   filter (a capturing listener).
+- What you write is kept in the account's Drafts (`drafts.rs`,
+  `POST /drafts` with the `Outgoing`), 3 seconds after you stop typing,
+  at once on Esc, so it outlasts a quit. Each keeping appends a new draft
+  (`\Draft`, `\Seen`) with a Message-ID of its own and deletes the one
+  before by its Message-ID (`DraftRef`), so Drafts holds one per mail you
+  write. The page keeps typing in memory as before and keeps one draft at
+  a time per mail (`keepNow` in `compose.tsx`). A draft carries what isn't
+  plain to read back in `X-Postrider-Draft` (`DraftNote`, base64 JSON):
+  To, Cc and Bcc as you wrote them, the mail it answers or forwards, and
+  how much of its text is the quote below yours; the mail sent has no
+  such header and no Bcc. Its files go in it, and once kept they come
+  from it (`Attach::Drafted`), not from memory. A mail opened in Drafts
+  opens as the mail you write (`DraftDialog`, `GET /drafts/{account}/{uid}`),
+  only your words in the text; another app's draft is all yours, To and
+  Cc from its header. Sending deletes the draft for good; ⇧⌘⌫ throws it
+  away to Trash (`POST /drafts/trash`); erasing it all, with no files,
+  deletes it for good (`POST /drafts/delete`).
 - Files go with any mail you write: the paperclip (⇧⌘A), dropped on the
   dialog, or pasted into the text. Each goes ahead alone to
   `POST /uploads` (`NewUpload`, base64, up to 25 MB; the route takes
@@ -531,8 +548,8 @@ Like the ask field's, what it needs is kept in memory.
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
   text part numbers its links with, HTML tags or entities; a migration
-  cleaned the lines kept before, `0018_snippet_tags.sql`), archiving, sending and
-  files (`archive.rs`, `send.rs`, `files.rs`), More professional
+  cleaned the lines kept before, `0018_snippet_tags.sql`), archiving, sending,
+  drafts and files (`archive.rs`, `send.rs`, `drafts.rs`, `files.rs`), More professional
   (`rewrite.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
   ask field's answers (`ask.rs`), sorting rules (`rules.rs`, written

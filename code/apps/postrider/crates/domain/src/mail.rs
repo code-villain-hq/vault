@@ -440,6 +440,10 @@ pub struct Outgoing {
     pub forwards: Option<MailRef>,
     /// The files it takes along, in their order.
     pub files: Vec<Attach>,
+    /// The draft it was kept as last: keeping it again takes that one's
+    /// place, and sending it deletes it. What's below your words comes from
+    /// there while it's in Drafts.
+    pub draft: Option<DraftRef>,
 }
 
 /// A file a mail you write takes along.
@@ -451,6 +455,37 @@ pub enum Attach {
     Kept { index: u32 },
     /// A file you added, by the id adding it gave.
     Added { upload: Uuid },
+    /// One of the files of its draft, by its place among them.
+    Drafted { index: u32 },
+}
+
+/// A draft in an account's Drafts, by its Message-ID: each time it's kept,
+/// it's kept anew, with an id of its own, in place of the one before.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct DraftRef {
+    /// The account whose Drafts holds it: the one it goes from.
+    pub account_id: Uuid,
+    pub message_id: String,
+}
+
+/// A draft opened from Drafts, to write on: as the page shows a mail you
+/// write.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, optional_fields)]
+pub struct Draft {
+    pub draft: DraftRef,
+    pub to: String,
+    pub cc: String,
+    pub bcc: String,
+    pub subject: String,
+    /// Your words: what it quotes or forwards below them stays as it is.
+    pub text: String,
+    /// Its files, in their order, as [`Attach::Drafted`] names them.
+    pub files: Vec<Attachment>,
+    pub answers: Option<MailRef>,
+    pub forwards: Option<MailRef>,
 }
 
 impl Outgoing {

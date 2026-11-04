@@ -11,7 +11,8 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::{
-    accounts, archive, ask, caldav, connect, files, folders, mail, newsletters, rewrite, send, ws,
+    accounts, archive, ask, caldav, connect, drafts, files, folders, mail, newsletters, rewrite,
+    send, ws,
 };
 
 /// The API, plus the built web app from `web_dir` when given.
@@ -44,6 +45,10 @@ pub fn router(state: AppState) -> Router {
             post(send::upload).layer(DefaultBodyLimit::max(send::UPLOAD_BODY)),
         )
         .route("/rewrite", post(rewrite::rewrite))
+        .route("/drafts", post(drafts::keep))
+        .route("/drafts/trash", post(drafts::trash))
+        .route("/drafts/delete", post(drafts::delete))
+        .route("/drafts/{account_id}/{uid}", get(drafts::open))
         .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
         .route("/mails/{account_id}/{uid}/trash", post(archive::trash))

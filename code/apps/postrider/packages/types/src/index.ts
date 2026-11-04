@@ -11,6 +11,8 @@ export type * from "./generated/CalendarCreate";
 export type * from "./generated/CalendarPatch";
 export type * from "./generated/Conversation";
 export type * from "./generated/Day";
+export type * from "./generated/Draft";
+export type * from "./generated/DraftRef";
 export type * from "./generated/Event";
 export type * from "./generated/Folder";
 export type * from "./generated/FolderLink";

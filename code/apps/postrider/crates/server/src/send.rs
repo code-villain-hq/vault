@@ -5,8 +5,12 @@
 //! answered. A reply goes in its mail's thread, quoting it below; a forward
 //! writes its mail out below.
 //!
-//! Its files are named in `files`: one of the forwarded mail's, by its
-//! place, or one you added. A file you add comes first, alone, with
+//! What you write is kept in Drafts as you go (`drafts.rs`), and sending
+//! it deletes its draft there. While the draft is in Drafts, what's below
+//! your words, and the thread it goes in, come from it.
+//!
+//! Its files are named in `files`: one of the forwarded mail's or of its
+//! draft's, by its place, or one you added. A file you add comes first, alone, with
 //! `POST /uploads`, and waits in memory, for you only, until its mail goes
 //! or a day has passed. Each file holds up to 25 MB, and a mail's files
 //! together as much.
@@ -24,6 +28,7 @@ use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Local};
+use lettre::address::Envelope;
 use lettre::message::header::{Bcc, Cc, ContentType, To};
 use lettre::message::{Attachment, Mailbox, Mailboxes, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
@@ -33,8 +38,9 @@ use postrider_domain::{Attach, FolderRole, MailAccount, NewUpload, Outgoing, Upl
 use uuid::Uuid;
 
 use crate::auth::Member;
+use crate::drafts::{self, DraftNote};
 use crate::error::AppError;
-use crate::imap;
+use crate::imap::{self, Failure, Place};
 use crate::mail::Mail;
 use crate::message;
 use crate::state::AppState;
@@ -69,19 +75,40 @@ pub(crate) struct Uploaded {
 }
 
 /// What a mail you write carries below your words.
-enum Below {
+pub(crate) enum Below {
     Nothing,
     /// The source of the mail it answers: quoted, in its thread.
     Answers(Vec<u8>),
-    /// The source of the mail it forwards: written out, its files there to
-    /// keep.
+    /// The source of the mail it forwards: written out.
     Forwards(Vec<u8>),
+    /// The source of its draft: what's below your words there, in the
+    /// thread it's in.
+    Drafted(Vec<u8>),
+}
+
+/// Whether a mail is written to go, or to be kept in Drafts as it stands:
+/// whom it goes to not yet said, or half typed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Purpose {
+    Send,
+    Draft,
+}
+
+/// What a mail you write takes besides your words.
+pub(crate) struct Gathered {
+    pub below: Below,
+    pub files: Vec<message::File>,
+    /// The mail it answers, where it is: marked answered once it's sent.
+    pub answered: Option<(MailAccount, Place, i64)>,
+    /// Its draft, where it is in Drafts.
+    pub drafted: Option<(MailAccount, Place)>,
 }
 
 /// A mail written: as it goes out, and as it's kept, with its Bcc.
-struct Written {
+pub(crate) struct Written {
     message: lettre::Message,
-    kept: Vec<u8>,
+    pub kept: Vec<u8>,
+    pub message_id: String,
 }
 
 impl Mail {
@@ -95,29 +122,14 @@ impl Mail {
         outgoing.validate()?;
         let sender = self.account(workspace_id, outgoing.from_account).await?;
         let from = self.sender(&sender, user_id).await?;
-        let mut answered = None;
-        let below = if let Some(mail) = &outgoing.answers {
-            let account = self.account(workspace_id, mail.account_id).await?;
-            let (place, raw) = self
-                .source_of(&account, mail.folder.as_deref(), mail.uid)
-                .await?;
-            answered = Some((account, place, mail.uid));
-            Below::Answers(raw)
-        } else if let Some(mail) = &outgoing.forwards {
-            let account = self.account(workspace_id, mail.account_id).await?;
-            let (_, raw) = self
-                .source_of(&account, mail.folder.as_deref(), mail.uid)
-                .await?;
-            Below::Forwards(raw)
-        } else {
-            Below::Nothing
-        };
-        let kept_from = match &below {
-            Below::Forwards(raw) => Some(raw.as_slice()),
-            _ => None,
-        };
-        let files = self.files_for(workspace_id, user_id, &outgoing.files, kept_from)?;
-        let written = write(from, outgoing, &below, &files)?;
+        let gathered = self.gather(workspace_id, user_id, outgoing).await?;
+        let written = write(
+            from,
+            outgoing,
+            &gathered.below,
+            &gathered.files,
+            Purpose::Send,
+        )?;
         let password = self
             .password(&sender)
             .await
@@ -125,10 +137,17 @@ impl Mail {
         send(&sender, password, written.message).await?;
         self.forget_uploads(&outgoing.files);
 
-        // Sent, it's done: the copy and the mark follow without waiting.
+        // Sent, it's done: the copy, its draft gone and the mark follow
+        // without waiting.
+        let (answered, drafted) = (gathered.answered, gathered.drafted);
+        let draft = outgoing.draft.clone();
         let mail = Arc::clone(self);
         tokio::spawn(async move {
             mail.file_sent(&sender, written.kept).await;
+            if let (Some((account, place)), Some(draft)) = (drafted, draft) {
+                mail.delete_draft_at(&account, &place, &draft.message_id)
+                    .await;
+            }
             let Some((account, place, uid)) = answered else {
                 return;
             };
@@ -143,6 +162,80 @@ impl Mail {
             }
         });
         Ok(())
+    }
+
+    /// What `outgoing` takes besides your words. While its draft is in
+    /// Drafts, what's below them and its thread come from there; else from
+    /// the mail it answers or forwards.
+    pub(crate) async fn gather(
+        &self,
+        workspace_id: Uuid,
+        user_id: Uuid,
+        outgoing: &Outgoing,
+    ) -> Result<Gathered, AppError> {
+        let refused = |failure: Failure| AppError::refused(failure.message());
+        let (mut drafted, mut draft_raw) = (None, None);
+        if let Some(draft) = &outgoing.draft {
+            let account = self.account(workspace_id, draft.account_id).await?;
+            if let Some((place, raw)) = self
+                .draft_source(&account, &draft.message_id)
+                .await
+                .map_err(refused)?
+            {
+                drafted = Some((account, place));
+                draft_raw = Some(raw);
+            }
+        }
+        let (mut answered, mut answers_raw, mut forwards_raw) = (None, None, None);
+        if let Some(mail) = &outgoing.answers {
+            let account = self.account(workspace_id, mail.account_id).await?;
+            if draft_raw.is_some() {
+                // Its draft quotes it already: it's only found, to be
+                // marked answered.
+                let place = match mail.folder.as_deref() {
+                    None => Some(Place::inbox()),
+                    Some(key) => self.place(&account, key).await.ok().flatten(),
+                };
+                answered = place.map(|place| (account, place, mail.uid));
+            } else {
+                let (place, raw) = self
+                    .source_of(&account, mail.folder.as_deref(), mail.uid)
+                    .await?;
+                answered = Some((account, place, mail.uid));
+                answers_raw = Some(raw);
+            }
+        } else if let Some(mail) = &outgoing.forwards {
+            let keeps = outgoing
+                .files
+                .iter()
+                .any(|file| matches!(file, Attach::Kept { .. }));
+            if draft_raw.is_none() || keeps {
+                let account = self.account(workspace_id, mail.account_id).await?;
+                let (_, raw) = self
+                    .source_of(&account, mail.folder.as_deref(), mail.uid)
+                    .await?;
+                forwards_raw = Some(raw);
+            }
+        }
+        let files = self.files_for(
+            workspace_id,
+            user_id,
+            &outgoing.files,
+            forwards_raw.as_deref(),
+            draft_raw.as_deref(),
+        )?;
+        let below = match (draft_raw, answers_raw, forwards_raw) {
+            (Some(raw), _, _) => Below::Drafted(raw),
+            (None, Some(raw), _) => Below::Answers(raw),
+            (None, None, Some(raw)) => Below::Forwards(raw),
+            (None, None, None) => Below::Nothing,
+        };
+        Ok(Gathered {
+            below,
+            files,
+            answered,
+            drafted,
+        })
     }
 
     /// Keeps a file you added until its mail goes, or a day has passed.
@@ -199,13 +292,14 @@ impl Mail {
     }
 
     /// The files `files` names: kept from `kept_from`, the mail it
-    /// forwards, or added by you.
+    /// forwards, from `drafted_from`, its draft, or added by you.
     fn files_for(
         &self,
         workspace_id: Uuid,
         user_id: Uuid,
         files: &[Attach],
         kept_from: Option<&[u8]>,
+        drafted_from: Option<&[u8]>,
     ) -> Result<Vec<message::File>, AppError> {
         let mut found = Vec::with_capacity(files.len());
         for attach in files {
@@ -214,6 +308,11 @@ impl Mail {
                     .and_then(|raw| message::file(raw, *index as usize))
                     .ok_or_else(|| {
                         AppError::invalid("A file of the mail it forwards isn't there any more.")
+                    })?,
+                Attach::Drafted { index } => drafted_from
+                    .and_then(|raw| message::file(raw, *index as usize))
+                    .ok_or_else(|| {
+                        AppError::invalid("A file of its draft isn't in Drafts any more.")
                     })?,
                 Attach::Added { upload } => self
                     .uploads
@@ -287,27 +386,39 @@ impl Mail {
     }
 }
 
-/// `outgoing`, written from `from`, with what goes `below` it and `files`.
-fn write(
+/// `outgoing`, written from `from`, with what goes `below` it and `files`:
+/// to go, or as a draft, which takes whom it goes to as typed so far.
+pub(crate) fn write(
     from: Mailbox,
     outgoing: &Outgoing,
     below: &Below,
     files: &[message::File],
+    purpose: Purpose,
 ) -> Result<Written, AppError> {
     let original = match below {
-        Below::Answers(raw) | Below::Forwards(raw) => Some(
+        Below::Answers(raw) | Below::Forwards(raw) | Below::Drafted(raw) => Some(
             MessageParser::new()
                 .parse(raw)
                 .ok_or_else(|| AppError::invalid("That mail can't be read any more."))?,
         ),
         Below::Nothing => None,
     };
-    let to = addresses(&outgoing.to)?;
-    let cc = addresses(&outgoing.cc)?;
-    let bcc = addresses(&outgoing.bcc)?;
-    if [&to, &cc, &bcc]
-        .iter()
-        .all(|list| list.iter().next().is_none())
+    let [to, cc, bcc] = match purpose {
+        Purpose::Send => [
+            addresses(&outgoing.to)?,
+            addresses(&outgoing.cc)?,
+            addresses(&outgoing.bcc)?,
+        ],
+        Purpose::Draft => [
+            addresses_so_far(&outgoing.to),
+            addresses_so_far(&outgoing.cc),
+            addresses_so_far(&outgoing.bcc),
+        ],
+    };
+    if purpose == Purpose::Send
+        && [&to, &cc, &bcc]
+            .iter()
+            .all(|list| list.iter().next().is_none())
     {
         return Err(AppError::invalid("Say whom it goes to."));
     }
@@ -319,15 +430,17 @@ fn write(
         let said = original.subject().unwrap_or_default().trim();
         subject = match below {
             Below::Forwards(_) => prefixed("Fwd: ", &["fwd:", "fw:", "wg:"], said),
-            _ => prefixed("Re: ", &["re:", "aw:"], said),
+            Below::Answers(_) => prefixed("Re: ", &["re:", "aw:"], said),
+            _ => String::new(),
         };
     }
 
-    let domain = from.email.domain().to_string();
+    let address = from.email.clone();
+    let message_id = format!("<{}@{}>", Uuid::now_v7(), address.domain());
     let mut builder: MessageBuilder = lettre::Message::builder()
         .from(from)
         .subject(subject)
-        .message_id(Some(format!("<{}@{domain}>", Uuid::now_v7())))
+        .message_id(Some(message_id.clone()))
         .date_now();
     if to.iter().next().is_some() {
         builder = builder.mailbox(To::from(to));
@@ -338,32 +451,62 @@ fn write(
     if bcc.iter().next().is_some() {
         builder = builder.mailbox(Bcc::from(bcc));
     }
+    if purpose == Purpose::Draft {
+        // A draft goes nowhere: its envelope names only you, so it can be
+        // written before it says whom it goes to.
+        let envelope = Envelope::new(Some(address.clone()), vec![address])
+            .map_err(|e| AppError::invalid(format!("This draft can't be kept: {e}.")))?;
+        builder = builder.envelope(envelope);
+    }
 
-    let mut body = outgoing.text.trim_end().replace("\r\n", "\n");
-    match (below, &original) {
-        (Below::Answers(_), Some(original)) => {
-            if let Some(id) = original.message_id() {
-                let mut thread: Vec<String> = original
-                    .references()
-                    .map(|list| list.iter().map(|id| format!("<{id}>")).collect())
-                    .unwrap_or_default();
-                thread.push(format!("<{id}>"));
-                builder = builder
-                    .in_reply_to(format!("<{id}>"))
-                    .references(thread.join(" "));
-            }
-            body.push_str(&quote(original));
-        }
-        (Below::Forwards(_), Some(original)) => {
-            let forwarded = forwarded(original);
-            // With no note, the mail starts with what it forwards.
-            body.push_str(if body.is_empty() {
-                forwarded.trim_start()
-            } else {
-                &forwarded
-            });
-        }
-        _ => {}
+    // Its thread: the mail it answers, or the one its draft was in.
+    let thread = match (below, &original) {
+        (Below::Answers(_), Some(original)) => original.message_id().map(|id| {
+            let mut thread: Vec<String> = original
+                .references()
+                .map(|list| list.iter().map(|id| format!("<{id}>")).collect())
+                .unwrap_or_default();
+            thread.push(format!("<{id}>"));
+            (format!("<{id}>"), thread.join(" "))
+        }),
+        (Below::Drafted(_), Some(draft)) => draft.in_reply_to().and_then(|answers| {
+            let answers = answers.first()?;
+            let thread: Vec<String> = draft
+                .references()
+                .map(|list| list.iter().map(|id| format!("<{id}>")).collect())
+                .unwrap_or_else(|| vec![format!("<{answers}>")]);
+            Some((format!("<{answers}>"), thread.join(" ")))
+        }),
+        _ => None,
+    };
+    if let Some((answers, references)) = thread {
+        builder = builder.in_reply_to(answers).references(references);
+    }
+
+    let text = lf(outgoing.text.trim_end());
+    let under = match (below, &original) {
+        (Below::Answers(_), Some(original)) => quote(original),
+        (Below::Forwards(_), Some(original)) => forwarded(original),
+        (Below::Drafted(_), Some(draft)) => drafts::below(draft),
+        _ => String::new(),
+    };
+    let under = lf(under.trim_start_matches(['\r', '\n']).trim_end());
+    // With nothing of yours, the mail starts with what's below.
+    let body = match (text.is_empty(), under.is_empty()) {
+        (_, true) => text,
+        (true, false) => format!("{under}\n"),
+        (false, false) => format!("{text}\n\n{under}\n"),
+    };
+    if purpose == Purpose::Draft {
+        let note = DraftNote {
+            to: outgoing.to.clone(),
+            cc: outgoing.cc.clone(),
+            bcc: outgoing.bcc.clone(),
+            below: under.chars().count(),
+            answers: outgoing.answers.clone(),
+            forwards: outgoing.forwards.clone(),
+        };
+        builder = builder.header(note.header());
     }
 
     let built = |builder: MessageBuilder| {
@@ -388,7 +531,13 @@ fn write(
     Ok(Written {
         message: built(builder.clone())?,
         kept: built(builder.keep_bcc())?.formatted(),
+        message_id,
     })
+}
+
+/// Text with its line breaks as `\n` alone, as a draft's is read back.
+pub(crate) fn lf(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "")
 }
 
 /// `subject` with `prefix` before it, unless it starts with one of `seen`
@@ -512,6 +661,44 @@ fn named(mailbox: &mail_parser::Mailbox<'_>) -> String {
 /// or "Anna Weber <anna@example.test>", with commas or semicolons between.
 /// One that isn't an address stops it, named, rather than going missing.
 fn addresses(typed: &str) -> Result<Mailboxes, AppError> {
+    let mut to = Mailboxes::new();
+    for part in parts(typed) {
+        match address(&part) {
+            Some(mailbox) => to.push(mailbox),
+            None => {
+                return Err(AppError::invalid(format!(
+                    "\u{201c}{part}\u{201d} isn't an address to send to."
+                )));
+            }
+        }
+    }
+    Ok(to)
+}
+
+/// The addresses typed so far, as a draft keeps them: those that are
+/// whole. The rest stays in its note, as typed.
+fn addresses_so_far(typed: &str) -> Mailboxes {
+    parts(typed)
+        .iter()
+        .filter_map(|part| address(part))
+        .collect::<Vec<_>>()
+        .into()
+}
+
+/// One address as typed: `None` when it isn't one, whole.
+fn address(part: &str) -> Option<Mailbox> {
+    // The parser stops where an address ends: what's left must be none.
+    let whole = if part.contains('<') {
+        part.ends_with('>')
+    } else {
+        !part.contains(char::is_whitespace)
+    };
+    part.parse::<Mailbox>().ok().filter(|_| whole)
+}
+
+/// What's typed in To, Cc or Bcc, split at the commas and semicolons
+/// between addresses: not those in a quoted name or within `<>`.
+fn parts(typed: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let (mut part, mut quoted, mut angled) = (String::new(), false, false);
     for c in typed.chars() {
@@ -528,24 +715,11 @@ fn addresses(typed: &str) -> Result<Mailboxes, AppError> {
         part.push(c);
     }
     parts.push(part);
-    let mut to = Mailboxes::new();
-    for part in parts.iter().map(|p| p.trim()).filter(|p| !p.is_empty()) {
-        // The parser stops where an address ends: what's left must be none.
-        let whole = if part.contains('<') {
-            part.ends_with('>')
-        } else {
-            !part.contains(char::is_whitespace)
-        };
-        match part.parse::<Mailbox>() {
-            Ok(mailbox) if whole => to.push(mailbox),
-            _ => {
-                return Err(AppError::invalid(format!(
-                    "\u{201c}{part}\u{201d} isn't an address to send to."
-                )));
-            }
-        }
-    }
-    Ok(to)
+    parts
+        .iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect()
 }
 
 /// Sends `message` over the account's SMTP server.
@@ -654,6 +828,7 @@ Does it work for three Macs?\r\n\
             answers: None,
             forwards: None,
             files: Vec::new(),
+            draft: None,
         }
     }
 
@@ -664,7 +839,16 @@ Does it work for three Macs?\r\n\
     #[test]
     fn a_reply_quotes_its_mail_in_the_thread() {
         let mail = outgoing("Team <team@example.test>", "Yes, it does.");
-        let sent = sent(write(from(), &mail, &Below::Answers(MAIL.to_vec()), &[]).unwrap());
+        let sent = sent(
+            write(
+                from(),
+                &mail,
+                &Below::Answers(MAIL.to_vec()),
+                &[],
+                Purpose::Send,
+            )
+            .unwrap(),
+        );
         assert!(sent.contains("To: Team <team@example.test>"), "{sent}");
         assert!(sent.contains("Subject: Re: Layer for our team?"), "{sent}");
         assert!(sent.contains("In-Reply-To: <q1@example.test>"), "{sent}");
@@ -683,7 +867,16 @@ Does it work for three Macs?\r\n\
     fn a_subject_already_answered_stays() {
         let mail = String::from_utf8_lossy(MAIL).replace("Subject: Layer", "Subject: AW: Layer");
         let reply = outgoing("anna@example.test", "Ja.");
-        let sent = sent(write(from(), &reply, &Below::Answers(mail.into_bytes()), &[]).unwrap());
+        let sent = sent(
+            write(
+                from(),
+                &reply,
+                &Below::Answers(mail.into_bytes()),
+                &[],
+                Purpose::Send,
+            )
+            .unwrap(),
+        );
         assert!(sent.contains("Subject: AW: Layer for our team?"), "{sent}");
     }
 
@@ -692,7 +885,7 @@ Does it work for three Macs?\r\n\
         let mut mail = outgoing("", "Hi all.");
         mail.cc = "Anna Weber <anna@example.test>, kim@example.test".into();
         mail.bcc = "boss@example.test".into();
-        let written = write(from(), &mail, &Below::Nothing, &[]).unwrap();
+        let written = write(from(), &mail, &Below::Nothing, &[], Purpose::Send).unwrap();
         let kept = String::from_utf8(written.kept.clone()).unwrap();
         let recipients: Vec<String> = written
             .message
@@ -737,7 +930,16 @@ Does it work for three Macs?\r\n\
             uid: 1,
         });
         let files = vec![message::file(pdf.as_bytes(), 0).unwrap()];
-        let sent = sent(write(from(), &mail, &Below::Forwards(pdf.into_bytes()), &files).unwrap());
+        let sent = sent(
+            write(
+                from(),
+                &mail,
+                &Below::Forwards(pdf.into_bytes()),
+                &files,
+                Purpose::Send,
+            )
+            .unwrap(),
+        );
         assert!(sent.contains("Subject: Fwd: Layer for our team?"), "{sent}");
         assert!(!sent.contains("In-Reply-To"), "{sent}");
         assert!(sent.contains("For you."), "{sent}");
@@ -756,7 +958,14 @@ Does it work for three Macs?\r\n\
         mail.text = String::new();
         let pdf = String::from_utf8_lossy(MAIL).into_owned();
         let sent = super::tests::sent(
-            write(from(), &mail, &Below::Forwards(pdf.into_bytes()), &[]).unwrap(),
+            write(
+                from(),
+                &mail,
+                &Below::Forwards(pdf.into_bytes()),
+                &[],
+                Purpose::Send,
+            )
+            .unwrap(),
         );
         assert!(sent.contains("\r\n\r\n---------- Forwarded"), "{sent}");
         assert!(!sent.contains("Invoice.pdf"), "{sent}");
@@ -784,20 +993,20 @@ Does it work for three Macs?\r\n\
         let files = [Attach::Added { upload: upload.id }];
 
         assert!(
-            mail.files_for(workspace, Uuid::now_v7(), &files, None)
+            mail.files_for(workspace, Uuid::now_v7(), &files, None, None)
                 .is_err()
         );
-        let found = mail.files_for(workspace, you, &files, None).unwrap();
+        let found = mail.files_for(workspace, you, &files, None, None).unwrap();
         assert_eq!(found[0].content_type, "application/octet-stream");
         let mut written = outgoing("kim@example.test", "");
         written.files = files.to_vec();
-        let sent = sent(write(from(), &written, &Below::Nothing, &found).unwrap());
+        let sent = sent(write(from(), &written, &Below::Nothing, &found, Purpose::Send).unwrap());
         assert!(sent.contains("filename=\"Q4 plan.pdf\""), "{sent}");
 
         mail.forget_uploads(&files);
-        assert!(mail.files_for(workspace, you, &files, None).is_err());
+        assert!(mail.files_for(workspace, you, &files, None, None).is_err());
         let kept = [Attach::Kept { index: 0 }];
-        assert!(mail.files_for(workspace, you, &kept, None).is_err());
+        assert!(mail.files_for(workspace, you, &kept, None, None).is_err());
     }
 
     #[tokio::test]
@@ -824,7 +1033,7 @@ Does it work for three Macs?\r\n\
             "Hi.",
         );
         mail.subject = " Layer ".into();
-        let sent = sent(write(from(), &mail, &Below::Nothing, &[]).unwrap());
+        let sent = sent(write(from(), &mail, &Below::Nothing, &[], Purpose::Send).unwrap());
         // lettre quotes names, and writes one with a comma in base64.
         assert!(
             sent.contains(
@@ -840,7 +1049,7 @@ Does it work for three Macs?\r\n\
     #[test]
     fn nobody_to_send_to_is_said() {
         let mail = outgoing(" , ", "Hi.");
-        assert!(write(from(), &mail, &Below::Nothing, &[]).is_err());
+        assert!(write(from(), &mail, &Below::Nothing, &[], Purpose::Send).is_err());
     }
 
     #[test]

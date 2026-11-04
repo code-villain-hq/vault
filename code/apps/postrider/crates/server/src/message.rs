@@ -187,6 +187,21 @@ pub struct File {
     pub bytes: Vec<u8>,
 }
 
+/// The files [`read`] lists, by name and size, from a mail's source.
+pub fn attachments(raw: &[u8]) -> Vec<Attachment> {
+    let Some(message) = MessageParser::new().parse(raw) else {
+        return Vec::new();
+    };
+    let html = message.html_bodies().collect::<Vec<_>>().join("\n");
+    let pictures = pictures(&message, &html);
+    files(&message, &pictures)
+        .map(|part| Attachment {
+            name: file_name(&part),
+            size: i64::try_from(part.decoded_len()).unwrap_or(i64::MAX),
+        })
+        .collect()
+}
+
 /// The file at `index` among those [`read`] lists.
 pub fn file(raw: &[u8], index: usize) -> Option<File> {
     let message = MessageParser::new().parse(raw)?;
