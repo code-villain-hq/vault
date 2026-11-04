@@ -179,6 +179,7 @@ pub fn structure(raw: &[u8]) -> String {
 }
 
 /// A file that came with a mail, to open.
+#[derive(Clone)]
 pub struct File {
     pub name: String,
     /// Its MIME type: `application/pdf`.
@@ -212,16 +213,6 @@ pub fn file(raw: &[u8], index: usize) -> Option<File> {
         content_type,
         bytes,
     })
-}
-
-/// Every file [`read`] lists, in its order: what a forward takes along.
-pub fn files_of(raw: &[u8]) -> Vec<File> {
-    let count = MessageParser::new().parse(raw).map_or(0, |message| {
-        let html = message.html_bodies().collect::<Vec<_>>().join("\n");
-        let pictures = pictures(&message, &html);
-        files(&message, &pictures).count()
-    });
-    (0..count).filter_map(|index| file(raw, index)).collect()
 }
 
 /// The pictures a mail's HTML shows by `cid:`, by their id, while there's

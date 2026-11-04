@@ -90,8 +90,9 @@ export function useDrop(key: string) {
 export function keepFilesOut() {
   const files = (event: globalThis.DragEvent) =>
     event.dataTransfer?.types.includes("Files") ?? false;
+  // A place that takes files (a mail you write) says so first.
   window.addEventListener("dragover", (event) => {
-    if (!files(event)) return;
+    if (!files(event) || event.defaultPrevented) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
   });

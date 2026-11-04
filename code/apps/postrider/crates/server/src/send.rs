@@ -3,25 +3,33 @@
 //! SMTP from the account you picked, to To, Cc and Bcc. Then a copy goes
 //! to that account's Sent, Bcc kept, and the mail it answers is marked
 //! answered. A reply goes in its mail's thread, quoting it below; a forward
-//! writes its mail out below, with its files.
+//! writes its mail out below.
+//!
+//! Its files are named in `files`: one of the forwarded mail's, by its
+//! place, or one you added. A file you add comes first, alone, with
+//! `POST /uploads`, and waits in memory, for you only, until its mail goes
+//! or a day has passed. Each file holds up to 25 MB, and a mail's files
+//! together as much.
 //!
 //! SMTP is the account's IMAP server (`imap.` read as `smtp.`) on 465, with
 //! TLS, and the same user name and password. The stand-ins at 127.0.0.1 are
 //! Mailpit's, on 3025 without TLS: nothing leaves this Mac.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use chrono::{DateTime, Local};
 use lettre::message::header::{Bcc, Cc, ContentType, To};
 use lettre::message::{Attachment, Mailbox, Mailboxes, MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use mail_parser::MessageParser;
-use postrider_domain::{FolderRole, MailAccount, Outgoing, Validate};
+use postrider_domain::{Attach, FolderRole, MailAccount, NewUpload, Outgoing, Upload, Validate};
 use uuid::Uuid;
 
 use crate::auth::Member;
@@ -40,12 +48,33 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 /// How much of the mail a reply quotes below it, in characters.
 const QUOTED: usize = 20_000;
 
+/// The most a file may hold, and a mail's files together.
+const FILE_BYTES: usize = 25_000_000;
+
+/// How long a file you added waits for its mail.
+const UPLOAD_KEPT: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// The most that added files may hold together while they wait.
+const WAITING_BYTES: usize = 500_000_000;
+
+/// How much an upload's request may hold: a file at its most, in base64.
+pub const UPLOAD_BODY: usize = FILE_BYTES / 3 * 4 + 1_000_000;
+
+/// A file you added to a mail you're writing, waiting for it to go.
+pub(crate) struct Uploaded {
+    workspace_id: Uuid,
+    user_id: Uuid,
+    file: message::File,
+    at: Instant,
+}
+
 /// What a mail you write carries below your words.
 enum Below {
     Nothing,
     /// The source of the mail it answers: quoted, in its thread.
     Answers(Vec<u8>),
-    /// The source of the mail it forwards: written out, with its files.
+    /// The source of the mail it forwards: written out, its files there to
+    /// keep.
     Forwards(Vec<u8>),
 }
 
@@ -83,12 +112,18 @@ impl Mail {
         } else {
             Below::Nothing
         };
-        let written = write(from, outgoing, &below)?;
+        let kept_from = match &below {
+            Below::Forwards(raw) => Some(raw.as_slice()),
+            _ => None,
+        };
+        let files = self.files_for(workspace_id, user_id, &outgoing.files, kept_from)?;
+        let written = write(from, outgoing, &below, &files)?;
         let password = self
             .password(&sender)
             .await
             .map_err(|failure| AppError::refused(failure.message()))?;
         send(&sender, password, written.message).await?;
+        self.forget_uploads(&outgoing.files);
 
         // Sent, it's done: the copy and the mark follow without waiting.
         let mail = Arc::clone(self);
@@ -108,6 +143,110 @@ impl Mail {
             }
         });
         Ok(())
+    }
+
+    /// Keeps a file you added until its mail goes, or a day has passed.
+    pub fn add_upload(
+        &self,
+        workspace_id: Uuid,
+        user_id: Uuid,
+        new: &NewUpload,
+    ) -> Result<Upload, AppError> {
+        let name = file_name(&new.name);
+        let bytes = STANDARD
+            .decode(new.data.as_bytes())
+            .map_err(|_| AppError::invalid(format!("{name} didn't arrive whole. Add it again.")))?;
+        if bytes.len() > FILE_BYTES {
+            return Err(AppError::invalid(format!(
+                "{name} holds {}; a mail takes files up to {}.",
+                megabytes(bytes.len()),
+                megabytes(FILE_BYTES)
+            )));
+        }
+        let kind = new.content_type.trim();
+        let content_type = if ContentType::parse(kind).is_ok() {
+            kind.to_string()
+        } else {
+            "application/octet-stream".to_string()
+        };
+        let mut uploads = self.uploads.lock().expect("never poisoned");
+        uploads.retain(|_, waiting| waiting.at.elapsed() < UPLOAD_KEPT);
+        let waiting: usize = uploads.values().map(|w| w.file.bytes.len()).sum();
+        if waiting + bytes.len() > WAITING_BYTES {
+            return Err(AppError::refused(
+                "Too many added files are waiting. Send or close a mail first.",
+            ));
+        }
+        let (id, size) = (Uuid::now_v7(), bytes.len());
+        uploads.insert(
+            id,
+            Uploaded {
+                workspace_id,
+                user_id,
+                file: message::File {
+                    name: name.clone(),
+                    content_type,
+                    bytes,
+                },
+                at: Instant::now(),
+            },
+        );
+        Ok(Upload {
+            id,
+            name,
+            size: size as i64,
+        })
+    }
+
+    /// The files `files` names: kept from `kept_from`, the mail it
+    /// forwards, or added by you.
+    fn files_for(
+        &self,
+        workspace_id: Uuid,
+        user_id: Uuid,
+        files: &[Attach],
+        kept_from: Option<&[u8]>,
+    ) -> Result<Vec<message::File>, AppError> {
+        let mut found = Vec::with_capacity(files.len());
+        for attach in files {
+            let file = match attach {
+                Attach::Kept { index } => kept_from
+                    .and_then(|raw| message::file(raw, *index as usize))
+                    .ok_or_else(|| {
+                        AppError::invalid("A file of the mail it forwards isn't there any more.")
+                    })?,
+                Attach::Added { upload } => self
+                    .uploads
+                    .lock()
+                    .expect("never poisoned")
+                    .get(upload)
+                    .filter(|w| w.workspace_id == workspace_id && w.user_id == user_id)
+                    .map(|w| w.file.clone())
+                    .ok_or_else(|| {
+                        AppError::invalid("A file you added waited too long. Add it again.")
+                    })?,
+            };
+            found.push(file);
+        }
+        let together: usize = found.iter().map(|file| file.bytes.len()).sum();
+        if together > FILE_BYTES {
+            return Err(AppError::invalid(format!(
+                "Its files hold {} together; a mail takes up to {}.",
+                megabytes(together),
+                megabytes(FILE_BYTES)
+            )));
+        }
+        Ok(found)
+    }
+
+    /// Lets go of the files you added to a mail that went.
+    fn forget_uploads(&self, files: &[Attach]) {
+        let mut uploads = self.uploads.lock().expect("never poisoned");
+        for attach in files {
+            if let Attach::Added { upload } = attach {
+                uploads.remove(upload);
+            }
+        }
     }
 
     /// Whom mail from `account` comes from: you, by name, at its address.
@@ -148,8 +287,13 @@ impl Mail {
     }
 }
 
-/// `outgoing`, written from `from`, with what goes `below` it.
-fn write(from: Mailbox, outgoing: &Outgoing, below: &Below) -> Result<Written, AppError> {
+/// `outgoing`, written from `from`, with what goes `below` it and `files`.
+fn write(
+    from: Mailbox,
+    outgoing: &Outgoing,
+    below: &Below,
+    files: &[message::File],
+) -> Result<Written, AppError> {
     let original = match below {
         Below::Answers(raw) | Below::Forwards(raw) => Some(
             MessageParser::new()
@@ -196,7 +340,6 @@ fn write(from: Mailbox, outgoing: &Outgoing, below: &Below) -> Result<Written, A
     }
 
     let mut body = outgoing.text.trim_end().replace("\r\n", "\n");
-    let mut files = Vec::new();
     match (below, &original) {
         (Below::Answers(_), Some(original)) => {
             if let Some(id) = original.message_id() {
@@ -211,7 +354,7 @@ fn write(from: Mailbox, outgoing: &Outgoing, below: &Below) -> Result<Written, A
             }
             body.push_str(&quote(original));
         }
-        (Below::Forwards(raw), Some(original)) => {
+        (Below::Forwards(_), Some(original)) => {
             let forwarded = forwarded(original);
             // With no note, the mail starts with what it forwards.
             body.push_str(if body.is_empty() {
@@ -219,7 +362,6 @@ fn write(from: Mailbox, outgoing: &Outgoing, below: &Below) -> Result<Written, A
             } else {
                 &forwarded
             });
-            files = message::files_of(raw);
         }
         _ => {}
     }
@@ -232,7 +374,7 @@ fn write(from: Mailbox, outgoing: &Outgoing, below: &Below) -> Result<Written, A
             builder.singlepart(text)
         } else {
             let mut parts = MultiPart::mixed().singlepart(text);
-            for file in &files {
+            for file in files {
                 let kind = ContentType::parse(&file.content_type)
                     .or_else(|_| ContentType::parse("application/octet-stream"))
                     .expect("application/octet-stream is a type");
@@ -340,6 +482,22 @@ fn when(original: &mail_parser::Message<'_>) -> Option<String> {
         })
 }
 
+/// A file's name as it goes: its last part, without what a name can't
+/// hold, or "File".
+fn file_name(given: &str) -> String {
+    let last = given.rsplit(['/', '\\']).next().unwrap_or_default();
+    let name: String = last.chars().filter(|c| !c.is_control()).take(200).collect();
+    match name.trim() {
+        "" | "." | ".." => "File".to_string(),
+        name => name.to_string(),
+    }
+}
+
+/// `size` bytes as people read them: "3.2 MB".
+fn megabytes(size: usize) -> String {
+    format!("{:.1} MB", size as f64 / 1_000_000.0)
+}
+
 /// Someone as a mail names them: "Anna Weber <anna@example.test>", or the
 /// address alone.
 fn named(mailbox: &mail_parser::Mailbox<'_>) -> String {
@@ -440,6 +598,19 @@ pub(crate) fn is_this_mac(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
+/// `POST /api/w/{workspace}/uploads`: keeps a file you add to a mail.
+pub async fn upload(
+    State(state): State<AppState>,
+    member: Member,
+    Json(new): Json<NewUpload>,
+) -> Result<Json<Upload>, AppError> {
+    Ok(Json(state.mail.add_upload(
+        member.actor.workspace_id,
+        member.actor.user_id,
+        &new,
+    )?))
+}
+
 /// `POST /api/w/{workspace}/mails`: sends what you wrote.
 pub async fn send_mail(
     State(state): State<AppState>,
@@ -482,6 +653,7 @@ Does it work for three Macs?\r\n\
             text: text.into(),
             answers: None,
             forwards: None,
+            files: Vec::new(),
         }
     }
 
@@ -492,7 +664,7 @@ Does it work for three Macs?\r\n\
     #[test]
     fn a_reply_quotes_its_mail_in_the_thread() {
         let mail = outgoing("Team <team@example.test>", "Yes, it does.");
-        let sent = sent(write(from(), &mail, &Below::Answers(MAIL.to_vec())).unwrap());
+        let sent = sent(write(from(), &mail, &Below::Answers(MAIL.to_vec()), &[]).unwrap());
         assert!(sent.contains("To: Team <team@example.test>"), "{sent}");
         assert!(sent.contains("Subject: Re: Layer for our team?"), "{sent}");
         assert!(sent.contains("In-Reply-To: <q1@example.test>"), "{sent}");
@@ -511,7 +683,7 @@ Does it work for three Macs?\r\n\
     fn a_subject_already_answered_stays() {
         let mail = String::from_utf8_lossy(MAIL).replace("Subject: Layer", "Subject: AW: Layer");
         let reply = outgoing("anna@example.test", "Ja.");
-        let sent = sent(write(from(), &reply, &Below::Answers(mail.into_bytes())).unwrap());
+        let sent = sent(write(from(), &reply, &Below::Answers(mail.into_bytes()), &[]).unwrap());
         assert!(sent.contains("Subject: AW: Layer for our team?"), "{sent}");
     }
 
@@ -520,7 +692,7 @@ Does it work for three Macs?\r\n\
         let mut mail = outgoing("", "Hi all.");
         mail.cc = "Anna Weber <anna@example.test>, kim@example.test".into();
         mail.bcc = "boss@example.test".into();
-        let written = write(from(), &mail, &Below::Nothing).unwrap();
+        let written = write(from(), &mail, &Below::Nothing, &[]).unwrap();
         let kept = String::from_utf8(written.kept.clone()).unwrap();
         let recipients: Vec<String> = written
             .message
@@ -564,7 +736,8 @@ Does it work for three Macs?\r\n\
             folder: None,
             uid: 1,
         });
-        let sent = sent(write(from(), &mail, &Below::Forwards(pdf.into_bytes())).unwrap());
+        let files = vec![message::file(pdf.as_bytes(), 0).unwrap()];
+        let sent = sent(write(from(), &mail, &Below::Forwards(pdf.into_bytes()), &files).unwrap());
         assert!(sent.contains("Subject: Fwd: Layer for our team?"), "{sent}");
         assert!(!sent.contains("In-Reply-To"), "{sent}");
         assert!(sent.contains("For you."), "{sent}");
@@ -582,9 +755,66 @@ Does it work for three Macs?\r\n\
 
         mail.text = String::new();
         let pdf = String::from_utf8_lossy(MAIL).into_owned();
-        let sent =
-            super::tests::sent(write(from(), &mail, &Below::Forwards(pdf.into_bytes())).unwrap());
+        let sent = super::tests::sent(
+            write(from(), &mail, &Below::Forwards(pdf.into_bytes()), &[]).unwrap(),
+        );
         assert!(sent.contains("\r\n\r\n---------- Forwarded"), "{sent}");
+        assert!(!sent.contains("Invoice.pdf"), "{sent}");
+    }
+
+    /// Mail with no database: adding files needs none.
+    fn mail() -> Mail {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://127.0.0.1:1/none")
+            .unwrap();
+        Mail::new(pool, crate::secrets::Secrets::memory())
+    }
+
+    #[tokio::test]
+    async fn an_added_file_goes_once_and_only_for_whom_added_it() {
+        let mail = mail();
+        let (workspace, you) = (Uuid::now_v7(), Uuid::now_v7());
+        let new = NewUpload {
+            name: "../Plans/Q4 plan.pdf".into(),
+            content_type: "not a type".into(),
+            data: STANDARD.encode(b"%PDF-1.7"),
+        };
+        let upload = mail.add_upload(workspace, you, &new).unwrap();
+        assert_eq!((upload.name.as_str(), upload.size), ("Q4 plan.pdf", 8));
+        let files = [Attach::Added { upload: upload.id }];
+
+        assert!(
+            mail.files_for(workspace, Uuid::now_v7(), &files, None)
+                .is_err()
+        );
+        let found = mail.files_for(workspace, you, &files, None).unwrap();
+        assert_eq!(found[0].content_type, "application/octet-stream");
+        let mut written = outgoing("kim@example.test", "");
+        written.files = files.to_vec();
+        let sent = sent(write(from(), &written, &Below::Nothing, &found).unwrap());
+        assert!(sent.contains("filename=\"Q4 plan.pdf\""), "{sent}");
+
+        mail.forget_uploads(&files);
+        assert!(mail.files_for(workspace, you, &files, None).is_err());
+        let kept = [Attach::Kept { index: 0 }];
+        assert!(mail.files_for(workspace, you, &kept, None).is_err());
+    }
+
+    #[tokio::test]
+    async fn a_file_too_big_is_said() {
+        let mail = mail();
+        let new = NewUpload {
+            name: "film.mov".into(),
+            content_type: "video/quicktime".into(),
+            data: STANDARD.encode(vec![0; FILE_BYTES + 1]),
+        };
+        let Err(error) = mail.add_upload(Uuid::nil(), Uuid::nil(), &new) else {
+            panic!("a file too big was taken");
+        };
+        assert!(
+            format!("{error:?}").contains("film.mov holds 25.0 MB"),
+            "{error:?}"
+        );
     }
 
     #[test]
@@ -594,7 +824,7 @@ Does it work for three Macs?\r\n\
             "Hi.",
         );
         mail.subject = " Layer ".into();
-        let sent = sent(write(from(), &mail, &Below::Nothing).unwrap());
+        let sent = sent(write(from(), &mail, &Below::Nothing, &[]).unwrap());
         // lettre quotes names, and writes one with a comma in base64.
         assert!(
             sent.contains(
@@ -610,7 +840,7 @@ Does it work for three Macs?\r\n\
     #[test]
     fn nobody_to_send_to_is_said() {
         let mail = outgoing(" , ", "Hi.");
-        assert!(write(from(), &mail, &Below::Nothing).is_err());
+        assert!(write(from(), &mail, &Below::Nothing, &[]).is_err());
     }
 
     #[test]

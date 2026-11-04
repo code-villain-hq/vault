@@ -703,7 +703,8 @@ input.crumb-name {
 }
 /* A reply, a forward or a new mail, as the storyboard's composer: To (Cc
    and Bcc when asked for) and Subject on lines of their own, the text with
-   room, and the account it goes from beside More professional and Send. */
+   room, the files it takes along, and the account it goes from beside the
+   paperclip, More professional and Send. */
 .compose {
   display: grid;
   padding: 6px 18px 14px;
@@ -760,7 +761,31 @@ input.crumb-name {
   outline-offset: -2px;
 }
 .compose-files {
-  padding-top: 8px;
+  padding-bottom: 10px;
+}
+.compose-files li:has(button:hover) {
+  background: var(--surface);
+}
+/* Leave a file out: a faint cross at the end of its chip. */
+.compose-remove {
+  margin-right: -4px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--faint);
+}
+.compose-remove:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.compose-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* Files held over the mail drop into it. */
+.compose[data-dropping] {
+  border-radius: var(--radius-lg);
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
 }
 .compose-text {
   min-height: 236px;

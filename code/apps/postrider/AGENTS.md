@@ -224,16 +224,26 @@ Every change happens on the account's server; the Inbox follows it there.
   replies to all: to them, and in Cc to whom else the mail went to and
   copied, but your accounts' addresses. F forwards it: below what you
   write, its sender, date, subject, To and Cc, and its text (an HTML mail
-  forwards as its text), with its files. To, Cc, Bcc and Subject are
-  yours to change; Cc and Bcc show when there's something in them, or
-  once asked for. Everything goes to `POST /mails` (`Outgoing`, with
-  `answers` or `forwards`), over SMTP: the IMAP server with `imap.` read
+  forwards as its text), with its files, each to leave out. The dialog
+  waits for the mail it answers to be read, for whom it went to and its
+  files. To, Cc, Bcc and Subject are yours to change; Cc and Bcc show
+  when there's something in them, or once asked for. Everything goes to
+  `POST /mails` (`Outgoing`, with `answers` or `forwards`, and `files`:
+  `kept` by their place in the mail forwarded, or `added`), over SMTP:
+  the IMAP server with `imap.` read
   as `smtp.`, on 465 with TLS, with the same password; the stand-ins at
   127.0.0.1 use Mailpit on 3025. Bcc goes only in the envelope; the copy
   in Sent keeps it. The mail answered is marked answered. Esc keeps what
   you wrote, in memory, until the page reloads; ⌘Enter sends. With a mail
   open, F forwards it before the list beside it can take F for its
   filter (a capturing listener).
+- Files go with any mail you write: the paperclip (⇧⌘A), dropped on the
+  dialog, or pasted into the text. Each goes ahead alone to
+  `POST /uploads` (`NewUpload`, base64, up to 25 MB; the route takes
+  bodies to `UPLOAD_BODY`) and waits in the server's memory, for whom
+  added it, until its mail goes or a day passes. A mail's files hold
+  25 MB together, checked on the page first. Send waits until they're
+  there; a mail with files needs no text.
 - C writes a new mail (`POST /mails`, `send.rs`; the sidebar's pen and
   ⌘K too). To suggests people who wrote to you; picking one sends it from
   the account they wrote to, unless you pick another, and else from the

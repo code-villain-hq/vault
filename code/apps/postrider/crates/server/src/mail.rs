@@ -28,6 +28,7 @@ use crate::folders::Marked;
 use crate::imap::{self, Failure, KeptHeaders, Login, Place, Session, Summary};
 use crate::message;
 use crate::secrets::Secrets;
+use crate::send::Uploaded;
 use crate::state::AppState;
 
 /// How long a server may stay quiet in IDLE before Postrider looks again
@@ -89,6 +90,9 @@ pub struct Mail {
     /// What marking a folder read marked, for Undo, by the id the page got.
     /// It lasts until the server stops.
     pub(crate) marked: Mutex<HashMap<Uuid, Marked>>,
+    /// Files added to mails being written, by the id adding them gave,
+    /// until their mail goes or a day has passed (`send::upload`).
+    pub(crate) uploads: Mutex<HashMap<Uuid, Uploaded>>,
 }
 
 impl Mail {
@@ -106,6 +110,7 @@ impl Mail {
             set_aside_failed: Mutex::default(),
             newsletter_headers: Mutex::default(),
             marked: Mutex::default(),
+            uploads: Mutex::default(),
         }
     }
 

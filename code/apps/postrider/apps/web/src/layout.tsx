@@ -585,6 +585,7 @@ const SECTIONS: ShortcutSection[] = [
     keys: [
       ["C", "New mail"],
       ["⌘Enter", "Send"],
+      ["⇧⌘A", "Add files"],
       ["⌘Z", "Back to yours, after More professional"],
       ["Esc", "Close it, keeping what you wrote"],
     ],

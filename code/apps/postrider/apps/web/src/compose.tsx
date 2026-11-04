@@ -4,21 +4,26 @@
 // you. The account it goes from sits beside the buttons; More professional
 // writes it again with Claude Code on this Mac (`rewrite.rs`), in your
 // language and with every fact kept, and Back to yours (or ⌘Z) puts your
-// words back. It all goes to `POST /mails` (`send.rs`).
+// words back. Files come with the paperclip (⇧⌘A), dropped on the mail or
+// pasted into it; each goes ahead with `POST /uploads`, and a forward takes
+// its mail's along until you leave one out. It all goes to `POST /mails`
+// (`send.rs`).
 
 import { Dialog } from "@base-ui/react/dialog";
 import { CreateDialog, shortcutFree } from "@code-villain/web";
 import type {
-  Attachment,
+  Attach,
   MailRef,
   MailSummary,
   Message,
+  NewUpload,
   Outgoing,
   Party,
   Rewrite,
   Rewritten,
+  Upload,
 } from "@postrider/types";
-import { ChevronDown, Paperclip, Sparkles, Undo2 } from "lucide-react";
+import { ChevronDown, Paperclip, Sparkles, Undo2, X } from "lucide-react";
 import {
   createContext,
   type ReactNode,
@@ -54,17 +59,47 @@ type Draft = Partial<Lines> & {
   from?: string;
   yours?: string;
   wroteTo?: string;
+  /** The files, once you added one or left one out. */
+  files?: Going[];
 };
 const drafts = new Map<string, Draft>();
 
-/** Keeps what changed, unless nothing is written and the lines are as they began. */
+/**
+ * Keeps what changed, unless nothing is written, the lines are as they
+ * began and the files weren't touched.
+ */
 function keep(key: string, next: Draft, began: Lines = NO_LINES) {
   const draft = { ...drafts.get(key), ...next };
   const changed = (Object.keys(began) as (keyof Lines)[]).some(
     (line) => (draft[line] ?? began[line]).trim() !== began[line].trim(),
   );
-  if (draft.text?.trim() || changed) drafts.set(key, draft);
+  if (draft.text?.trim() || changed || draft.files) drafts.set(key, draft);
   else drafts.delete(key);
+}
+
+/**
+ * A file the mail takes along: one of the mail it forwards, or one you
+ * added. `attach` is missing while an added one is on its way.
+ */
+type Going = { key: string; name: string; size: number; attach?: Attach };
+
+/** Added files on their way to the server, by key: what each becomes there. */
+const arriving = new Map<string, Promise<Attach>>();
+
+/** The most a file may hold, and a mail's files together, as `send.rs` takes. */
+const MOST_BYTES = 25_000_000;
+
+/** A file's bytes in base64, as `POST /uploads` takes them. */
+function base64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = typeof reader.result === "string" ? reader.result : "";
+      resolve(url.slice(url.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(new Error(`${file.name} couldn't be read.`));
+    reader.readAsDataURL(file);
+  });
 }
 
 /** A new mail's draft. */
@@ -92,9 +127,16 @@ export function AnswerDialog({
 }) {
   return (
     <CreateDialog open={how !== undefined} onClose={onClose} width="40rem">
-      {how && (
-        <AnswerForm key={how} how={how} summary={summary} message={message} onSent={onClose} />
-      )}
+      {/* What it answers comes first: whom it went to, and its files. */}
+      {how &&
+        (message ? (
+          <AnswerForm key={how} how={how} summary={summary} message={message} onSent={onClose} />
+        ) : (
+          <>
+            <Dialog.Title className="sr-only">Reading the mail</Dialog.Title>
+            <p className="p-5 text-faint">Reading the mail…</p>
+          </>
+        ))}
     </CreateDialog>
   );
 }
@@ -107,7 +149,7 @@ function AnswerForm({
 }: {
   how: Answering;
   summary: MailSummary;
-  message: Message | undefined;
+  message: Message;
   onSent: () => void;
 }) {
   const { workspace, place } = useWorkspace();
@@ -130,16 +172,28 @@ function AnswerForm({
     folder: summary.folder ?? undefined,
   };
 
-  const send = (text: string, from: string) => {
+  const send = (text: string, from: string, files: Attach[]) => {
     const outgoing: Outgoing = {
       ...lines,
       from_account: from,
       text,
       answers: forwarding ? undefined : mail,
       forwards: forwarding ? mail : undefined,
+      files,
     };
     return api("POST", `/api/w/${workspace.id}/mails`, outgoing, place);
   };
+  // A forward takes its mail's files along.
+  const [kept] = useState<Going[]>(() =>
+    forwarding
+      ? message.attachments.map((file, index) => ({
+          key: `kept:${index}`,
+          name: file.name,
+          size: file.size,
+          attach: { kind: "kept", index },
+        }))
+      : [],
+  );
 
   const title = forwarding
     ? `Forward ${summary.subject || "(no subject)"}`
@@ -158,6 +212,7 @@ function AnswerForm({
       ready={addressed(lines)}
       needsText={!forwarding}
       focusText={!forwarding}
+      startFiles={kept}
       send={send}
       onSent={onSent}
     >
@@ -170,9 +225,6 @@ function AnswerForm({
         }}
         autoFocus={forwarding}
       />
-      {forwarding && message && message.attachments.length > 0 && (
-        <FilesGoing files={message.attachments} />
-      )}
     </Writer>
   );
 }
@@ -182,14 +234,9 @@ function AnswerForm({
  * else its sender; to all, also to whom else it went to and copied, but
  * you; both "Re: " its subject. A forward goes to no one yet, "Fwd: " it.
  */
-function begin(
-  how: Answering,
-  summary: MailSummary,
-  message: Message | undefined,
-  own: Set<string>,
-): Lines {
+function begin(how: Answering, summary: MailSummary, message: Message, own: Set<string>): Lines {
   if (how === "forward") return { ...NO_LINES, subject: prefixed("Fwd", summary.subject) };
-  const answer: Party[] = message?.answer_to.length
+  const answer: Party[] = message.answer_to.length
     ? message.answer_to
     : [{ name: summary.from_name, address: summary.from_address }];
   const others = (people: Party[]) => people.filter((p) => !own.has(p.address.toLowerCase()));
@@ -198,7 +245,7 @@ function begin(
   const seen = new Set(to.map((p) => p.address.toLowerCase()));
   const cc: Party[] = [];
   if (how === "all") {
-    for (const person of others([...(message?.sent_to ?? []), ...(message?.copied ?? [])])) {
+    for (const person of others([...message.sent_to, ...message.copied])) {
       const address = person.address.toLowerCase();
       if (seen.has(address)) continue;
       seen.add(address);
@@ -264,8 +311,8 @@ function NewMailForm({ onSent }: { onSent: () => void }) {
   const known = (id: string | undefined) => accounts.find((a) => a.id === id)?.id;
   const defaultFrom = known(lastFrom) ?? accounts[0]?.id ?? "";
 
-  const send = (text: string, from: string) => {
-    const mail: Outgoing = { ...lines, from_account: from, text };
+  const send = (text: string, from: string, files: Attach[]) => {
+    const mail: Outgoing = { ...lines, from_account: from, text, files };
     return api("POST", `/api/w/${workspace.id}/mails`, mail, place).then(() => {
       lastFrom = from;
     });
@@ -386,16 +433,26 @@ function AddressLines({
   );
 }
 
-/** The files a forward takes along, by name and size. */
-function FilesGoing({ files }: { files: Attachment[] }) {
-  const numbered = useMemo(() => files.map((file, at) => ({ ...file, at })), [files]);
+/** The files a mail takes along, by name and size, each to leave out. */
+function FilesGoing({ files, onRemove }: { files: Going[]; onRemove: (key: string) => void }) {
   return (
     <ul className="files compose-files" aria-label="Files it takes along">
-      {numbered.map((file) => (
-        <li key={file.at}>
+      {files.map((file) => (
+        <li key={file.key}>
           <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
           <span className="truncate">{file.name}</span>
-          <span className="text-faint tabular-nums">{bytes(file.size)}</span>
+          <span className="text-faint tabular-nums">
+            {file.attach ? bytes(file.size) : "Adding…"}
+          </span>
+          <button
+            type="button"
+            className="compose-remove"
+            aria-label={`Leave ${file.name} out`}
+            title="Leave it out"
+            onClick={() => onRemove(file.key)}
+          >
+            <X size={13} strokeWidth={2} aria-hidden="true" />
+          </button>
         </li>
       ))}
     </ul>
@@ -423,6 +480,7 @@ function Writer({
   ready = true,
   needsText = true,
   focusText = true,
+  startFiles = [],
   send,
   onSent,
   children,
@@ -442,8 +500,10 @@ function Writer({
   needsText?: boolean;
   /** Whether the text takes the focus first, not whom it goes to. */
   focusText?: boolean;
-  /** Sends `text` from the account `from`. */
-  send: (text: string, from: string) => Promise<unknown>;
+  /** The files it starts with: a forward's. */
+  startFiles?: Going[];
+  /** Sends `text` from the account `from`, with `files`. */
+  send: (text: string, from: string, files: Attach[]) => Promise<unknown>;
   onSent: () => void;
   children: ReactNode;
 }) {
@@ -458,6 +518,82 @@ function Writer({
   const sender = accounts.find((a) => a.id === from);
   const field = useRef<HTMLTextAreaElement>(null);
   const picked = useRef(kept?.from !== undefined);
+  const [files, setFiles] = useState<Going[]>(() => kept?.files ?? startFiles);
+  const filesNow = useRef(files);
+  const picker = useRef<HTMLInputElement>(null);
+  const [dropping, setDropping] = useState(false);
+  const mounted = useRef(true);
+
+  // Files change here while it's open, and in the draft once it's closed.
+  const changeFiles = useCallback(
+    (change: (files: Going[]) => Going[]) => {
+      if (!mounted.current) {
+        const closed = drafts.get(draft)?.files;
+        if (closed) keep(draft, { files: change(closed) }, began);
+        return;
+      }
+      filesNow.current = change(filesNow.current);
+      setFiles(filesNow.current);
+      keep(draft, { files: filesNow.current }, began);
+    },
+    [draft, began],
+  );
+
+  // Waits for an added file to arrive, then names it by what it became.
+  const follow = useCallback(
+    (key: string) => {
+      arriving.get(key)?.then(
+        (attach) => {
+          arriving.delete(key);
+          changeFiles((now) => now.map((file) => (file.key === key ? { ...file, attach } : file)));
+        },
+        (problem: unknown) => {
+          arriving.delete(key);
+          changeFiles((now) => now.filter((file) => file.key !== key));
+          if (mounted.current) setError(messageOf(problem));
+        },
+      );
+    },
+    [changeFiles],
+  );
+
+  useEffect(() => {
+    mounted.current = true;
+    for (const file of filesNow.current) if (!file.attach) follow(file.key);
+    return () => {
+      mounted.current = false;
+    };
+  }, [follow]);
+
+  const add = (chosen: Iterable<File>) => {
+    let together = filesNow.current.reduce((sum, file) => sum + file.size, 0);
+    for (const file of chosen) {
+      if (together + file.size > MOST_BYTES) {
+        setError(
+          file.size > MOST_BYTES
+            ? `${file.name} holds ${bytes(file.size)}; a mail takes files up to 25 MB.`
+            : `With ${file.name}, its files would hold ${bytes(together + file.size)}; a mail takes up to 25 MB.`,
+        );
+        continue;
+      }
+      setError(undefined);
+      together += file.size;
+      const key = crypto.randomUUID();
+      arriving.set(
+        key,
+        base64(file)
+          .then((data) => {
+            const upload: NewUpload = { name: file.name, content_type: file.type, data };
+            return api<Upload>("POST", `/api/w/${workspace.id}/uploads`, upload, place);
+          })
+          .then((added): Attach => ({ kind: "added", upload: added.id })),
+      );
+      changeFiles((now) => [...now, { key, name: file.name, size: file.size }]);
+      follow(key);
+    }
+  };
+  const arrived = files.every((file) => file.attach);
+  const empty = !text.trim() && files.length === 0;
 
   useEffect(() => {
     if (suggestedFrom && !picked.current) setFrom(suggestedFrom);
@@ -500,10 +636,11 @@ function Writer({
   };
 
   const submit = () => {
-    if (busy || !ready || (needsText && !text.trim())) return;
+    if (busy || !ready || !arrived || (needsText && empty)) return;
     setBusy("sending");
     setError(undefined);
-    send(text, from).then(() => {
+    const going = filesNow.current.flatMap((file) => (file.attach ? [file.attach] : []));
+    send(text, from, going).then(() => {
       drafts.delete(draft);
       onSent();
     }, done);
@@ -512,15 +649,36 @@ function Writer({
   return (
     <form
       className="compose"
+      data-dropping={dropping || undefined}
       onSubmit={(event) => {
         event.preventDefault();
         submit();
+      }}
+      // Files dropped on the mail go with it; the page keeps the rest out
+      // (`keepFilesOut`).
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        setDropping(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropping(false);
+      }}
+      onDrop={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        setDropping(false);
+        add(event.dataTransfer.files);
       }}
       onKeyDown={(event) => {
         const command = event.metaKey || event.ctrlKey;
         if (event.key === "Enter" && command) {
           event.preventDefault();
           submit();
+        } else if (event.key.toLowerCase() === "a" && command && event.shiftKey) {
+          event.preventDefault();
+          picker.current?.click();
         } else if (
           event.key.toLowerCase() === "z" &&
           command &&
@@ -542,8 +700,23 @@ function Writer({
         value={text}
         readOnly={busy === "rewriting"}
         onChange={(event) => write(event.target.value)}
+        onPaste={(event) => {
+          // A file pasted goes with it, as a screenshot would.
+          if (event.clipboardData.files.length === 0) return;
+          event.preventDefault();
+          add(event.clipboardData.files);
+        }}
         className="compose-text"
       />
+      {files.length > 0 && (
+        <FilesGoing
+          files={files}
+          onRemove={(key) => {
+            changeFiles((now) => now.filter((file) => file.key !== key));
+            field.current?.focus();
+          }}
+        />
+      )}
       {error && <ErrorMessage>{error}</ErrorMessage>}
       <div className="compose-foot">
         {accounts.length > 1 ? (
@@ -576,10 +749,29 @@ function Writer({
             {sender?.address}
           </span>
         )}
+        <input
+          ref={picker}
+          type="file"
+          multiple
+          hidden
+          onChange={(event) => {
+            add(event.target.files ?? []);
+            event.target.value = "";
+            field.current?.focus();
+          }}
+        />
+        <button
+          type="button"
+          className="ui-button ui-icon-button ml-auto"
+          aria-label="Add files"
+          title="Add files (⇧⌘A)"
+          onClick={() => picker.current?.click()}
+        >
+          <Paperclip size={15} strokeWidth={1.75} aria-hidden="true" />
+        </button>
         {/* One button that turns into the other, so the focus stays on it. */}
         <Button
           variant="secondary"
-          className="ml-auto"
           disabled={busy !== undefined || !text.trim()}
           onClick={yours === undefined ? rewrite : backToYours}
           title={
@@ -601,8 +793,8 @@ function Writer({
         </Button>
         <Button
           type="submit"
-          disabled={busy !== undefined || !ready || (needsText && !text.trim())}
-          title="Send (⌘Enter)"
+          disabled={busy !== undefined || !ready || !arrived || (needsText && empty)}
+          title={arrived ? "Send (⌘Enter)" : "Its files are still on their way"}
         >
           {busy === "sending" ? "Sending…" : "Send"}
         </Button>

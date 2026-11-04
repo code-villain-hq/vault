@@ -436,8 +436,21 @@ pub struct Outgoing {
     pub text: String,
     /// The mail it answers: it goes in that mail's thread, quoting it below.
     pub answers: Option<MailRef>,
-    /// The mail it forwards: below what you wrote, with its files.
+    /// The mail it forwards: below what you wrote, with the files it keeps.
     pub forwards: Option<MailRef>,
+    /// The files it takes along, in their order.
+    pub files: Vec<Attach>,
+}
+
+/// A file a mail you write takes along.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export)]
+pub enum Attach {
+    /// One of the files of the mail it forwards, by its place among them.
+    Kept { index: u32 },
+    /// A file you added, by the id adding it gave.
+    Added { upload: Uuid },
 }
 
 impl Outgoing {
@@ -448,9 +461,10 @@ impl Outgoing {
             || [&self.to, &self.cc, &self.bcc]
                 .iter()
                 .any(|f| f.len() > 10_000)
+            || self.files.len() > 100
         {
             return Err(ValidationError(
-                "A mail holds up to a million characters.".into(),
+                "A mail holds up to a million characters and 100 files.".into(),
             ));
         }
         if self.answers.is_some() && self.forwards.is_some() {
@@ -471,11 +485,33 @@ impl Validate for Outgoing {
         {
             return Err(ValidationError("Say whom it goes to.".into()));
         }
-        if self.text.trim().is_empty() && self.forwards.is_none() {
+        if self.text.trim().is_empty() && self.forwards.is_none() && self.files.is_empty() {
             return Err(ValidationError("Write something first.".into()));
         }
         Ok(())
     }
+}
+
+/// A file to add to a mail you write, as the page read it.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct NewUpload {
+    pub name: String,
+    /// Its type, as the browser says: `application/pdf`, or empty.
+    pub content_type: String,
+    /// Its bytes, in base64.
+    pub data: String,
+}
+
+/// A file added, kept in memory until its mail goes or a day has passed.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Upload {
+    pub id: Uuid,
+    pub name: String,
+    #[ts(type = "number")]
+    pub size: i64,
 }
 
 /// More professional: what you wrote, to be written again as a mail.

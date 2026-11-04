@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::routing::{any, delete, get, post};
 use axum::{Json, Router};
 use postrider_domain::{Bootstrap, Transaction, TransactionResult};
@@ -39,6 +39,10 @@ pub fn router(state: AppState) -> Router {
         .route("/answers/{answer}/undo", post(ask::undo))
         .route("/mail/sync", post(mail::sync))
         .route("/mails", post(send::send_mail))
+        .route(
+            "/uploads",
+            post(send::upload).layer(DefaultBodyLimit::max(send::UPLOAD_BODY)),
+        )
         .route("/rewrite", post(rewrite::rewrite))
         .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
