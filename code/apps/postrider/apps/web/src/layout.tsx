@@ -540,7 +540,7 @@ const SECTIONS: ShortcutSection[] = [
     keys: [
       ["J K or ↓ ↑", "Next and previous mail"],
       ["Enter or O", "Open the mail"],
-      ["F", "All mail, only unread or only read"],
+      ["F", "All mail, only unread or only read, with no mail open"],
       ["/", "Search mail"],
     ],
   },
@@ -572,6 +572,8 @@ const SECTIONS: ShortcutSection[] = [
     keys: [
       ["J K", "The next and previous mail, opened"],
       ["R", "Reply"],
+      ["A", "Reply to all"],
+      ["F", "Forward"],
       ["E", "Archive, and open the next"],
       ["⌫", "Delete, and open the next"],
       ["V", "Move to a folder, or a new one"],

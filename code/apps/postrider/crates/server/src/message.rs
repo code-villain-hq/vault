@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use base64::Engine;
 use mail_parser::{MessageParser, MessagePart, PartKind};
-use postrider_domain::{Attachment, MailSummary, Message};
+use postrider_domain::{Attachment, MailSummary, Message, Party};
 
 /// How much of a mail's inline pictures goes into its HTML, all together.
 const PICTURES: usize = 8 * 1024 * 1024;
@@ -20,6 +20,9 @@ pub fn read(raw: &[u8], summary: MailSummary) -> Message {
             html: None,
             attachments: Vec::new(),
             reply_to: None,
+            answer_to: Vec::new(),
+            sent_to: Vec::new(),
+            copied: Vec::new(),
         };
     };
 
@@ -40,6 +43,10 @@ pub fn read(raw: &[u8], summary: MailSummary) -> Message {
             let name = mailbox.name().map(str::trim).filter(|n| !n.is_empty());
             name.or(mailbox.address()).map(str::to_string)
         });
+
+    let answer_to = parties(message.reply_to().or_else(|| message.from()));
+    let sent_to = parties(message.to());
+    let copied = parties(message.cc());
 
     let text = message
         .text_bodies()
@@ -87,7 +94,31 @@ pub fn read(raw: &[u8], summary: MailSummary) -> Message {
         html,
         attachments,
         reply_to,
+        answer_to,
+        sent_to,
+        copied,
     }
+}
+
+/// The people in an address field, with their addresses; groups opened.
+fn parties(field: Option<mail_parser::AddressList<'_>>) -> Vec<Party> {
+    field
+        .map(|list| {
+            list.mailboxes()
+                .filter_map(|mailbox| {
+                    Some(Party {
+                        name: mailbox
+                            .name()
+                            .map(str::trim)
+                            .unwrap_or_default()
+                            .to_string(),
+                        address: mailbox.address()?.trim().to_string(),
+                    })
+                })
+                .filter(|party| !party.address.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// A mail you opened, read as [`read`] does, with how it's built in the
@@ -181,6 +212,16 @@ pub fn file(raw: &[u8], index: usize) -> Option<File> {
         content_type,
         bytes,
     })
+}
+
+/// Every file [`read`] lists, in its order: what a forward takes along.
+pub fn files_of(raw: &[u8]) -> Vec<File> {
+    let count = MessageParser::new().parse(raw).map_or(0, |message| {
+        let html = message.html_bodies().collect::<Vec<_>>().join("\n");
+        let pictures = pictures(&message, &html);
+        files(&message, &pictures).count()
+    });
+    (0..count).filter_map(|index| file(raw, index)).collect()
 }
 
 /// The pictures a mail's HTML shows by `cid:`, by their id, while there's

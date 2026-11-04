@@ -1,21 +1,24 @@
-// Writing mail, in a dialog over the page: R replies to the mail that's
-// open, C writes a new one. The account it goes from sits beside the
-// buttons; More professional writes it again with Claude Code on this Mac
-// (`rewrite.rs`), in your language and with every fact kept, and Back to
-// yours (or ⌘Z) puts your words back.
+// Writing mail, in a dialog over the page: C writes a new one, and on an
+// open mail R replies, A replies to all and F forwards it. To, Cc and Bcc
+// take addresses with commas between and suggest the people who wrote to
+// you. The account it goes from sits beside the buttons; More professional
+// writes it again with Claude Code on this Mac (`rewrite.rs`), in your
+// language and with every fact kept, and Back to yours (or ⌘Z) puts your
+// words back. It all goes to `POST /mails` (`send.rs`).
 
 import { Dialog } from "@base-ui/react/dialog";
 import { CreateDialog, shortcutFree } from "@code-villain/web";
 import type {
+  Attachment,
   MailRef,
   MailSummary,
   Message,
-  NewMail,
-  Reply,
+  Outgoing,
+  Party,
   Rewrite,
   Rewritten,
 } from "@postrider/types";
-import { ChevronDown, Sparkles, Undo2 } from "lucide-react";
+import { ChevronDown, Paperclip, Sparkles, Undo2 } from "lucide-react";
 import {
   createContext,
   type ReactNode,
@@ -27,30 +30,40 @@ import {
   useState,
 } from "react";
 import { api, messageOf } from "./api";
-import { initial, mailKey } from "./inbox";
+import { initial, mailKey, ownAddresses } from "./inbox";
 import { hue, useAccounts, useInbox } from "./mail";
 import { Button, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
+/** How an open mail is answered: R, A or F. */
+export type Answering = "reply" | "all" | "forward";
+
+/** Whom it goes to and what about, as the lines above the text hold them. */
+type Lines = { to: string; cc: string; bcc: string; subject: string };
+
+const NO_LINES: Lines = { to: "", cc: "", bcc: "", subject: "" };
+
 /**
- * What was written and not sent, by the mail it answers, or "new": Esc
- * keeps it until the page reloads. `yours` is your text while Postrider's
- * stands in its place; `wroteTo` is the account the person a new mail goes
- * to wrote to.
+ * What was written and not sent, by how it answers which mail, or "new":
+ * Esc keeps it until the page reloads. `yours` is your text while
+ * Postrider's stands in its place; `wroteTo` is the account the person a
+ * new mail goes to wrote to.
  */
-type Draft = {
+type Draft = Partial<Lines> & {
   text?: string;
   from?: string;
-  to?: string;
-  subject?: string;
   yours?: string;
   wroteTo?: string;
 };
 const drafts = new Map<string, Draft>();
 
-function keep(key: string, next: Draft) {
+/** Keeps what changed, unless nothing is written and the lines are as they began. */
+function keep(key: string, next: Draft, began: Lines = NO_LINES) {
   const draft = { ...drafts.get(key), ...next };
-  if (draft.text?.trim() || draft.to?.trim() || draft.subject?.trim()) drafts.set(key, draft);
+  const changed = (Object.keys(began) as (keyof Lines)[]).some(
+    (line) => (draft[line] ?? began[line]).trim() !== began[line].trim(),
+  );
+  if (draft.text?.trim() || changed) drafts.set(key, draft);
   else drafts.delete(key);
 }
 
@@ -61,87 +74,148 @@ const NEW = "new";
 let lastFrom: string | undefined;
 
 /**
- * R: a reply to a mail. It goes to whom the mail asks replies to go, from
- * the account it came to unless you pick another; ⌘Enter sends it, and Esc
- * closes it with what you wrote kept.
+ * R, A or F on an open mail: a reply to whom it asks replies to go (A: and
+ * to everyone else it went to, but you), or a forward. It goes from the
+ * account the mail came to unless you pick another; ⌘Enter sends it, and
+ * Esc closes it with what you wrote kept.
  */
-export function ReplyDialog({
-  open,
+export function AnswerDialog({
+  how,
   onClose,
   summary,
   message,
 }: {
-  open: boolean;
+  how: Answering | undefined;
   onClose: () => void;
   summary: MailSummary;
   message: Message | undefined;
 }) {
   return (
-    <CreateDialog open={open} onClose={onClose} width="40rem">
-      <ReplyForm summary={summary} message={message} onSent={onClose} />
+    <CreateDialog open={how !== undefined} onClose={onClose} width="40rem">
+      {how && (
+        <AnswerForm key={how} how={how} summary={summary} message={message} onSent={onClose} />
+      )}
     </CreateDialog>
   );
 }
 
-function ReplyForm({
+function AnswerForm({
+  how,
   summary,
   message,
   onSent,
 }: {
+  how: Answering;
   summary: MailSummary;
   message: Message | undefined;
   onSent: () => void;
 }) {
   const { workspace, place } = useWorkspace();
   const accounts = useAccounts();
-  const mine = accounts.find((a) => a.id === summary.account_id);
-  const to = message?.reply_to ?? summary.from_name;
-  const subject = replySubject(summary.subject);
-  const replying: MailRef = {
+  const draft = `${how}:${mailKey(summary)}`;
+  const [began] = useState(() => begin(how, summary, message, ownAddresses(accounts)));
+  const [lines, setLines] = useState<Lines>(() => {
+    const kept = drafts.get(draft);
+    return {
+      to: kept?.to ?? began.to,
+      cc: kept?.cc ?? began.cc,
+      bcc: kept?.bcc ?? began.bcc,
+      subject: kept?.subject ?? began.subject,
+    };
+  });
+  const forwarding = how === "forward";
+  const mail: MailRef = {
     account_id: summary.account_id,
     uid: summary.uid,
     folder: summary.folder ?? undefined,
   };
 
   const send = (text: string, from: string) => {
-    const reply: Reply = {
+    const outgoing: Outgoing = {
+      ...lines,
+      from_account: from,
       text,
-      from_account: from === summary.account_id ? undefined : from,
-      folder: summary.folder ?? undefined,
+      answers: forwarding ? undefined : mail,
+      forwards: forwarding ? mail : undefined,
     };
-    return api(
-      "POST",
-      `/api/w/${workspace.id}/mails/${summary.account_id}/${summary.uid}/reply`,
-      reply,
-      place,
-    );
+    return api("POST", `/api/w/${workspace.id}/mails`, outgoing, place);
   };
 
+  const title = forwarding
+    ? `Forward ${summary.subject || "(no subject)"}`
+    : `Reply to ${summary.from_name || summary.from_address}`;
   return (
     <Writer
-      draft={mailKey(summary)}
+      draft={draft}
+      began={began}
       defaultFrom={summary.account_id}
-      label="Your reply"
-      about={{ to, subject, replying }}
+      label={forwarding ? "Your note" : "Your reply"}
+      about={{
+        to: lines.to.trim() || undefined,
+        subject: lines.subject.trim() || undefined,
+        replying: forwarding ? undefined : mail,
+      }}
+      ready={addressed(lines)}
+      needsText={!forwarding}
+      focusText={!forwarding}
       send={send}
       onSent={onSent}
     >
-      <Dialog.Title className="sr-only">Reply to {to}</Dialog.Title>
-      <div className="compose-line">
-        <span className="compose-label">To</span>
-        <span className="ui-chip compose-to" style={hue(mine?.hue ?? 1)}>
-          <span className="av sm" aria-hidden="true">
-            {initial(to)}
-          </span>
-          {to}
-        </span>
-      </div>
-      <div className="compose-line">
-        <span className="compose-label">Subject</span>
-        <span className="truncate">{subject}</span>
-      </div>
+      <Dialog.Title className="sr-only">{title}</Dialog.Title>
+      <AddressLines
+        lines={lines}
+        onChange={(next) => {
+          setLines(next);
+          keep(draft, next, began);
+        }}
+        autoFocus={forwarding}
+      />
+      {forwarding && message && message.attachments.length > 0 && (
+        <FilesGoing files={message.attachments} />
+      )}
     </Writer>
   );
+}
+
+/**
+ * The lines an answer starts with. A reply goes to the mail's Reply-To,
+ * else its sender; to all, also to whom else it went to and copied, but
+ * you; both "Re: " its subject. A forward goes to no one yet, "Fwd: " it.
+ */
+function begin(
+  how: Answering,
+  summary: MailSummary,
+  message: Message | undefined,
+  own: Set<string>,
+): Lines {
+  if (how === "forward") return { ...NO_LINES, subject: prefixed("Fwd", summary.subject) };
+  const answer: Party[] = message?.answer_to.length
+    ? message.answer_to
+    : [{ name: summary.from_name, address: summary.from_address }];
+  const others = (people: Party[]) => people.filter((p) => !own.has(p.address.toLowerCase()));
+  // To all: but you, unless it's you who asked for the answers.
+  const to = how === "all" && others(answer).length > 0 ? others(answer) : answer;
+  const seen = new Set(to.map((p) => p.address.toLowerCase()));
+  const cc: Party[] = [];
+  if (how === "all") {
+    for (const person of others([...(message?.sent_to ?? []), ...(message?.copied ?? [])])) {
+      const address = person.address.toLowerCase();
+      if (seen.has(address)) continue;
+      seen.add(address);
+      cc.push(person);
+    }
+  }
+  return {
+    to: to.map(written).join(", "),
+    cc: cc.map(written).join(", "),
+    bcc: "",
+    subject: prefixed("Re", summary.subject),
+  };
+}
+
+/** Whether it says whom it goes to. */
+function addressed(lines: Lines): boolean {
+  return [lines.to, lines.cc, lines.bcc].some((line) => line.replaceAll(/[,;\s]/g, "") !== "");
 }
 
 const NewMailContext = createContext<() => void>(() => {});
@@ -185,14 +259,13 @@ function NewMailForm({ onSent }: { onSent: () => void }) {
   const { workspace, place } = useWorkspace();
   const accounts = useAccounts();
   const kept = drafts.get(NEW);
-  const [to, setTo] = useState(kept?.to ?? "");
-  const [subject, setSubject] = useState(kept?.subject ?? "");
+  const [lines, setLines] = useState<Lines>({ ...NO_LINES, ...kept });
   const [wroteTo, setWroteTo] = useState(kept?.wroteTo);
   const known = (id: string | undefined) => accounts.find((a) => a.id === id)?.id;
   const defaultFrom = known(lastFrom) ?? accounts[0]?.id ?? "";
 
   const send = (text: string, from: string) => {
-    const mail: NewMail = { from_account: from, to, subject, text };
+    const mail: Outgoing = { ...lines, from_account: from, text };
     return api("POST", `/api/w/${workspace.id}/mails`, mail, place).then(() => {
       lastFrom = from;
     });
@@ -201,47 +274,139 @@ function NewMailForm({ onSent }: { onSent: () => void }) {
   return (
     <Writer
       draft={NEW}
+      began={NO_LINES}
       defaultFrom={defaultFrom}
       suggestedFrom={wroteTo}
       label="Your mail"
-      about={{ to: to.trim() || undefined, subject: subject.trim() || undefined }}
-      ready={to.trim() !== ""}
+      about={{ to: lines.to.trim() || undefined, subject: lines.subject.trim() || undefined }}
+      ready={addressed(lines)}
+      focusText={false}
       send={send}
       onSent={onSent}
     >
       <Dialog.Title className="sr-only">New mail</Dialog.Title>
+      <AddressLines
+        lines={lines}
+        onChange={(next) => {
+          setLines(next);
+          keep(NEW, next);
+        }}
+        onPick={(person) => {
+          setWroteTo(person.account_id);
+          keep(NEW, { wroteTo: person.account_id });
+        }}
+        autoFocus
+      />
+    </Writer>
+  );
+}
+
+/**
+ * To, Cc and Bcc, then Subject. Cc and Bcc show once there's something in
+ * them, or once asked for.
+ */
+function AddressLines({
+  lines,
+  onChange,
+  onPick,
+  autoFocus = false,
+}: {
+  lines: Lines;
+  onChange: (lines: Lines) => void;
+  onPick?: (person: Person) => void;
+  autoFocus?: boolean;
+}) {
+  const [copies, setCopies] = useState<"shown" | "asked" | undefined>(
+    lines.cc.trim() || lines.bcc.trim() ? "shown" : undefined,
+  );
+  const line = (name: keyof Lines) => (value: string) => onChange({ ...lines, [name]: value });
+  return (
+    <>
       <div className="compose-line">
-        <label htmlFor="new-mail-to" className="compose-label">
+        <label htmlFor="compose-to" className="compose-label">
           To
         </label>
-        <ToField
-          value={to}
-          onChange={(next) => {
-            setTo(next);
-            keep(NEW, { to: next });
-          }}
-          onPick={(person) => {
-            setWroteTo(person.account_id);
-            keep(NEW, { wroteTo: person.account_id });
-          }}
+        <AddressField
+          id="compose-to"
+          value={lines.to}
+          onChange={line("to")}
+          onPick={onPick}
+          autoFocus={autoFocus}
         />
+        {!copies && (
+          <button
+            type="button"
+            className="compose-more"
+            title="Copy someone in, seen or unseen"
+            onClick={() => setCopies("asked")}
+          >
+            Cc Bcc
+          </button>
+        )}
       </div>
+      {copies && (
+        <>
+          <div className="compose-line">
+            <label htmlFor="compose-cc" className="compose-label">
+              Cc
+            </label>
+            <AddressField
+              id="compose-cc"
+              value={lines.cc}
+              onChange={line("cc")}
+              onPick={onPick}
+              autoFocus={copies === "asked"}
+            />
+          </div>
+          <div className="compose-line">
+            <label htmlFor="compose-bcc" className="compose-label">
+              Bcc
+            </label>
+            <AddressField
+              id="compose-bcc"
+              value={lines.bcc}
+              onChange={line("bcc")}
+              onPick={onPick}
+            />
+          </div>
+        </>
+      )}
       <div className="compose-line">
-        <label htmlFor="new-mail-subject" className="compose-label">
+        <label htmlFor="compose-subject" className="compose-label">
           Subject
         </label>
         <input
-          id="new-mail-subject"
-          value={subject}
-          onChange={(event) => {
-            setSubject(event.target.value);
-            keep(NEW, { subject: event.target.value });
-          }}
+          id="compose-subject"
+          value={lines.subject}
+          onChange={(event) => line("subject")(event.target.value)}
           className="compose-input"
         />
       </div>
-    </Writer>
+    </>
   );
+}
+
+/** The files a forward takes along, by name and size. */
+function FilesGoing({ files }: { files: Attachment[] }) {
+  const numbered = useMemo(() => files.map((file, at) => ({ ...file, at })), [files]);
+  return (
+    <ul className="files compose-files" aria-label="Files it takes along">
+      {numbered.map((file) => (
+        <li key={file.at}>
+          <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" className="text-muted" />
+          <span className="truncate">{file.name}</span>
+          <span className="text-faint tabular-nums">{bytes(file.size)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** "820 bytes", "14 KB", "2.3 MB". */
+export function bytes(size: number): string {
+  if (size < 1000) return `${size} bytes`;
+  if (size < 1_000_000) return `${Math.round(size / 1000)} KB`;
+  return `${(size / 1_000_000).toFixed(1)} MB`;
 }
 
 /**
@@ -250,16 +415,21 @@ function NewMailForm({ onSent }: { onSent: () => void }) {
  */
 function Writer({
   draft,
+  began,
   defaultFrom,
   suggestedFrom,
   label,
   about,
   ready = true,
+  needsText = true,
+  focusText = true,
   send,
   onSent,
   children,
 }: {
   draft: string;
+  /** The lines as they began, so a draft that's only those isn't kept. */
+  began: Lines;
   defaultFrom: string;
   /** The account the person it goes to wrote to: it goes from there, unless you pick one. */
   suggestedFrom?: string;
@@ -268,6 +438,10 @@ function Writer({
   about: Omit<Rewrite, "text" | "from_account">;
   /** Whether it has what it needs besides the text. */
   ready?: boolean;
+  /** Whether it can't go without text: a forward can. */
+  needsText?: boolean;
+  /** Whether the text takes the focus first, not whom it goes to. */
+  focusText?: boolean;
   /** Sends `text` from the account `from`. */
   send: (text: string, from: string) => Promise<unknown>;
   onSent: () => void;
@@ -292,7 +466,7 @@ function Writer({
   const write = (next: string) => {
     setText(next);
     setYours(undefined);
-    keep(draft, { text: next, yours: undefined });
+    keep(draft, { text: next, yours: undefined }, began);
   };
 
   // A button that's busy lets go of the focus: the text takes it back, so
@@ -313,7 +487,7 @@ function Writer({
       if ((drafts.get(draft)?.text ?? "") === asked.text) {
         setText(rewritten.text);
         setYours(asked.text);
-        keep(draft, { text: rewritten.text, yours: asked.text });
+        keep(draft, { text: rewritten.text, yours: asked.text }, began);
       }
       done();
     }, done);
@@ -326,7 +500,7 @@ function Writer({
   };
 
   const submit = () => {
-    if (busy || !ready || !text.trim()) return;
+    if (busy || !ready || (needsText && !text.trim())) return;
     setBusy("sending");
     setError(undefined);
     send(text, from).then(() => {
@@ -363,7 +537,7 @@ function Writer({
       {children}
       <textarea
         ref={field}
-        autoFocus={draft !== NEW}
+        autoFocus={focusText}
         aria-label={label}
         value={text}
         readOnly={busy === "rewriting"}
@@ -383,7 +557,7 @@ function Writer({
               onChange={(event) => {
                 picked.current = true;
                 setFrom(event.target.value);
-                keep(draft, { from: event.target.value });
+                keep(draft, { from: event.target.value }, began);
               }}
             >
               {accounts.map((account) => (
@@ -427,7 +601,7 @@ function Writer({
         </Button>
         <Button
           type="submit"
-          disabled={busy !== undefined || !ready || !text.trim()}
+          disabled={busy !== undefined || !ready || (needsText && !text.trim())}
           title="Send (⌘Enter)"
         >
           {busy === "sending" ? "Sending…" : "Send"}
@@ -441,17 +615,21 @@ function Writer({
 type Person = { name: string; address: string; account_id: string };
 
 /**
- * To: addresses with commas between. What you type after the last one
- * finds the people who wrote to you, by name or address.
+ * To, Cc or Bcc: addresses with commas between. What you type after the
+ * last one finds the people who wrote to you, by name or address.
  */
-function ToField({
+function AddressField({
+  id,
   value,
   onChange,
   onPick,
+  autoFocus = false,
 }: {
+  id: string;
   value: string;
   onChange: (to: string) => void;
-  onPick: (person: Person) => void;
+  onPick?: (person: Person) => void;
+  autoFocus?: boolean;
 }) {
   const { inbox } = useInbox();
   const [focused, setFocused] = useState(false);
@@ -486,15 +664,15 @@ function ToField({
   const pick = (person: Person) => {
     const before = value.slice(0, value.length - last.length);
     onChange(`${before}${before ? " " : ""}${written(person)}, `);
-    onPick(person);
+    onPick?.(person);
     setActive(0);
   };
 
   return (
     <div className="relative min-w-0 flex-1">
       <input
-        id="new-mail-to"
-        autoFocus
+        id={id}
+        autoFocus={autoFocus}
         value={value}
         onChange={(event) => {
           onChange(event.target.value);
@@ -519,8 +697,8 @@ function ToField({
         }}
         role="combobox"
         aria-expanded={shown}
-        aria-controls="new-mail-people"
-        aria-activedescendant={shown ? `new-mail-person-${active}` : undefined}
+        aria-controls={`${id}-people`}
+        aria-activedescendant={shown ? `${id}-person-${active}` : undefined}
         autoComplete="off"
         spellCheck={false}
         placeholder="Name or address"
@@ -528,7 +706,7 @@ function ToField({
       />
       {shown && (
         <div
-          id="new-mail-people"
+          id={`${id}-people`}
           role="listbox"
           aria-label="People"
           className="ui-menu absolute top-full left-0 z-10 mt-1 w-full p-1.5"
@@ -536,7 +714,7 @@ function ToField({
           {matches.map((person, index) => (
             <div
               key={person.address}
-              id={`new-mail-person-${index}`}
+              id={`${id}-person-${index}`}
               role="option"
               aria-selected={index === active}
               tabIndex={-1}
@@ -564,13 +742,15 @@ function ToField({
 }
 
 /** A person as To reads them: "Anna Weber <anna@…>", quoted where the name needs it. */
-function written({ name, address }: Person): string {
+function written({ name, address }: Party): string {
   if (!name || name.toLowerCase() === address.toLowerCase()) return address;
   const safe = /[",;<>@]/.test(name) ? `"${name.replaceAll('"', "")}"` : name;
   return `${safe} <${address}>`;
 }
 
-/** "Re: " the subject, unless it's a reply already. */
-function replySubject(subject: string): string {
-  return /^(re|aw):/i.test(subject.trim()) ? subject.trim() : `Re: ${subject.trim()}`;
+/** "Re: " or "Fwd: " the subject, unless it says so already (or AW:, WG:, Fw:). */
+function prefixed(prefix: "Re" | "Fwd", subject: string): string {
+  const said = subject.trim();
+  const already = prefix === "Re" ? /^(re|aw):/i : /^(fwd?|wg):/i;
+  return already.test(said) ? said : `${prefix}: ${said}`;
 }

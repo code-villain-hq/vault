@@ -9,10 +9,19 @@ import {
 } from "@code-villain/web";
 import type { Attachment, MailSummary, Message, MoveMail } from "@postrider/types";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Archive, ArrowLeft, FolderInput, Paperclip, Reply, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArrowLeft,
+  Forward,
+  FolderInput,
+  Paperclip,
+  Reply,
+  ReplyAll,
+  Trash2,
+} from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, messageOf } from "./api";
-import { ReplyDialog } from "./compose";
+import { AnswerDialog, type Answering, bytes } from "./compose";
 import { markSeen, useListedMails } from "./folders";
 import {
   anchorOf,
@@ -73,7 +82,7 @@ export function MailPage() {
   const mails = useRowsShown(from, rows, key).map((row) => row.mail);
   const at = conversation ? anchorOf(conversation) : undefined;
   const index = mails.findIndex((mail) => mailKey(mail) === (at ? mailKey(at) : key));
-  const [replying, setReplying] = useState(false);
+  const [answering, setAnswering] = useState<Answering>();
   const [moving, setMoving] = useState(false);
   const letters: Letter[] = conversation
     ? conversation.mails.map((mail) => ({
@@ -183,7 +192,11 @@ export function MailPage() {
         setMoving(true);
       } else if (key === "r" && answered) {
         event.preventDefault();
-        setReplying(true);
+        setAnswering("reply");
+      } else if (key === "a" && answered && !event.defaultPrevented) {
+        // G then A goes to Archive: the shortcuts took that A already.
+        event.preventDefault();
+        setAnswering("all");
       } else if ((key === "u" || key === "i") && newsletter && !event.defaultPrevented) {
         // G then I goes to the Inbox: the shortcuts took that I already.
         event.preventDefault();
@@ -193,6 +206,19 @@ export function MailPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
+
+  // F forwards the open mail. It goes first, so the list beside it, whose
+  // F picks what it shows, leaves it.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "f" || event.shiftKey || !answered) return;
+      if (!shortcutFree(event)) return;
+      event.preventDefault();
+      setAnswering("forward");
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [answered]);
 
   const subject = summary?.subject || "(no subject)";
   return (
@@ -236,7 +262,19 @@ export function MailPage() {
             </>
           )}
           {answered && (
-            <ReaderButton icon={Reply} label="Reply (R)" onClick={() => setReplying(true)} />
+            <>
+              <ReaderButton icon={Reply} label="Reply (R)" onClick={() => setAnswering("reply")} />
+              <ReaderButton
+                icon={ReplyAll}
+                label="Reply all (A)"
+                onClick={() => setAnswering("all")}
+              />
+              <ReaderButton
+                icon={Forward}
+                label="Forward (F)"
+                onClick={() => setAnswering("forward")}
+              />
+            </>
           )}
           {archivable && (
             <ReaderButton icon={Archive} label="Archive (E)" onClick={() => fileAway("archive")} />
@@ -267,10 +305,10 @@ export function MailPage() {
         </article>
       </PageBody>
       {answered && answeredKey && (
-        <ReplyDialog
+        <AnswerDialog
           key={answeredKey}
-          open={replying}
-          onClose={() => setReplying(false)}
+          how={answering}
+          onClose={() => setAnswering(undefined)}
           summary={messages[answeredKey] ?? answered}
           message={messages[answeredKey]}
         />
@@ -593,13 +631,6 @@ async function openFile(url: string, place: Place, name: string) {
   link.download = name;
   link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-}
-
-/** "820 bytes", "14 KB", "2.3 MB". */
-function bytes(size: number): string {
-  if (size < 1000) return `${size} bytes`;
-  if (size < 1_000_000) return `${Math.round(size / 1000)} KB`;
-  return `${(size / 1_000_000).toFixed(1)} MB`;
 }
 
 const URLS = /\bhttps?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]'}*]/g;

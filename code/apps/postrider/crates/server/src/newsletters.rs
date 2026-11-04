@@ -68,8 +68,8 @@ use crate::folders::listing;
 use crate::imap::{self, Failure, Headed, Place};
 use crate::judging;
 use crate::mail::Mail;
-use crate::reply::{is_this_mac, send};
 use crate::rules::{self, Moved, Rule, When};
+use crate::send::{is_this_mac, send};
 use crate::state::AppState;
 
 /// What the page counts as lately: "They sent you … in the last month."

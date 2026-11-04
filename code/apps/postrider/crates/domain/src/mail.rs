@@ -403,60 +403,76 @@ pub struct Message {
     /// Who a reply goes to when it isn't the sender: its Reply-To, by name
     /// or address.
     pub reply_to: Option<String>,
+    /// Whom R answers, with their addresses: its Reply-To, else its sender.
+    pub answer_to: Vec<Party>,
+    /// Its To and Cc, with their addresses: whom else A answers.
+    pub sent_to: Vec<Party>,
+    pub copied: Vec<Party>,
 }
 
-/// R: a reply to a mail, as the page sends it.
+/// Someone a mail names, with their address.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Party {
+    /// Their name: empty when the mail gives none.
+    pub name: String,
+    pub address: String,
+}
+
+/// A mail you write, as the page sends it: a new one (C), a reply (R, or
+/// A to all) or a forward (F).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export, optional_fields)]
-pub struct Reply {
-    /// The account it goes from: the one the mail came to when left out.
-    pub from_account: Option<Uuid>,
-    /// The folder the mail is in, by its key: the Inbox when left out.
-    pub folder: Option<String>,
+pub struct Outgoing {
+    /// The account it goes from.
+    pub from_account: Uuid,
+    /// Whom it goes to: addresses, or names with them ("Anna Weber
+    /// <anna@example.test>"), with commas between. Cc and Bcc the same.
+    pub to: String,
+    pub cc: String,
+    pub bcc: String,
+    pub subject: String,
     pub text: String,
+    /// The mail it answers: it goes in that mail's thread, quoting it below.
+    pub answers: Option<MailRef>,
+    /// The mail it forwards: below what you wrote, with its files.
+    pub forwards: Option<MailRef>,
 }
 
-impl Validate for Reply {
-    fn validate(&self) -> Result<(), ValidationError> {
-        if self.text.trim().is_empty() {
-            return Err(ValidationError("Write something first.".into()));
-        }
-        if self.text.len() > 1_000_000 {
+impl Outgoing {
+    /// Whether it fits in a mail at all.
+    pub fn check_size(&self) -> Result<(), ValidationError> {
+        if self.text.len() > 1_000_000
+            || self.subject.len() > 1_000
+            || [&self.to, &self.cc, &self.bcc]
+                .iter()
+                .any(|f| f.len() > 10_000)
+        {
             return Err(ValidationError(
-                "A reply holds up to a million characters.".into(),
+                "A mail holds up to a million characters.".into(),
+            ));
+        }
+        if self.answers.is_some() && self.forwards.is_some() {
+            return Err(ValidationError(
+                "A mail answers another or forwards it, not both.".into(),
             ));
         }
         Ok(())
     }
 }
 
-/// C: a new mail, as the page sends it.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(deny_unknown_fields)]
-#[ts(export)]
-pub struct NewMail {
-    /// The account it goes from.
-    pub from_account: Uuid,
-    /// Whom it goes to: addresses, or names with them ("Anna Weber
-    /// <anna@example.test>"), with commas between.
-    pub to: String,
-    pub subject: String,
-    pub text: String,
-}
-
-impl Validate for NewMail {
+impl Validate for Outgoing {
     fn validate(&self) -> Result<(), ValidationError> {
-        if self.to.trim().is_empty() {
+        self.check_size()?;
+        if [&self.to, &self.cc, &self.bcc]
+            .iter()
+            .all(|f| f.trim().is_empty())
+        {
             return Err(ValidationError("Say whom it goes to.".into()));
         }
-        if self.text.trim().is_empty() {
+        if self.text.trim().is_empty() && self.forwards.is_none() {
             return Err(ValidationError("Write something first.".into()));
-        }
-        if self.text.len() > 1_000_000 || self.subject.len() > 1_000 || self.to.len() > 10_000 {
-            return Err(ValidationError(
-                "A mail holds up to a million characters.".into(),
-            ));
         }
         Ok(())
     }

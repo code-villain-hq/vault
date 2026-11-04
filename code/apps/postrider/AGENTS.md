@@ -7,7 +7,7 @@ is the approved storyboard; build from it, a step at a time, not beyond it.
 Step 1 is built: the unified Inbox, today, Sent, Archive, Drafts, Junk,
 Trash and the other folders in the sidebar, Search mail (/), All, Unread
 and Read on every list (F), Settings → Accounts, and on a mail E to archive it, ⌫ to delete it, V to move it,
-R to reply and its files to open. A folder's name in the top bar renames
+R to reply, A to reply to all, F to forward, and its files to open. A folder's name in the top bar renames
 it; a right click on a sidebar item, or ⇧F10 on it, marks it all read,
 renames or deletes it, or empties Trash and Junk. A mail opens beside its list, in three columns: the
 sidebar, the list, the mail. Esc closes it, J and K or ↓ and ↑ move. A narrow window
@@ -160,7 +160,8 @@ and none when nothing is unread.
 
 Every list, the Inbox, a folder, a sender's mail and a search, shows all
 its mail, only the unread or only the read (`shown.tsx`): All, Unread and
-Read in its top bar, or F, which goes from one to the next. Each list
+Read in its top bar, or F, which goes from one to the next (with a mail
+open, F forwards it). Each list
 keeps its own while the app runs; all searches share one. A conversation
 is unread while any of its Inbox mail is, as its dot says. What a list
 showed since its filter was picked stays while you're on it, so mail you
@@ -218,13 +219,22 @@ Every change happens on the account's server; the Inbox follows it there.
   account with the rules that sort into it. Empty Trash… and Empty Junk…
   (`POST /folders/{key}/empty`) delete their mail for good. Both ask
   first, Cancel focused.
-- R replies (`reply.rs`, `compose.tsx`): to the mail's Reply-To, else its
-  sender, from the account it came to, in its thread, quoting it. It goes
-  over SMTP: the IMAP server with `imap.` read as `smtp.`, on 465 with
-  TLS, with the same password; the stand-ins at 127.0.0.1 use Mailpit on
-  3025. A copy goes to Sent and the mail is marked answered. Esc keeps
-  what you wrote, in memory, until the page reloads; ⌘Enter sends.
-- C writes a new mail (`POST /mails`, `reply.rs`; the sidebar's pen and
+- R replies (`send.rs`, `compose.tsx`): to the mail's Reply-To, else its
+  sender, from the account it came to, in its thread, quoting it. A
+  replies to all: to them, and in Cc to whom else the mail went to and
+  copied, but your accounts' addresses. F forwards it: below what you
+  write, its sender, date, subject, To and Cc, and its text (an HTML mail
+  forwards as its text), with its files. To, Cc, Bcc and Subject are
+  yours to change; Cc and Bcc show when there's something in them, or
+  once asked for. Everything goes to `POST /mails` (`Outgoing`, with
+  `answers` or `forwards`), over SMTP: the IMAP server with `imap.` read
+  as `smtp.`, on 465 with TLS, with the same password; the stand-ins at
+  127.0.0.1 use Mailpit on 3025. Bcc goes only in the envelope; the copy
+  in Sent keeps it. The mail answered is marked answered. Esc keeps what
+  you wrote, in memory, until the page reloads; ⌘Enter sends. With a mail
+  open, F forwards it before the list beside it can take F for its
+  filter (a capturing listener).
+- C writes a new mail (`POST /mails`, `send.rs`; the sidebar's pen and
   ⌘K too). To suggests people who wrote to you; picking one sends it from
   the account they wrote to, unless you pick another, and else from the
   account the last new mail went from. Commas or semicolons part
@@ -511,8 +521,8 @@ Like the ask field's, what it needs is kept in memory.
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
   text part numbers its links with, HTML tags or entities; a migration
-  cleaned the lines kept before, `0018_snippet_tags.sql`), archiving, replying and
-  files (`archive.rs`, `reply.rs`, `files.rs`), More professional
+  cleaned the lines kept before, `0018_snippet_tags.sql`), archiving, sending and
+  files (`archive.rs`, `send.rs`, `files.rs`), More professional
   (`rewrite.rs`), CalDAV (`caldav.rs`),
   connecting accounts (`connect.rs`), the keychain (`secrets.rs`), the
   ask field's answers (`ask.rs`), sorting rules (`rules.rs`, written
@@ -525,7 +535,7 @@ Like the ask field's, what it needs is kept in memory.
 - `apps/web`: React + Base UI + Tailwind. `mailbox.tsx` is the list
   column beside the open mail, `inbox.tsx` the Inbox and today,
   `folders.tsx` a folder, a search and the search field, `message.tsx` an
-  opened mail, `compose.tsx` a reply and a new mail, `newsletters.tsx` the
+  opened mail, `compose.tsx` a reply, a forward and a new mail, `newsletters.tsx` the
   Newsletters, `ask.tsx` the ask field and its
   answer, `settings.tsx` the accounts and calendars, `mail.tsx` the live
   Inbox, notifications and the folder list.

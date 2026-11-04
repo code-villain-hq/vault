@@ -11,7 +11,7 @@ use crate::auth::Member;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::{
-    accounts, archive, ask, caldav, connect, files, folders, mail, newsletters, reply, rewrite, ws,
+    accounts, archive, ask, caldav, connect, files, folders, mail, newsletters, rewrite, send, ws,
 };
 
 /// The API, plus the built web app from `web_dir` when given.
@@ -38,13 +38,12 @@ pub fn router(state: AppState) -> Router {
         .route("/ask", post(ask::ask))
         .route("/answers/{answer}/undo", post(ask::undo))
         .route("/mail/sync", post(mail::sync))
-        .route("/mails", post(reply::send_new))
+        .route("/mails", post(send::send_mail))
         .route("/rewrite", post(rewrite::rewrite))
         .route("/mails/{account_id}/{uid}", get(mail::open))
         .route("/mails/{account_id}/{uid}/archive", post(archive::archive))
         .route("/mails/{account_id}/{uid}/trash", post(archive::trash))
         .route("/mails/{account_id}/{uid}/move", post(archive::move_to))
-        .route("/mails/{account_id}/{uid}/reply", post(reply::reply))
         .route("/mails/{account_id}/{uid}/files/{index}", get(files::file))
         .route("/folders", get(folders::folders))
         .route(
