@@ -32,3 +32,18 @@ test("the frame's script is the one both policies allow", () => {
   expect(srcDoc).toContain(`script-src '${REPORTER_HASH}';`);
   expect(srcDoc).toContain(`<script data-token="${token}">${REPORTER}</script>`);
 });
+
+// Held back, a mail loads nothing from the web: its sender can't see it was
+// read. What it carries itself still shows.
+test("a mail's pictures from the web wait to be asked for", () => {
+  globalThis.DOMParser ??= class {
+    parseFromString() {
+      return { querySelectorAll: () => [] };
+    }
+  } as unknown as typeof DOMParser;
+  const held = paper("<p>Hi</p>", false).srcDoc;
+  expect(held).toContain("img-src data:;");
+  const policy = held.match(/Content-Security-Policy" content="([^"]*)"/)?.[1];
+  expect(policy).not.toMatch(/https?:/);
+  expect(paper("<p>Hi</p>", true).srcDoc).toContain("img-src https: http: data:;");
+});

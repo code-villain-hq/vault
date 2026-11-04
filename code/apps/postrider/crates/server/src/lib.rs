@@ -25,6 +25,7 @@ pub mod message;
 pub mod newsletters;
 pub mod outbox;
 pub mod parcels;
+pub mod pictures;
 pub mod preview;
 mod proof;
 pub mod queued;

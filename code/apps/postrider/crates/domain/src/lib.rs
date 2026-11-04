@@ -22,8 +22,9 @@ pub use mail::{
     FolderRole, HUES, Inbox, KeptInInbox, Listing, MailAccount, MailAccountConnect,
     MailAccountCreate, MailAccountPatch, MailRef, MailSummary, MarkMail, MarkedRead, Message,
     MoveMail, NewUpload, Newsletter, NewsletterRef, Newsletters, Outgoing, Parcel, ParcelState,
-    Parcels, Party, RenameFolder, Rewrite, Rewritten, SIGNATURE_CHARS, SenderProblem, Senders,
-    ServerCalendar, SettingAside, UnsubscribeSent, Unsubscribed, Unsubscribing, Upload, signed,
+    Parcels, Party, PictureSender, PictureSenders, RenameFolder, Rewrite, Rewritten,
+    SIGNATURE_CHARS, SenderProblem, Senders, ServerCalendar, SettingAside, UnsubscribeSent,
+    Unsubscribed, Unsubscribing, Upload, signed,
 };
 pub use model::{Actor, ModelKind, Validate, ValidationError, Write};
 pub use protocol::{

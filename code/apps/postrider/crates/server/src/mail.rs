@@ -984,7 +984,7 @@ pub async fn open(
     Query(params): Query<OpenParams>,
 ) -> Result<Json<Message>, AppError> {
     let workspace_id = member.actor.workspace_id;
-    Ok(Json(match params.folder {
+    let mut message = match params.folder {
         Some(folder) => {
             state
                 .mail
@@ -992,7 +992,10 @@ pub async fn open(
                 .await?
         }
         None => state.mail.open(workspace_id, account_id, uid).await?,
-    }))
+    };
+    message.pictures =
+        crate::pictures::load(&state.pool, workspace_id, &message.summary.from_address).await?;
+    Ok(Json(message))
 }
 
 #[cfg(test)]

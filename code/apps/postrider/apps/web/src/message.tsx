@@ -47,6 +47,7 @@ import { takeAnswerAsked } from "./mail-menu";
 import { flaggedRow, flagToggle, readToggle, useMarkMail } from "./marks";
 import { conversationGoing, MoveDialog, openList, useMoveMail } from "./move";
 import { pageName } from "./newsletters";
+import { loadsFromWeb, PicturesHeld, useLoadsPictures } from "./pictures";
 import { isDesktop, openInBrowser, saveAndOpen } from "./platform";
 import { useDoings, type Wanted, want } from "./sender";
 import { Button, ErrorMessage } from "./ui";
@@ -559,7 +560,7 @@ function Said({
       )}
       {message &&
         (message.html?.trim() ? (
-          <MailHtml html={message.html} instead={<MailText text={message.text} />} />
+          <Html mailKey={key} summary={summary} message={message} html={message.html} />
         ) : (
           <MailText text={message.text} />
         ))}
@@ -728,6 +729,33 @@ function MailText({ text }: { text: string }) {
 }
 
 /**
+ * A mail's HTML, its pictures from the web held back until they're asked
+ * for (`pictures.tsx`), with what's held said above it.
+ */
+function Html({
+  mailKey,
+  summary,
+  message,
+  html,
+}: {
+  mailKey: string;
+  summary: MailSummary;
+  message: Message;
+  html: string;
+}) {
+  const pictures = useLoadsPictures(mailKey, summary.from_address, message.pictures);
+  const held = useMemo(() => !pictures && loadsFromWeb(html), [pictures, html]);
+  return (
+    <>
+      {held && (
+        <PicturesHeld mailKey={mailKey} name={summary.from_name} address={summary.from_address} />
+      )}
+      <MailHtml html={html} pictures={pictures} instead={<MailText text={message.text} />} />
+    </>
+  );
+}
+
+/**
  * A mail's HTML, on paper of its own: in a frame of no origin, where none of
  * the mail's scripts, forms or pop-ups run, that loads pictures and styles
  * but sends no referrer. One script of Postrider's runs there and tells the
@@ -740,12 +768,20 @@ function MailText({ text }: { text: string }) {
  * still shown, and scrolls, until it says more. One that says it shows
  * nothing, no text and no picture, gives way to `instead`.
  */
-function MailHtml({ html, instead }: { html: string; instead: ReactNode }) {
+function MailHtml({
+  html,
+  pictures,
+  instead,
+}: {
+  html: string;
+  pictures: boolean;
+  instead: ReactNode;
+}) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number>();
   const [silent, setSilent] = useState(false);
   const [emptyOne, setEmptyOne] = useState<string>();
-  const { srcDoc, token } = useMemo(() => paper(html), [html]);
+  const { srcDoc, token } = useMemo(() => paper(html, pictures), [html, pictures]);
 
   useEffect(() => {
     setSilent(false);
@@ -845,8 +881,9 @@ html:root, html:root > body { height: auto !important; min-height: 0 !important;
  * itself in a box as tall as the frame, which scrolls or clips, is as tall
  * as what that box holds, if the box grows with the frame: one that didn't
  * is the mail's own size, and its height stays. Nothing is said before the
- * mail is read, so a 0 is the mail's. Loaded with no text and no picture
- * to show, it says it's empty. Everything it says carries the render's
+ * mail is read, so a 0 is the mail's. Loaded, and once it has been laid
+ * out (a frame that hasn't sees nothing), with no text and no picture to
+ * show, it says it's empty. Everything it says carries the render's
  * token, which comes on its own tag: it takes itself out of the document
  * before the mail is read, so the mail's styles can't read it.
  *
@@ -917,7 +954,9 @@ const shows = () => {
 };
 addEventListener("load", () => {
   tall();
-  if (!shows()) say({ empty: true });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!shows()) say({ empty: true });
+  }));
 });
 document.addEventListener("click", (event) => {
   const link = event.target instanceof Element && event.target.closest("a[*|href], area[href]");
@@ -934,7 +973,7 @@ document.addEventListener("keydown", (event) => {
 });`;
 
 /** `REPORTER`'s sha256, the one script either policy lets the frame run. */
-export const REPORTER_HASH = "sha256-O+uR5pDQJzYbLosPZckeQ10SR4FkJhyZUjHB27wzXcc=";
+export const REPORTER_HASH = "sha256-kX3tI1hCfWq1iz0M34vCt8+B/O98mENR1iCG4Ku8DVM=";
 
 /**
  * The frame's document: the mail's HTML under a policy that runs only
@@ -949,11 +988,16 @@ export const REPORTER_HASH = "sha256-O+uR5pDQJzYbLosPZckeQ10SR4FkJhyZUjHB27wzXcc
  * mail's, and surer than theirs, keeps them as tall as what they hold.
  * `token` is what the frame's script signs what it says with.
  */
-export function paper(html: string): { srcDoc: string; token: string } {
+export function paper(html: string, pictures = true): { srcDoc: string; token: string } {
   const token = crypto.randomUUID();
   const body = withoutRefresh(html);
+  // Held back, nothing comes from the web: no picture, background,
+  // stylesheet or font. What the mail carries itself (`data:`) still shows.
+  const web = pictures
+    ? "img-src https: http: data:; style-src 'unsafe-inline' https:; font-src https: data:"
+    : "img-src data:; style-src 'unsafe-inline'; font-src data:";
   const srcDoc = `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '${REPORTER_HASH}'; img-src https: http: data:; style-src 'unsafe-inline' https:; font-src https: data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '${REPORTER_HASH}'; ${web}">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="light">
 <base target="_blank">

@@ -31,7 +31,13 @@ answer_to: Array<Party>,
 /**
  * Its To and Cc, with their addresses: whom else A answers.
  */
-sent_to: Array<Party>, copied: Array<Party>, account_id: string, 
+sent_to: Array<Party>, copied: Array<Party>, 
+/**
+ * Whether its HTML loads its pictures from the web as it opens: you
+ * said so for its sender, or it's yours. Else they wait to be asked
+ * for, so its sender can't see it was read.
+ */
+pictures: boolean, account_id: string, 
 /**
  * The folder it's in, by its key ([`Folder::key`]); `None` for a mail
  * in the Inbox's copy.

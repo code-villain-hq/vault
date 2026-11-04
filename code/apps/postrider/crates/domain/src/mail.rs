@@ -453,6 +453,26 @@ pub struct Message {
     /// Its To and Cc, with their addresses: whom else A answers.
     pub sent_to: Vec<Party>,
     pub copied: Vec<Party>,
+    /// Whether its HTML loads its pictures from the web as it opens: you
+    /// said so for its sender, or it's yours. Else they wait to be asked
+    /// for, so its sender can't see it was read.
+    pub pictures: bool,
+}
+
+/// Whether a sender's mail loads its pictures as it opens, from now on.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct PictureSender {
+    pub address: String,
+    pub load: bool,
+}
+
+/// The senders whose mail loads its pictures as it opens, by address.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PictureSenders {
+    pub senders: Vec<String>,
 }
 
 /// Someone a mail names, with their address.

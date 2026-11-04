@@ -41,6 +41,8 @@ export type * from "./generated/Parcel";
 export type * from "./generated/ParcelState";
 export type * from "./generated/Parcels";
 export type * from "./generated/Party";
+export type * from "./generated/PictureSender";
+export type * from "./generated/PictureSenders";
 export type * from "./generated/RenameFolder";
 export type * from "./generated/Rewrite";
 export type * from "./generated/Rewritten";

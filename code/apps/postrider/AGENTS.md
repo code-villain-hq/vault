@@ -358,6 +358,14 @@ Offline, moving and reading wait for it (above).
   The writer shows it under the text, not in it, so drafts and More
   professional keep only your words and picking another account signs
   with its.
+- Pictures from the web wait (`pictures.tsx`, `pictures.rs`): a mail's
+  frame gets a policy that loads only what came in the mail (`data:`),
+  so a tracking pixel can't tell its sender you opened it. When the mail
+  would load something, a bar above it offers Load pictures, for that
+  mail while Postrider runs, and Always from this sender, which the
+  server keeps (`picture_senders`, `GET`/`POST /pictures`) and Settings
+  lists to remove. Your own accounts' mail always loads them; the server
+  says so on `Message.pictures` as the mail opens.
 - More professional (`rewrite.rs`, `POST /rewrite`), beside Send in a
   reply and a new mail, has Claude Code on this Mac write yours again, in
   your language, with every fact kept and no tools. A reply's mail comes
@@ -678,7 +686,7 @@ in memory, so a mail is read once while the server runs.
   `folders.tsx` a folder, a search and the search field, `message.tsx` an
   opened mail, `compose.tsx` a reply, a forward and a new mail, `newsletters.tsx` the
   Newsletters, `ask.tsx` the ask field and its
-  answer, `settings.tsx` the accounts and calendars, `mail.tsx` the live
+  answer, `settings.tsx` the accounts and calendars, `pictures.tsx` held-back pictures, `mail.tsx` the live
   Inbox, notifications and the folder list.
 - `apps/desktop`: Tauri shell. `this_mac.rs` starts Postrider on Postgres
   for this Mac, with `code/kit/desktop`, and Claude Code to answer; `main.rs` notifies with

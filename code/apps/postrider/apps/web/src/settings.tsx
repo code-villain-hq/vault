@@ -11,6 +11,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { api } from "./api";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, useAccounts, useAccountStatus } from "./mail";
+import { PictureSendersList } from "./pictures";
 import { Button, ErrorMessage, Section, TextField } from "./ui";
 import { useRecords, useWorkspace } from "./workspace";
 
@@ -39,6 +40,9 @@ export function AccountsPage() {
           </Section>
           <Section title="Calendar">
             {calendar ? <CalendarRow calendar={calendar} /> : <AddCalendar />}
+          </Section>
+          <Section title="Pictures always load from">
+            <PictureSendersList />
           </Section>
         </div>
       </PageBody>

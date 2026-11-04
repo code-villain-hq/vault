@@ -23,6 +23,7 @@ pub fn read(raw: &[u8], summary: MailSummary) -> Message {
             answer_to: Vec::new(),
             sent_to: Vec::new(),
             copied: Vec::new(),
+            pictures: false,
         };
     };
 
@@ -97,6 +98,7 @@ pub fn read(raw: &[u8], summary: MailSummary) -> Message {
         answer_to,
         sent_to,
         copied,
+        pictures: false,
     }
 }
 

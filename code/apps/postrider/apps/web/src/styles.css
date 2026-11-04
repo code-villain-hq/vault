@@ -868,6 +868,21 @@ label.compose-from:focus-within {
 }
 
 /* A mail in HTML keeps its own look, on paper the app's theme doesn't touch. */
+/* Above a mail whose pictures wait: quiet, with the two ways on. */
+.pictures-held {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--muted);
+}
+.pictures-held > [role="alert"] {
+  flex-basis: 100%;
+}
 .paper {
   overflow: hidden;
   border-radius: var(--radius-lg);
