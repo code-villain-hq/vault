@@ -6,6 +6,9 @@
 //! `POST /drafts/delete` deletes one with nothing left in it. Sending it
 //! deletes it (`send.rs`).
 //!
+//! While Drafts can't be reached, a draft waits in the outbox
+//! (`outbox.rs`), shown in Drafts, and goes there once it can.
+//!
 //! A draft is written as its mail would go: your words, what it quotes or
 //! forwards below them, its files and its thread. What Postrider needs
 //! besides goes in its note, the `X-Postrider-Draft` header: whom it goes
@@ -199,18 +202,29 @@ impl Mail {
             &gathered.files,
             Purpose::Draft,
         )?;
-        let drafts = self
-            .folder_for(&account, FolderRole::Drafts)
+        let kept = async {
+            let drafts = self.folder_for(&account, FolderRole::Drafts).await?;
+            self.on_server(&account, |session| {
+                let (path, raw) = (drafts.path.clone(), written.kept.clone());
+                Box::pin(async move { imap::put_draft(session, &path, &raw).await })
+            })
             .await
-            .map_err(refused)?;
-        self.on_server(&account, |session| {
-            let (path, raw) = (drafts.path.clone(), written.kept.clone());
-            Box::pin(async move { imap::put_draft(session, &path, &raw).await })
-        })
-        .await
-        .map_err(refused)?;
-        if let (Some((was_in, place)), Some(was)) = (&gathered.drafted, &outgoing.draft) {
-            self.delete_draft_at(was_in, place, &was.message_id).await;
+        };
+        let waits = self.waits_to_send(account.id);
+        match if waits { Ok(()) } else { kept.await } {
+            Ok(()) if !waits => {
+                if let Some((account_id, message_id)) =
+                    self.replaced(outgoing.draft.as_ref()).await?
+                {
+                    self.delete_draft(account_id, &message_id).await;
+                }
+            }
+            Ok(()) | Err(Failure::Offline(_)) => {
+                let replaces = self.replaced(outgoing.draft.as_ref()).await?;
+                self.post(&account, crate::outbox::Posted::Draft, &written, replaces)
+                    .await?;
+            }
+            Err(failure) => return Err(refused(failure)),
         }
         Ok(DraftRef {
             account_id: account.id,
@@ -227,6 +241,9 @@ impl Mail {
     ) -> Result<Draft, AppError> {
         let refused = |failure: Failure| AppError::refused(failure.message());
         let account = self.account(workspace_id, account_id).await?;
+        if let Some(raw) = self.waiting_at(account.id, uid).await? {
+            return read(account.id, &raw);
+        }
         let gone = || AppError::not_found("This draft isn't in Drafts any more.");
         let place = self
             .drafts_of(&account)
@@ -254,76 +271,100 @@ impl Mail {
     ) -> Result<(), AppError> {
         let refused = |failure: Failure| AppError::refused(failure.message());
         let account = self.account(workspace_id, draft.account_id).await?;
-        let Some(place) = self.drafts_of(&account).await.map_err(refused)? else {
+        // One waiting here goes at once; what it replaces in Drafts waits
+        // to be deleted there, as one out of reach does.
+        let Some((account_id, message_id)) = self.replaced(Some(draft)).await? else {
             return Ok(());
         };
-        if !to_trash {
-            self.delete_draft_at(&account, &place, &draft.message_id)
-                .await;
-            return Ok(());
-        }
-        let trash = self
-            .folder_for(&account, FolderRole::Trash)
+        let account = if account_id == account.id {
+            account
+        } else {
+            self.account(workspace_id, account_id).await?
+        };
+        let dropped = async {
+            if self.waits_to_send(account.id) {
+                return Err(Failure::Offline("its changes wait".into()));
+            }
+            let Some(place) = self.drafts_of(&account).await? else {
+                return Ok(());
+            };
+            if !to_trash {
+                return self
+                    .on_server(&account, |session| {
+                        let (path, id) = (place.path.clone(), message_id.clone());
+                        Box::pin(async move { imap::delete_by_id(session, &path, &id).await })
+                    })
+                    .await;
+            }
+            let trash = self.folder_for(&account, FolderRole::Trash).await?;
+            self.on_server(&account, |session| {
+                let (from, id, to) = (place.path.clone(), message_id.clone(), trash.path.clone());
+                Box::pin(async move { imap::move_by_id(session, &from, &id, &to).await })
+            })
             .await
-            .map_err(refused)?;
-        self.on_server(&account, |session| {
-            let (from, id, to) = (
-                place.path.clone(),
-                draft.message_id.clone(),
-                trash.path.clone(),
-            );
-            Box::pin(async move { imap::move_by_id(session, &from, &id, &to).await })
-        })
-        .await
-        .map_err(refused)
+        };
+        match dropped.await {
+            Ok(()) => Ok(()),
+            Err(Failure::Offline(_)) => Ok(self.post_deletion(&account, &message_id).await?),
+            Err(failure) => Err(refused(failure)),
+        }
     }
 
-    /// A draft's source, found in its account's Drafts by its Message-ID:
-    /// `None` once it's gone.
+    /// A draft's source: waiting here, or found in its account's Drafts
+    /// by its Message-ID. `None` once it's gone.
     pub(crate) async fn draft_source(
         &self,
         account: &MailAccount,
         message_id: &str,
-    ) -> Result<Option<(Place, Vec<u8>)>, Failure> {
+    ) -> Result<Option<Vec<u8>>, Failure> {
         if message_id.is_empty() {
             return Ok(None);
+        }
+        if let Some(raw) = self.waiting_draft(account.id, message_id).await? {
+            return Ok(Some(raw));
         }
         let Some(place) = self.drafts_of(account).await? else {
             return Ok(None);
         };
-        let raw = self
-            .on_server(account, |session| {
-                let (path, id) = (place.path.clone(), message_id.to_string());
-                Box::pin(async move { imap::source_by_id(session, &path, &id).await })
-            })
-            .await?;
-        Ok(raw.map(|raw| (place, raw)))
+        self.on_server(account, |session| {
+            let (path, id) = (place.path.clone(), message_id.to_string());
+            Box::pin(async move { imap::source_by_id(session, &path, &id).await })
+        })
+        .await
     }
 
-    /// Deletes a draft for good, as one kept anew or sent is. A server that
-    /// refuses leaves it there, said in the log.
-    pub(crate) async fn delete_draft_at(
-        &self,
-        account: &MailAccount,
-        place: &Place,
-        message_id: &str,
-    ) {
-        if message_id.is_empty() {
-            return;
-        }
-        let deleted = self
-            .on_server(account, |session| {
-                let (path, id) = (place.path.clone(), message_id.to_string());
-                Box::pin(async move { imap::delete_by_id(session, &path, &id).await })
-            })
-            .await;
-        if let Err(failure) = deleted {
-            tracing::info!(address = %account.address, "couldn't delete a draft: {}", failure.message());
+    /// Deletes a draft for good, as one kept anew is, in the account
+    /// `account_id`. One out of reach waits to be deleted.
+    pub(crate) async fn delete_draft(&self, account_id: Uuid, message_id: &str) {
+        let deleted = async {
+            let account = self
+                .account_by_id(account_id)
+                .await
+                .map_err(|e| Failure::Offline(e.to_string()))?;
+            let Some(place) = self.drafts_of(&account).await? else {
+                return Ok(());
+            };
+            let found = self
+                .on_server(&account, |session| {
+                    let (path, id) = (place.path.clone(), message_id.to_string());
+                    Box::pin(async move { imap::delete_by_id(session, &path, &id).await })
+                })
+                .await;
+            if let Err(Failure::Offline(_)) = found {
+                self.post_deletion(&account, message_id)
+                    .await
+                    .map_err(|e| Failure::Offline(e.to_string()))?;
+                return Ok(());
+            }
+            found
+        };
+        if let Err(failure) = deleted.await {
+            tracing::info!("couldn't delete a draft: {}", failure.message());
         }
     }
 
     /// The account's Drafts: `None` while it has none.
-    async fn drafts_of(&self, account: &MailAccount) -> Result<Option<Place>, Failure> {
+    pub(crate) async fn drafts_of(&self, account: &MailAccount) -> Result<Option<Place>, Failure> {
         Ok(self
             .places(account)
             .await?

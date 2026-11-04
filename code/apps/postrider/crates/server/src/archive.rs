@@ -47,6 +47,7 @@ impl Mail {
                     ))
                 })?,
         };
+        self.not_waiting(account.id, &from.path, uid).await?;
         let (to, _) = self.destination(&account, to).await.map_err(refused)?;
         if from.path == to.path {
             return Ok(());

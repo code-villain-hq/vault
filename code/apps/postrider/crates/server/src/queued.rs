@@ -366,7 +366,8 @@ impl Mail {
         let waiting: Vec<(Uuid, i64)> = sqlx::query_as(
             "SELECT account_id, count(*) FROM ( \
                SELECT account_id FROM queued_mails WHERE account_id = ANY($1) \
-               UNION ALL SELECT account_id FROM queued_reads WHERE account_id = ANY($1)) q \
+               UNION ALL SELECT account_id FROM queued_reads WHERE account_id = ANY($1) \
+               UNION ALL SELECT account_id FROM outbox WHERE account_id = ANY($1)) q \
              GROUP BY account_id",
         )
         .bind(&ids)

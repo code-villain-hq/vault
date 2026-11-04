@@ -32,4 +32,8 @@ flagged: boolean,
 /**
  * Who it went to, in a list of sent mail, where that's what matters.
  */
-to_name: string | null, };
+to_name: string | null, 
+/**
+ * Sent, but waiting for its server to take it (the outbox).
+ */
+unsent: boolean, };

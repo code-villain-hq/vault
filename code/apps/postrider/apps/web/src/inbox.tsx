@@ -330,9 +330,16 @@ function MailRow({
             {all.length}
           </span>
         )}
-        <time className="when" dateTime={last.date} title={new Date(last.date).toLocaleString()}>
-          {mailTime(last.date, now)}
-        </time>
+        {last.unsent ? (
+          // In the outbox: it goes once its server can be reached.
+          <span className="when" title="Goes once its server can be reached">
+            Not sent yet
+          </span>
+        ) : (
+          <time className="when" dateTime={last.date} title={new Date(last.date).toLocaleString()}>
+            {mailTime(last.date, now)}
+          </time>
+        )}
         <span className="subject">{mail.subject || "(no subject)"}</span>
         {flagged && (
           <Flag

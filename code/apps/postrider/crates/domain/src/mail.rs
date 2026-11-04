@@ -302,6 +302,9 @@ pub struct MailSummary {
     pub flagged: bool,
     /// Who it went to, in a list of sent mail, where that's what matters.
     pub to_name: Option<String>,
+    /// Sent, but waiting for its server to take it (the outbox).
+    #[serde(default)]
+    pub unsent: bool,
 }
 
 /// The unified Inbox: every account's newest mail, newest first.

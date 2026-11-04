@@ -1173,6 +1173,7 @@ pub(crate) fn as_read(raw: &[u8], account_id: Uuid, at_most: usize) -> String {
         seen: true,
         flagged: false,
         to_name: None,
+        unsent: false,
     };
     let opened = message::read(raw, summary);
     let mut body: String = opened.text.chars().take(at_most).collect();

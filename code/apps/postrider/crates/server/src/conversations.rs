@@ -315,6 +315,7 @@ impl Mail {
                         // Kept for conversations without its flags.
                         flagged: false,
                         to_name,
+                        unsent: false,
                     };
                     let joins = Joins {
                         message_id,
@@ -542,6 +543,7 @@ mod tests {
             seen: true,
             flagged: false,
             to_name: None,
+            unsent: false,
         }
     }
 

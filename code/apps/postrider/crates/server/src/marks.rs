@@ -51,6 +51,7 @@ impl Mail {
                     ))
                 })?,
         };
+        self.not_waiting(account.id, &place.path, uid).await?;
         let mut waits = self.waits(account.id, &place.path, uid).await?;
         if !waits {
             let marked = self
@@ -154,6 +155,7 @@ impl Mail {
                 seen,
                 flagged: true,
                 to_name: None,
+                unsent: false,
             });
         }
         for (account_id, place, line) in self.kept_lines(&ids, true).await? {

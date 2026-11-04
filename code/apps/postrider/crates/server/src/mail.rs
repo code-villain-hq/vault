@@ -100,6 +100,9 @@ pub struct Mail {
     /// Held while what waited for a server is done there (`queued.rs`), so
     /// the watcher and the keeper never both do it.
     pub(crate) replaying: tokio::sync::Mutex<()>,
+    /// Held while what waits in the outbox is sent (`outbox.rs`), so it
+    /// never goes twice.
+    pub(crate) sending: tokio::sync::Mutex<()>,
 }
 
 impl Mail {
@@ -120,6 +123,7 @@ impl Mail {
             marked: Mutex::default(),
             uploads: Mutex::default(),
             replaying: tokio::sync::Mutex::default(),
+            sending: tokio::sync::Mutex::default(),
         }
     }
 
@@ -341,6 +345,7 @@ impl Mail {
                         seen,
                         flagged,
                         to_name: None,
+                        unsent: false,
                     };
                     let joins = Joins {
                         message_id,
@@ -414,6 +419,7 @@ impl Mail {
             seen: true,
             flagged,
             to_name: None,
+            unsent: false,
         };
         Ok(message::opened(&raw, summary))
     }
@@ -780,6 +786,8 @@ impl Mail {
             self.bump();
         }
         self.set(account.id, AccountState::Online, None);
+        // The keeper sends what's in the outbox (`outbox.rs`) now.
+        self.keep_now();
         tracing::debug!(address = %account.address, "online in {} ms", began.elapsed().as_millis());
         let set_aside = self.set_newsletters_aside(account).await;
         {

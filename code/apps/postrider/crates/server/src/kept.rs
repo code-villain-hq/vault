@@ -81,6 +81,8 @@ pub async fn keep(mail: Arc<Mail>) {
                 );
                 continue;
             }
+            // Then what was sent or kept while it couldn't be reached.
+            mail.send_waiting(account).await;
             match mail.count(account).await {
                 Ok((kept, folders)) => {
                     changed |= kept;
@@ -787,11 +789,13 @@ impl Mail {
         // What waits for the server (`queued.rs`) stays as it was done
         // here: a mail moved here keeps its line, one moved away isn't
         // kept again, and one marked read or unread, flagged or not, stays
-        // so.
+        // so. So does a mail in the outbox (`outbox.rs`).
         let gone = sqlx::query(
             "DELETE FROM folder_mails m WHERE account_id = $1 AND path = $2 \
              AND NOT uid = ANY($3) AND NOT EXISTS (SELECT 1 FROM queued_mails q \
-               WHERE q.account_id = $1 AND q.to_path = $2 AND q.placeholder = m.uid)",
+               WHERE q.account_id = $1 AND q.to_path = $2 AND q.placeholder = m.uid) \
+             AND NOT EXISTS (SELECT 1 FROM outbox o \
+               WHERE o.account_id = $1 AND o.shown_path = $2 AND o.placeholder = m.uid)",
         )
         .bind(account_id)
         .bind(&place.path)

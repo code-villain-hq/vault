@@ -302,6 +302,7 @@ mod tests {
             seen: false,
             flagged: false,
             to_name: None,
+            unsent: false,
         }
     }
 

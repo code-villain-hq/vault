@@ -521,6 +521,7 @@ impl Mail {
             }
         }
         self.count_waiting(&mut listed.problems).await?;
+        self.mark_unsent(&mut listed.mails).await?;
         Ok(listed)
     }
 
@@ -619,6 +620,7 @@ impl Mail {
                 seen,
                 flagged,
                 to_name: None,
+                unsent: false,
             };
             if has_words(&mail, words) {
                 found.entry(account_id).or_default().push(mail);
@@ -840,6 +842,7 @@ pub(crate) fn summary(account_id: Uuid, place: &Place, line: Line) -> MailSummar
         seen: line.seen,
         flagged: line.flagged,
         to_name: (place.role == Some(FolderRole::Sent)).then_some(to_name),
+        unsent: false,
     }
 }
 
@@ -1028,6 +1031,7 @@ mod tests {
             seen: true,
             flagged: false,
             to_name: Some("Kristina".into()),
+            unsent: false,
         }
     }
 

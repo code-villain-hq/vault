@@ -34,15 +34,16 @@ use lettre::message::{Attachment, Mailbox, Mailboxes, MessageBuilder, MultiPart,
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use mail_parser::MessageParser;
-use postrider_domain::{Attach, FolderRole, MailAccount, NewUpload, Outgoing, Upload, Validate};
+use postrider_domain::{Attach, MailAccount, NewUpload, Outgoing, Upload, Validate};
 use uuid::Uuid;
 
 use crate::auth::Member;
 use crate::drafts::{self, DraftNote};
 use crate::error::AppError;
-use crate::imap::{self, Failure, Place};
+use crate::imap::{Failure, Place};
 use crate::mail::Mail;
 use crate::message;
+use crate::outbox::Posted;
 use crate::state::AppState;
 
 /// Where the SMTP stand-in listens, beside the IMAP one.
@@ -100,8 +101,6 @@ pub(crate) struct Gathered {
     pub files: Vec<message::File>,
     /// The mail it answers, where it is: marked answered once it's sent.
     pub answered: Option<(MailAccount, Place, i64)>,
-    /// Its draft, where it is in Drafts.
-    pub drafted: Option<(MailAccount, Place)>,
 }
 
 /// A mail written: as it goes out, and as it's kept, with its Bcc.
@@ -112,7 +111,9 @@ pub(crate) struct Written {
 }
 
 impl Mail {
-    /// Sends `outgoing` from the account it names.
+    /// Sends `outgoing` from the account it names. While its server can't
+    /// be reached, it waits in the outbox (`outbox.rs`) and goes once it
+    /// can; either way its copy shows in Sent at once.
     pub async fn send_mail(
         self: &Arc<Self>,
         workspace_id: Uuid,
@@ -134,33 +135,34 @@ impl Mail {
             .password(&sender)
             .await
             .map_err(|failure| AppError::refused(failure.message()))?;
-        send(&sender, password, written.message).await?;
+        let envelope = written.message.envelope().clone();
+        let raw = written.message.formatted();
+        let unsent = match deliver(&sender, password, &envelope, &raw).await {
+            Ok(()) => None,
+            Err(Unsent::Waits(why)) => {
+                tracing::info!(address = %sender.address, "couldn't send a mail, so it waits: {why}");
+                Some((envelope, raw))
+            }
+            Err(Unsent::Refused(why)) => return Err(AppError::refused(why)),
+        };
         self.forget_uploads(&outgoing.files);
 
-        // Sent, it's done: the copy, its draft gone and the mark follow
-        // without waiting.
-        let (answered, drafted) = (gathered.answered, gathered.drafted);
-        let draft = outgoing.draft.clone();
-        let mail = Arc::clone(self);
-        tokio::spawn(async move {
-            mail.file_sent(&sender, written.kept).await;
-            if let (Some((account, place)), Some(draft)) = (drafted, draft) {
-                mail.delete_draft_at(&account, &place, &draft.message_id)
-                    .await;
-            }
-            let Some((account, place, uid)) = answered else {
-                return;
-            };
-            let marked = mail
-                .on_server(&account, |session| {
-                    let path = place.path.clone();
-                    Box::pin(async move { imap::mark_answered(session, &path, uid).await })
-                })
-                .await;
-            if let Err(failure) = marked {
-                tracing::info!(address = %account.address, "couldn't mark answered: {}", failure.message());
-            }
-        });
+        // Sent or waiting, it's done here: its copy in Sent, its draft
+        // gone and the mail it answers marked follow, now or once its
+        // server can be reached.
+        let replaces = self.replaced(outgoing.draft.as_ref()).await?;
+        let answered = gathered
+            .answered
+            .map(|(account, place, uid)| (account.id, place.path, uid));
+        self.post(
+            &sender,
+            Posted::Send { unsent, answered },
+            &written,
+            replaces,
+        )
+        .await?;
+        let (mail, account) = (Arc::clone(self), sender);
+        tokio::spawn(async move { mail.send_waiting(&account).await });
         Ok(())
     }
 
@@ -174,16 +176,15 @@ impl Mail {
         outgoing: &Outgoing,
     ) -> Result<Gathered, AppError> {
         let refused = |failure: Failure| AppError::refused(failure.message());
-        let (mut drafted, mut draft_raw) = (None, None);
+        let mut draft_raw = None;
         if let Some(draft) = &outgoing.draft {
             let account = self.account(workspace_id, draft.account_id).await?;
-            if let Some((place, raw)) = self
-                .draft_source(&account, &draft.message_id)
-                .await
-                .map_err(refused)?
-            {
-                drafted = Some((account, place));
-                draft_raw = Some(raw);
+            match self.draft_source(&account, &draft.message_id).await {
+                Ok(raw) => draft_raw = raw,
+                // Out of reach, what's below your words comes from the
+                // mail it answers, as before it was kept.
+                Err(Failure::Offline(_)) => {}
+                Err(failure) => return Err(refused(failure)),
             }
         }
         let (mut answered, mut answers_raw, mut forwards_raw) = (None, None, None);
@@ -234,7 +235,6 @@ impl Mail {
             below,
             files,
             answered,
-            drafted,
         })
     }
 
@@ -363,26 +363,6 @@ impl Mail {
             .parse()
             .map_err(|_| AppError::invalid("This account's address isn't one to send from."))?;
         Ok(Mailbox::new(Some(name), address))
-    }
-
-    /// Puts a sent mail in its account's Sent, as the account's other mail
-    /// apps would; its server doesn't. Then the Inbox changes, so its
-    /// conversation reads Sent again and shows it (`conversations::keep`).
-    async fn file_sent(&self, account: &MailAccount, raw: Vec<u8>) {
-        let filed = async {
-            let sent = self.folder_for(account, FolderRole::Sent).await?;
-            self.on_server(account, |session| {
-                let (path, raw) = (sent.path.clone(), raw.clone());
-                Box::pin(async move { imap::put(session, &path, &raw).await })
-            })
-            .await
-        };
-        match filed.await {
-            Ok(()) => self.bump(),
-            Err(failure) => {
-                tracing::info!(address = %account.address, "couldn't put it in Sent: {}", failure.message())
-            }
-        }
     }
 }
 
@@ -722,12 +702,34 @@ fn parts(typed: &str) -> Vec<String> {
         .collect()
 }
 
+/// Why a mail didn't go.
+pub(crate) enum Unsent {
+    /// Its server can't be reached, or can't take it right now: it waits.
+    Waits(String),
+    /// Its server refused it, or the account's password.
+    Refused(String),
+}
+
 /// Sends `message` over the account's SMTP server.
 pub(crate) async fn send(
     account: &MailAccount,
     password: String,
     message: lettre::Message,
 ) -> Result<(), AppError> {
+    deliver(account, password, message.envelope(), &message.formatted())
+        .await
+        .map_err(|unsent| match unsent {
+            Unsent::Waits(why) | Unsent::Refused(why) => AppError::refused(why),
+        })
+}
+
+/// Sends `raw` over the account's SMTP server, to whom `envelope` names.
+pub(crate) async fn deliver(
+    account: &MailAccount,
+    password: String,
+    envelope: &Envelope,
+    raw: &[u8],
+) -> Result<(), Unsent> {
     let credentials = Credentials::new(account.username.clone(), password);
     let host = smtp_host(&account.host);
     let transport = if is_this_mac(&host) {
@@ -738,26 +740,31 @@ pub(crate) async fn send(
             .build()
     } else {
         AsyncSmtpTransport::<Tokio1Executor>::relay(&host)
-            .map_err(|e| AppError::refused(format!("Couldn't reach {host} to send it: {e}.")))?
+            .map_err(|e| Unsent::Refused(format!("Couldn't reach {host} to send it: {e}.")))?
             .credentials(credentials)
             .timeout(Some(TIMEOUT))
             .build()
     };
-    transport.send(message).await.map(drop).map_err(|e| {
-        let message = if e.status().is_some_and(|code| code.to_string() == "535") {
-            format!(
-                "{host} didn't take {}'s password for sending.",
-                account.address
-            )
-        } else if e.is_permanent() {
-            format!("{host} refused it: {e}.")
-        } else if e.is_transient() {
-            format!("{host} can't take it right now: {e}. Try again in a moment.")
-        } else {
-            format!("Couldn't reach {host} to send it: {e}.")
-        };
-        AppError::refused(message)
-    })
+    transport
+        .send_raw(envelope, raw)
+        .await
+        .map(drop)
+        .map_err(|e| {
+            if e.status().is_some_and(|code| code.to_string() == "535") {
+                Unsent::Refused(format!(
+                    "{host} didn't take {}'s password for sending.",
+                    account.address
+                ))
+            } else if e.is_permanent() {
+                Unsent::Refused(format!("{host} refused it: {e}."))
+            } else if e.is_transient() {
+                Unsent::Waits(format!(
+                    "{host} can't take it right now: {e}. Try again in a moment."
+                ))
+            } else {
+                Unsent::Waits(format!("Couldn't reach {host} to send it: {e}."))
+            }
+        })
 }
 
 /// The account's SMTP server: its IMAP server, `imap.` read as `smtp.`.

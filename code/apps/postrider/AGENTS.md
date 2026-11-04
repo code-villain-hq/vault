@@ -173,8 +173,21 @@ the server refuses then (the mail gone meanwhile, the folder deleted) is
 let go, and the mail shows where its server has it. The account's line
 above a list says how many changes wait (`AccountStatus.waiting`).
 Renaming, deleting, emptying or making a folder (a new one to move to,
-or Archive or Trash where the account has none yet), sending and keeping
-drafts still need the server.
+or Archive or Trash where the account has none yet) still need the
+server.
+
+Mail you send, and drafts you keep, wait in the outbox (`outbox.rs`,
+the `outbox` table) while their servers can't be reached. A mail to send
+keeps what goes over SMTP until it went, then its copy for Sent until
+it's there; it shows in Sent at once under a UID below zero, its line
+reading "Not sent yet" (`MailSummary.unsent`). A draft shows in Drafts
+the same way, and keeping it again, sending it or trashing it takes its
+place in the outbox. The keeper sends what waits after it replays
+`queued.rs`, oldest first, then deletes the draft each mail came from
+and marks the mail it answers answered. A mail the SMTP server refuses
+goes back to Drafts; a draft the IMAP server refuses stays here. What
+waits can't be moved or marked until it's on its server, and counts
+among the changes that wait.
 
 `GET /api/w/{id}/folders` lists
 every account's folders, each once by its role (Sent, Archive, Drafts,
@@ -601,7 +614,7 @@ Like the ask field's, what it needs is kept in memory.
 - `crates/server`: axum server: the API, the sync feed, IMAP (`imap.rs`,
   `mail.rs`, the folders and search in `folders.rs`, what this Mac keeps
   of them in `kept.rs`, what waits for a server that can't be reached in
-  `queued.rs`, read and flagged marks in `marks.rs`, conversations in
+  `queued.rs` and what's sent or kept meanwhile in `outbox.rs`, read and flagged marks in `marks.rs`, conversations in
   `conversations.rs`), reading a mail
   (`message.rs`, its list line in `preview.rs`, without the `[1]` a
   text part numbers its links with, HTML tags or entities; a migration
