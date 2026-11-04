@@ -987,7 +987,9 @@ body {
 }
 .pc-table {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 140px 84px auto;
+  /* The rows are subgrids: their 12px padding comes out of the first and last
+     columns, so the avatar's column holds it too. */
+  grid-template-columns: 38px minmax(0, 1fr) 140px 84px auto;
   column-gap: 12px;
 }
 .pc {
@@ -1052,7 +1054,7 @@ body {
     padding-inline: 4px;
   }
   .pc-table {
-    grid-template-columns: 26px minmax(0, 1fr) auto;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
   }
   .pc .st,
   .pc .lw {
