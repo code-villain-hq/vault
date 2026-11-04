@@ -1,11 +1,13 @@
 // A row of a list dragged onto a folder in the sidebar moves its mail
 // there, as V does: one mail, or from the Inbox all of a conversation's
 // Inbox mail. The Inbox, Archive, Junk, Trash and your own folders take
-// it, but not the folder it's in.
+// it, but not the folder it's in. Dropped on Flagged, it's flagged and
+// stays where it is.
 
 import type { Folder } from "@postrider/types";
 import { type DragEvent, useState } from "react";
 import type { From } from "./inbox";
+import { useMarkMail } from "./marks";
 import { type Going, useMoveMail } from "./move";
 
 /** What a row carries while it's dragged. */
@@ -24,7 +26,8 @@ export function carry(event: DragEvent<HTMLElement>, what: Carried, label: strin
   carried = what;
   const row = event.currentTarget;
   const rect = row.getBoundingClientRect();
-  event.dataTransfer.effectAllowed = "move";
+  // Moved onto a folder, or flagged (a link to it) onto Flagged.
+  event.dataTransfer.effectAllowed = "linkMove";
   // A link carries its address; the row carries what it's about.
   event.dataTransfer.clearData();
   event.dataTransfer.setData("text/plain", label);
@@ -78,6 +81,38 @@ export function useDrop(key: string) {
       carried = undefined;
       moveMail(going, { to: key }, what.from);
       what.close?.();
+    },
+  };
+  return { over, handlers };
+}
+
+/** Flagged in the sidebar: a row dropped on it is flagged, and stays in its list. */
+export function useFlagDrop() {
+  const markMail = useMarkMail();
+  const [over, setOver] = useState(false);
+  // The mail the row opens, as S flags it: a conversation's newest in the
+  // Inbox. A row flagged already, any of it, isn't flagged again.
+  const target = () => {
+    const going = carried?.going ?? [];
+    return going.some(({ mail }) => mail.flagged) ? undefined : going.at(-1)?.mail;
+  };
+  const handlers = {
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (!target()) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "link";
+      setOver(true);
+    },
+    onDragLeave: (event: DragEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
+    },
+    onDrop: (event: DragEvent<HTMLElement>) => {
+      setOver(false);
+      const mail = target();
+      if (!mail) return;
+      event.preventDefault();
+      carried = undefined;
+      markMail([{ mail, marks: { flagged: true } }]);
     },
   };
   return { over, handlers };

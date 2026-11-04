@@ -42,9 +42,9 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import { NewMailProvider, useNewMail } from "./compose";
-import { takesMail, useDrop } from "./drag";
+import { takesMail, useDrop, useFlagDrop } from "./drag";
 import { FolderMenu, useCountHidden } from "./folder-menu";
-import { InboxProvider, useFolders, useInbox, useUnread } from "./mail";
+import { InboxProvider, useAccounts, useFolders, useInbox, useUnread } from "./mail";
 import { isDesktop } from "./platform";
 import { setCurrentPlace } from "./server";
 import {
@@ -240,6 +240,7 @@ function Sidebar() {
           status={useSyncStatus()}
           refusals={useWorkspace().refusals}
           syncing={useInbox().syncing}
+          away={useAway()}
         />
         <SyncButton />
         <ShortcutsButton />
@@ -302,6 +303,7 @@ function MailNav() {
   );
   const inboxMarked = useCountHidden("inbox");
   const inboxDrop = useDrop("inbox");
+  const flagDrop = useFlagDrop();
   const newslettersMarked = useCountHidden(newsletters?.key ?? "newsletters");
   return (
     <nav aria-label="Mail" className="flex flex-col gap-4">
@@ -335,7 +337,8 @@ function MailNav() {
         <Link
           to="/$workspace/flagged"
           params={{ workspace: workspace.url_key }}
-          className={`${navLink} ${list === FLAGGED ? "active" : ""}`}
+          className={`${navLink} ${list === FLAGGED ? "active" : ""} ${flagDrop.over ? dropping : ""}`}
+          {...flagDrop.handlers}
         >
           <NavIcon icon={Flag} />
           Flagged
@@ -545,6 +548,25 @@ function WorkspaceMenu() {
       </Menu.Portal>
     </Menu.Root>
   );
+}
+
+/**
+ * The footer's word for accounts whose servers can't be reached: "Offline"
+ * when none can, else the first one's name, and the changes that wait.
+ */
+function useAway(): string | undefined {
+  const statuses = useInbox().inbox?.accounts ?? [];
+  const accounts = useAccounts();
+  // A refused account (a wrong password) has its own line above the list.
+  const away = statuses.filter((s) => s.state === "offline");
+  if (away.length === 0) return undefined;
+  const waiting = away.reduce((sum, s) => sum + s.waiting, 0);
+  const name = accounts.find((a) => a.id === away[0]?.account_id)?.name;
+  const who =
+    away.length === statuses.length || !name
+      ? "Offline"
+      : `${name}${away.length > 1 ? ` and ${away.length - 1} more` : ""} offline`;
+  return waiting > 0 ? `${who} · ${waiting} waiting` : who;
 }
 
 /** Postrider's own shortcuts; the kit's list adds "Anywhere" and "Menus". */

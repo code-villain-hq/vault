@@ -326,6 +326,48 @@ impl Mail {
                     (summary, joins)
                 },
             )
+            .chain(self.unsent(workspace_id).await?)
+            .collect())
+    }
+
+    /// Mail in the outbox (`outbox.rs`) that isn't in Sent yet, as if it
+    /// were: it joins its conversation at once, "Not sent yet".
+    async fn unsent(&self, workspace_id: Uuid) -> Result<Vec<(MailSummary, Joins)>, sqlx::Error> {
+        let rows: Vec<(Uuid, i64, Vec<u8>)> = sqlx::query_as(
+            "SELECT o.account_id, o.placeholder, o.kept FROM outbox o \
+             JOIN mail_accounts a ON a.id = o.account_id \
+             WHERE a.workspace_id = $1 AND o.kind = 'send' \
+             AND o.placeholder IS NOT NULL AND o.kept IS NOT NULL",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|(account_id, uid, kept)| {
+                let line = imap::summarize(&kept, None);
+                let summary = MailSummary {
+                    account_id,
+                    folder: Some(FolderRole::Sent.key().to_string()),
+                    uid,
+                    from_name: line.from_name,
+                    from_address: line.from_address,
+                    subject: line.subject,
+                    snippet: line.snippet,
+                    date: line.date,
+                    seen: true,
+                    flagged: false,
+                    to_name: Some(line.to_name),
+                    unsent: true,
+                };
+                let joins = Joins {
+                    message_id: line.message_id,
+                    refs: line.threading.refs,
+                    to_addresses: line.threading.to_addresses,
+                    reply_to: line.threading.reply_to,
+                };
+                (summary, joins)
+            })
             .collect())
     }
 }

@@ -286,14 +286,14 @@ impl Mail {
                 self.bump();
                 self.keep_now();
             }
+            // It waits for the keeper's next round: waking it now would
+            // only try again at once.
             Err(failure) => {
                 tracing::info!(
                     address = %account.address,
                     "couldn't send what waits in the outbox: {}",
                     failure.message()
                 );
-                self.bump();
-                self.keep_now();
             }
         }
     }
@@ -332,6 +332,7 @@ impl Mail {
                         .execute(&mut *tx)
                         .await?;
                         tx.commit().await?;
+                        self.bump();
                         waiting.kind = "draft".into();
                         (waiting.shown_path, waiting.placeholder) = (None, None);
                         (waiting.answered_account, waiting.answered_uid) = (None, None);

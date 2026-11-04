@@ -186,9 +186,14 @@ the same way, and keeping it again, sending it or trashing it takes its
 place in the outbox. The keeper sends what waits after it replays
 `queued.rs`, oldest first, then deletes the draft each mail came from
 and marks the mail it answers answered. A mail the SMTP server refuses
-goes back to Drafts; a draft the IMAP server refuses stays here. What
-waits can't be moved or marked until it's on its server, and counts
-among the changes that wait.
+goes back to Drafts; a draft the IMAP server refuses stays here. A
+server that can't be reached is tried again on the keeper's next round,
+not at once. A reply waiting to be sent shows in its Inbox conversation
+too. What waits can't be moved or marked until it's on its server, and
+counts among the changes that wait. The status at the sidebar's foot
+names the accounts that are offline and how much waits, "Lazarski
+offline · 1 waiting", in place of Synced (`away` on the kit's
+`SyncIndicator`).
 
 `GET /api/w/{id}/folders` lists
 every account's folders, each once by its role (Sent, Archive, Drafts,
@@ -294,7 +299,10 @@ Offline, moving and reading wait for it (above).
   Inbox mail, and the kept lines' of the folders a search asks, newest
   first. The Inbox's copy keeps flagged mail however old, and the
   keeper's stamp counts HIGHESTMODSEQ, so a flag set elsewhere is read.
-  Mail unflagged while Flagged shows stays in it until you leave.
+  Mail unflagged while Flagged shows stays in it until you leave. Inbox
+  mail opened from Flagged shows its whole conversation, but marks and
+  moves only itself. A row dropped on Flagged is flagged and stays where
+  it is (`useFlagDrop` in `drag.tsx`).
 - R replies (`send.rs`, `compose.tsx`): to the mail's Reply-To, else its
   sender, from the account it came to, in its thread, quoting it. A
   replies to all: to them, and in Cc to whom else the mail went to and

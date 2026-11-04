@@ -55,7 +55,8 @@ import { useWorkspace } from "./workspace";
 /**
  * `/$workspace/mail/$account/$uid`: a mail, opened beside the list it was
  * opened from: the Inbox, a folder (`?folder=`) or a search (`?q=`). From
- * the Inbox it opens its whole conversation, oldest first. Esc closes it;
+ * the Inbox, or Inbox mail from Flagged, it opens its whole
+ * conversation, oldest first. Esc closes it;
  * J and K, or ↓ and ↑, open the next and the previous one in the list,
  * while Space and the wheel scroll the mail; E archives it, ⌫ deletes it
  * and V moves it to a folder, the conversation's Inbox mail all at once,
@@ -82,6 +83,13 @@ export function MailPage() {
   const own = useMemo(() => ownAddresses(accounts), [accounts]);
   const folder = from.folder;
   const conversation = listed ? undefined : inbox?.conversations.find((c) => hasMail(c, key));
+  // Inbox mail opened from Flagged shows its whole conversation too, but
+  // is stepped through, marked and moved alone, as its row in Flagged is.
+  const whole =
+    conversation ??
+    (from.flagged && from.folder === undefined
+      ? inbox?.conversations.find((c) => hasMail(c, key))
+      : undefined);
   // The Inbox steps by conversation, as its rows do; the other lists by
   // mail; both through what the list's filter shows.
   const rows = useMemo(
@@ -93,8 +101,8 @@ export function MailPage() {
   const index = mails.findIndex((mail) => mailKey(mail) === (at ? mailKey(at) : key));
   const [answering, setAnswering] = useState<Answering>();
   const [moving, setMoving] = useState(false);
-  const letters: Letter[] = conversation
-    ? conversation.mails.map((mail) => ({
+  const letters: Letter[] = whole
+    ? whole.mails.map((mail) => ({
         key: mailKey(mail),
         account: mail.account_id,
         uid: mail.uid,
@@ -131,10 +139,10 @@ export function MailPage() {
   // A conversation's answer goes to the last who wrote in it but you.
   const answered = drafting
     ? undefined
-    : conversation
-      ? (conversation.mails.findLast((mail) => !isYours(mail, own)) ?? conversation.mails.at(-1))
+    : whole
+      ? (whole.mails.findLast((mail) => !isYours(mail, own)) ?? whole.mails.at(-1))
       : summary;
-  const answeredKey = answered && (conversation ? mailKey(answered) : key);
+  const answeredKey = answered && (whole ? mailKey(answered) : key);
   const unfolded = useUnfolded(thread, letters, [key, answeredKey]);
   // Read or not, flagged or not, as its row in the list says now: a
   // conversation as its Inbox mail is.

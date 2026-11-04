@@ -13,12 +13,18 @@ export function SyncIndicator({
   status,
   refusals,
   syncing = false,
+  away,
 }: {
   status: SyncState;
   /** Raises "refused", with the server's reason, when a change is turned down. */
   refusals: EventTarget;
   /** A sync someone asked for, with the app's sync button, is on its way. */
   syncing?: boolean;
+  /**
+   * What the app relies on beyond its own server and can't reach now, as
+   * "Lazarski offline · 1 waiting": shown in place of Synced.
+   */
+  away?: string;
 }) {
   const refused = useLatestRefusal(refusals);
   // Changes usually reach the server in a blink; saying "Syncing" for that
@@ -34,6 +40,7 @@ export function SyncIndicator({
     return <Pill tone="warn" label={`Offline${waiting}`} />;
   }
   if (syncing) return <Pill tone="muted" label="Syncing…" />;
+  if (away) return <Pill tone="warn" label={away} />;
   if (status.connection === "connecting" && !status.ready) {
     return <Pill tone="muted" label="Connecting…" />;
   }
