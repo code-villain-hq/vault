@@ -56,8 +56,12 @@ function same(a: string | undefined, b: string) {
   return a !== undefined && a.toLowerCase() === b.toLowerCase();
 }
 
-const item =
+/** A menu's item and its popup, as every right-click menu has them. */
+export const item =
   "ui-option flex cursor-default items-center gap-2 px-2 py-1.5 outline-none select-none data-disabled:opacity-60";
+
+export const popup =
+  "ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0";
 
 /** A sidebar item with its menu around it. `own` is one of your own folders. */
 export function FolderMenu({
@@ -204,7 +208,7 @@ export function FolderMenu({
                     ? (area.current?.querySelector<HTMLElement>("a") ?? false)
                     : false
               }
-              className="ui-menu min-w-52 origin-(--transform-origin) p-1 outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0"
+              className={popup}
             >
               {items.map(({ label, run, asks, disabled }) => (
                 <ContextMenu.Item

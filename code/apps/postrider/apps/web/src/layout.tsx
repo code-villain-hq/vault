@@ -556,6 +556,7 @@ const SECTIONS: ShortcutSection[] = [
       ["Enter or O", "Open the mail"],
       ["⇧U", "Mark it unread, or read"],
       ["S", "Flag it, or unflag it"],
+      ["⇧F10", "Its menu: reply, mark, archive, move, delete"],
       ["F", "All mail, only unread or only read, with no mail open"],
       ["/", "Search mail"],
     ],

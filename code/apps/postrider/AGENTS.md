@@ -11,7 +11,8 @@ R to reply, A to reply to all, F to forward, ⇧U to mark it unread
 (or read), S to flag it, and its files to open. Flagged, in the
 sidebar, lists every account's flagged mail. A folder's name in the top bar renames
 it; a right click on a sidebar item, or ⇧F10 on it, marks it all read,
-renames or deletes it, or empties Trash and Junk. A mail opens beside its list, in three columns: the
+renames or deletes it, or empties Trash and Junk; one on a mail in a list, or
+⇧F10 on its row, replies, marks, archives, moves or deletes it. A mail opens beside its list, in three columns: the
 sidebar, the list, the mail. Esc closes it, J and K or ↓ and ↑ move. A narrow window
 shows the list or the mail, with a way back. The desktop app notifies of
 new mail and counts what's unread on the dock. Step 2 is built too: the
@@ -257,6 +258,13 @@ Offline, moving and reading wait for it (above).
   `POST /folders/{key}/rename`): in every account that has it, with the
   rules that sort into it, Sieve's and reading ones. Sent, Archive and the
   other role folders keep their names.
+- Every row of a list has a menu (`mail-menu.tsx`; a right click, or
+  ⇧F10 or the menu key on the focused row): Reply, Reply all and Forward
+  open the mail and start the answer there; Mark as read or unread, Flag
+  or Unflag, Archive, Move to… and Delete are done from the list, on a
+  conversation's Inbox mail all together, as the keys beside them do on
+  an open mail. A draft has no answers, Archive and Trash don't offer
+  themselves, and mail in the outbox is greyed until it's on its server.
 - Every sidebar item has a menu (`folder-menu.tsx`; a right click, or
   ⇧F10 or the menu key on the focused item) with what that item can do,
   greyed where it can't now: Mark all as read with nothing unread. Mark

@@ -43,6 +43,7 @@ import {
 } from "./inbox";
 import { PageBody } from "./layout";
 import { hue, useAccounts, useFolders, useInbox } from "./mail";
+import { takeAnswerAsked } from "./mail-menu";
 import { flaggedRow, flagToggle, readToggle, useMarkMail } from "./marks";
 import { conversationGoing, MoveDialog, openList, useMoveMail } from "./move";
 import { pageName } from "./newsletters";
@@ -144,6 +145,13 @@ export function MailPage() {
   const flagged = row !== undefined && flaggedRow(row);
 
   useEffect(() => rememberOpened(key), [key]);
+
+  // Reply, Reply all or Forward from a list's menu.
+  useEffect(() => {
+    if (!answered) return;
+    const how = takeAnswerAsked(account, Number(uid));
+    if (how) setAnswering(how);
+  }, [account, uid, answered]);
 
   const open = (mail: MailSummary | undefined) => {
     if (!mail) return;

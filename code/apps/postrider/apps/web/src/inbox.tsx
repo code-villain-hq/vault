@@ -9,6 +9,7 @@ import { carry, putDown } from "./drag";
 import { SearchField } from "./folders";
 import { PageBody, PageHeader } from "./layout";
 import { clockTime, hue, mailTime, useAccounts, useInbox } from "./mail";
+import { MailMenu } from "./mail-menu";
 import { flaggedRow, flagToggle, readToggle, useMarkMail } from "./marks";
 import { conversationGoing, openList } from "./move";
 import { listOf, NoneShown, pick, ShownControl, useShown } from "./shown";
@@ -144,6 +145,7 @@ export function useRowsShown(from: From, rows: Row[], open: string | undefined):
  * not (`marks.tsx`). The Inbox lists `conversations`, the others `mails`, as
  * its filter shows them: all, unread or read. A row dragged onto a folder
  * in the sidebar moves there (`drag.tsx`); the open one closes, as E does.
+ * A right click, or ⇧F10 on the focused row, opens its menu (`mail-menu.tsx`).
  */
 export function MailList({
   mails,
@@ -202,6 +204,20 @@ export function MailList({
         // G then S goes to Sent: the shortcuts took that S already.
         event.preventDefault();
         markMail(flagToggle(rows[focused]));
+      } else if ((key === "F10" && event.shiftKey) || key === "ContextMenu") {
+        // The focused row's menu, under it.
+        const row = list.current?.querySelector<HTMLElement>(`[data-index="${focused}"]`);
+        if (!row) return;
+        event.preventDefault();
+        const rect = row.getBoundingClientRect();
+        row.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            clientX: rect.left + 16,
+            clientY: rect.bottom,
+          }),
+        );
       } else if ((key === "Enter" && event.target === document.body) || key === "o") {
         const mail = rows[focused]?.mail;
         if (!mail) return;
@@ -297,7 +313,7 @@ function MailRow({
   const who = conversation ? others.join(", ") || mail.from_name : (mail.to_name ?? mail.from_name);
   const snippet = conversation && isYours(last, own) ? `You: ${last.snippet}` : last.snippet;
   return (
-    <li>
+    <MailMenu row={{ mail, conversation }} from={from} close={close}>
       <Link
         to="/$workspace/mail/$account/$uid"
         params={{ workspace: workspace.url_key, account: mail.account_id, uid: String(mail.uid) }}
@@ -353,7 +369,7 @@ function MailRow({
         )}
         {last.snippet && <span className="snippet">{snippet}</span>}
       </Link>
-    </li>
+    </MailMenu>
   );
 }
 

@@ -427,7 +427,8 @@ input.crumb-name {
   color: var(--muted);
 }
 .mail:hover,
-.mail.focused {
+.mail.focused,
+[data-popup-open] > .mail {
   background: var(--hover);
 }
 .mail.selected {
