@@ -14,7 +14,7 @@ use crate::config::{SubTaskOf, Task};
 use crate::error::{Error, Result};
 use crate::pty::PaneInfo;
 use crate::spec::{self, Part, SubTask};
-use crate::tickets::{NewTicket, Ticket, Tracker};
+use crate::tickets::{NewTicket, Ticket, TicketPage, Tracker};
 
 use super::panes::{agent_file_dir, start_agent, Resume};
 use super::spec::{and_list, approve, spec_of, Slot, DRAFTS};
@@ -154,6 +154,43 @@ fn folder(path: &str) -> Option<String> {
 #[tauri::command]
 pub async fn epic_view(app: AppHandle, epic_id: String) -> Result<EpicView> {
     super::blocking(app, move |state| Ok(view(state, &an_epic(state, &epic_id)?))).await
+}
+
+/// The tickets under the epic's own that are not done (EPIC-14), and whether
+/// its tracker had more. None for an epic with no ticket.
+pub(crate) async fn tickets_under(app: &AppHandle, epic: &Task) -> Result<TicketPage> {
+    let Some(key) = epic.issue_key.as_deref() else {
+        return Ok(TicketPage { issues: Vec::new(), more: false });
+    };
+    let mut page = tracker(&app.state::<AppState>())?.children(key).await?;
+    page.issues.retain(|t| t.status_category != "done");
+    Ok(page)
+}
+
+/// The tickets under the epic's that are not its sub-tasks here yet
+/// (EPIC-14): no task has one, and no heading of its plan names one.
+pub(crate) async fn tickets_not_here(app: &AppHandle, epic: &Task) -> Result<TicketPage> {
+    let mut page = tickets_under(app, epic).await?;
+    let e = epic.clone();
+    let here = super::blocking(app.clone(), move |state| Ok(keys_here(state, &e))).await?;
+    page.issues.retain(|t| !here.contains(&t.key));
+    Ok(page)
+}
+
+#[tauri::command]
+pub async fn epic_tickets(app: AppHandle, epic_id: String) -> Result<TicketPage> {
+    let epic = an_epic(&app.state::<AppState>(), &epic_id)?;
+    tickets_not_here(&app, &epic).await
+}
+
+/// Every ticket a sub-task of the epic has, or will have once filed: the
+/// keys its plan's headings name, those filed for it, and every task's.
+fn keys_here(state: &AppState, epic: &Task) -> Vec<String> {
+    let (_, subs) = plan(state, epic);
+    let mut keys: Vec<String> = subs.into_iter().filter_map(|s| s.key).collect();
+    keys.extend(remembered(state, epic).into_values());
+    keys.extend(state.config.with(|c| c.tasks.iter().filter_map(|t| t.issue_key.clone()).collect::<Vec<_>>()));
+    keys
 }
 
 /// Make `task_ids` the epic's sub-tasks (EPIC-13): tasks whose tickets sit

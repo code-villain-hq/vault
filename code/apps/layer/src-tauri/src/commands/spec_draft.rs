@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::config::Task;
 use crate::error::{Error, Result};
@@ -70,6 +70,25 @@ pub async fn draft_spec(
 ) -> Result<()> {
     let program = claude()?;
     let emitter = app.clone();
+    // An epic's tasks go to the tickets already under it first (EPIC-4).
+    // Without them a draft planned their work again, and filing it made a
+    // second ticket for each.
+    let under: Vec<(String, String)> = match part {
+        Part::Tasks => {
+            let task = app.state::<super::AppState>().config.task(&task_id)?;
+            match (task.epic, task.issue_key.as_deref()) {
+                (true, Some(key)) => super::epics::tickets_under(&app, &task)
+                    .await
+                    .map_err(|e| Error::Other(format!("the tickets under {key} could not be read: {e}")))?
+                    .issues
+                    .into_iter()
+                    .map(|t| (t.key, t.summary))
+                    .collect(),
+                _ => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
+    };
     super::blocking(app, move |state| {
         let task = state.config.task(&task_id)?;
         let spec = spec_of(state, &task);
@@ -128,7 +147,7 @@ pub async fn draft_spec(
                     .iter()
                     .filter_map(|h| Some((h.folder.clone(), spec.approved(&Slot::tasks(&h.folder))?)))
                     .collect();
-                let prompt = tasks_prompt(&folders, &reqs, &design, &old, task.epic);
+                let prompt = tasks_prompt(&folders, &reqs, &design, &old, task.epic.then_some(under.as_slice()));
                 let id_of = |folder: &str| spec.home(folder).map(|h| h.checkout.id.clone());
                 let mut so_far = String::new();
                 let out = oneshot(&program, home_dir(), how(false), &prompt, |delta| {

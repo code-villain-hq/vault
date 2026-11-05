@@ -1236,7 +1236,7 @@ never hold credentials themselves.
 | `forget_note` | remove a note that no longer holds, with a reason for the message center | yes |
 | `spec_task` | tick (or untick) a numbered step of a repository's spec `tasks.md` (SPEC-13) | |
 | `spec_propose` | propose a change to the task's spec, with why, as a draft for the user to approve (SPEC-24) | |
-| `epic_subtasks` | an epic's sub-tasks: ticket, task, steps ticked, what each waits for, its agents (EPIC-12) | |
+| `epic_subtasks` | an epic's sub-tasks: ticket, task, steps ticked, what each waits for, its agents (EPIC-12); the tickets under it that are none yet (EPIC-14) | |
 | `subtask_start` | start a sub-task's agent on its spec, and move its ticket (EPIC-8) | yes |
 | `subtask_tell` | send one message to a sub-task's running agents (EPIC-12) | |
 | `browser_navigate` | open a page in the task's browser tab (BRW-3), and get its outline | |
@@ -3125,7 +3125,9 @@ paper.
   one sub-task across them. A heading that starts with a ticket key
   (`## ACME-104 Session refresh`) uses that ticket rather than filing a
   new one. Steps under no heading, or under `## Tasks`, make one sub-task
-  for their repository, called after the epic and the repository.
+  for their repository, called after the epic and the repository. The
+  draft is given the tickets already under the epic's (EPIC-14) and heads a
+  group for work one of them covers with its key.
 - **EPIC-5** A sub-task MUST wait for another when one of its steps is
   after one of the other's (`after api 4`, SPEC-1). The order sub-tasks
   are listed in follows that: what starts first leads.
@@ -3198,7 +3200,8 @@ paper.
   beside a task's terminals is (BRW-9).
 - **EPIC-12** The epic's chat MUST have three tools: `epic_subtasks` (each
   sub-task: its title, ticket, task, repositories, steps ticked of the
-  total, what it waits for, and its agents, running and needing you),
+  total, what it waits for, and its agents, running and needing you; then
+  the tickets under the epic's that are no sub-task here yet, EPIC-14),
   `subtask_start` (as Start, EPIC-8; with `confirm`, and refused for one
   that waits until what it waits for is merged), and `subtask_tell` (one
   message to the sub-task's running agents, typed into a terminal or sent
@@ -3220,10 +3223,31 @@ paper.
   under way, and a spec can still be written on its Spec tab. Before, only
   epics made from then on had sub-tasks, and every task started earlier
   stayed under Tasks.
+- **EPIC-14** The tickets under the epic's ticket in its tracker that are
+  not done and are no sub-task here (no task has one, and no heading of its
+  plan names one) MUST be shown and planned for, never filed again:
+  1. The Sub-tasks tab lists each: its key, its summary and its status.
+     With no plan and no sub-task yet, they take the place of "No
+     sub-tasks yet", led by how many there are ("3 tickets are under
+     ACME-300 in Jira") and Open the spec. With either, they come last,
+     under "Under ACME-300 in Jira, not in the spec". They are read again
+     when the plan or the sub-tasks change, and a failure to read them is
+     said under them.
+  2. The tasks draft (EPIC-4) is given each one's key and summary, and
+     heads a group for work one of them covers with its key
+     (`## ACME-301 Flight`). A heading without a key, which files a new
+     ticket, is only for work none of them covers. When they cannot be
+     read, the draft stops and says why.
+  3. `epic_subtasks` (EPIC-12) lists them as `not_here_yet`.
+
+  Before, the tab said "No sub-tasks yet" over an epic with six tickets
+  under it in Jira, the chat said it had no way to see them, and a plan
+  drafted without them filed each a second time.
 
 Code: `spec.rs` (`sub_tasks`: grouping steps into sub-tasks, and each
 one's `tasks.md`), `commands/epics.rs` (what the tab is shown, filing,
-starting, telling, `adopt_sub_tasks` for EPIC-13),
+starting, telling, `adopt_sub_tasks` for EPIC-13, `tickets_under` and
+`epic_tickets` for EPIC-14), `tickets.rs` (`children`),
 `commands/spec_prompts.rs` (the grouped tasks draft),
 `commands/task_context.rs` (the epic chat's context), `mcp.rs`
 (`epic_subtasks`, `subtask_start`, `subtask_tell`), `EpicView.tsx`,

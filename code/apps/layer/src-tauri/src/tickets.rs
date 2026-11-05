@@ -216,6 +216,15 @@ impl Tracker {
         }
     }
 
+    /// The tickets under this one: an epic's (EPIC-14), oldest first, as many
+    /// as one page holds, and whether there were more.
+    pub async fn children(&self, key: &str) -> Result<TicketPage> {
+        match self {
+            Self::Jira(client, _) => client.children(key, 100).await,
+            Self::Github(client, _) => client.sub_issues(&github::issue(key)?).await,
+        }
+    }
+
     /// Put a ticket under another, as a sub-task under its epic.
     pub async fn put_under(&self, key: &str, parent: &str) -> Result<()> {
         match self {

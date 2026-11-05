@@ -81,6 +81,22 @@ impl GitHub {
         Ok((0..wanted.len()).filter_map(|i| data.pointer(&format!("/i{i}/issue")).and_then(to_ticket)).collect())
     }
 
+    /// An issue's sub-issues, the first page of them (EPIC-14), and whether
+    /// it has more.
+    pub async fn sub_issues(&self, (owner, name, number): &IssueRef) -> Result<TicketPage> {
+        // Owner and name are GitHub's own characters, as in `issues`.
+        let q = format!(
+            "query {{ repository(owner: \"{owner}\", name: \"{name}\") {{ issue(number: {number}) {{
+              subIssues(first: {PAGE}) {{ totalCount nodes {{ {FIELDS} }} }} }} }} }}"
+        );
+        let v = self.graphql(&q, Value::Null).await?;
+        let subs = answer(&v, "/data/repository/issue/subIssues")?;
+        let issues: Vec<Ticket> =
+            subs.get("nodes").and_then(Value::as_array).into_iter().flatten().filter_map(to_ticket).collect();
+        let total = subs.get("totalCount").and_then(Value::as_u64).unwrap_or(0) as usize;
+        Ok(TicketPage { more: total > issues.len(), issues })
+    }
+
     /// File an issue, and say its number.
     pub async fn create_issue(&self, owner: &str, name: &str, title: &str, body: &str) -> Result<u64> {
         let v = self

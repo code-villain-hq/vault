@@ -12,12 +12,16 @@ import type {
   SubTaskView,
   TaskPrs,
   TaskView,
+  TicketPage,
 } from "../lib/types";
 import { ago, pane, type World } from "./world";
 
 type Args = Record<string, unknown>;
 
 const EPIC = "t-epic";
+/** ACME-300: an epic with tickets under it in Jira and no plan yet (EPIC-14). */
+const PDFS = "t-epic-pdfs";
+const UNDER_PDFS = ["Flight (P1)", "Hotel (P2)", "Cancelled state for all products"];
 const ROOT = "/Users/you/.villain-worktrees";
 const clean = {
   ahead: 0,
@@ -166,6 +170,10 @@ export function seedEpic(world: World) {
     subTask("t-lock", 0),
     subTask("t-retry", 1),
     subTask("t-form", 2),
+    task(PDFS, "ACME-300", "Rebrand the booking PDFs", ["api"], {
+      epic: true,
+      created_at: ago(3600),
+    }),
   );
   world.prs.push(
     prs("t-lock", "api", 51, true, "approved"),
@@ -209,6 +217,25 @@ export function seedEpic(world: World) {
       epic_key: "ACME-100",
       url: `https://acme.atlassian.net/browse/${p.key}`,
     })),
+    // Under ACME-100 in Jira and in no heading of its plan (EPIC-14).
+    {
+      ...world.issues[0],
+      key: "ACME-165",
+      summary: "Lockout notice copy",
+      status: "To Do",
+      status_category: "new",
+      epic_key: "ACME-100",
+      url: "https://acme.atlassian.net/browse/ACME-165",
+    },
+    ...UNDER_PDFS.map((summary, i) => ({
+      ...world.issues[0],
+      key: `ACME-${301 + i}`,
+      summary,
+      status: "To Do",
+      status_category: "new",
+      epic_key: "ACME-300",
+      url: `https://acme.atlassian.net/browse/ACME-${301 + i}`,
+    })),
   );
 }
 
@@ -241,6 +268,21 @@ export function epicAnswers(world: World, spawn: (a: Args, taskId: string) => Pa
   };
   return {
     epic_view: (a: Args) => view(a.epicId as string),
+    epic_tickets: (a: Args): TicketPage => {
+      const epic = world.tasks.find((t) => t.id === a.epicId);
+      const here = new Set([
+        ...world.tasks.map((t) => t.issue_key),
+        ...view(a.epicId as string).sub_tasks.map((s) => s.key),
+      ]);
+      const issues = [...world.issues, ...world.elsewhere].filter(
+        (i) =>
+          !!epic?.issue_key &&
+          i.epic_key === epic.issue_key &&
+          i.status_category !== "done" &&
+          !here.has(i.key),
+      );
+      return { issues, more: false };
+    },
     adopt_sub_tasks: (a: Args) => {
       const epicId = a.epicId as string;
       for (const t of world.tasks.filter(

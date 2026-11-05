@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::mcp::{arg, bool_prop, required, str_prop, tool};
 use crate::pty::{Activity, PaneKind};
 
-use super::epics::{filed_of, start_sub_task_inner, view, waiting_for};
+use super::epics::{filed_of, start_sub_task_inner, tickets_not_here, view, waiting_for};
 use super::AppState;
 
 pub fn epic_tools() -> Vec<Value> {
@@ -23,7 +23,9 @@ pub fn epic_tools() -> Vec<Value> {
              task id, repositories, steps ticked of the total, the sub-tasks it waits for \
              that have not merged, its pull requests, its agents (running, and which need \
              the person), and its state: merged, changes, approved, in review, asking, \
-             working, waits, ready or not filed.",
+             working, waits, ready or not filed. Then the tickets under the epic's ticket \
+             that are no sub-task here yet (not_here_yet): the epic's tasks plan their \
+             steps under headings that start with their keys, and File gives each a task.",
             json!({ "epic_id": epic() }),
             vec![],
         ),
@@ -159,5 +161,15 @@ async fn subtasks(app: &AppHandle, epic: &Task) -> Result<Value> {
             "state": state_word,
         }));
     }
-    Ok(json!({ "epic": epic.name, "planned": tab.planned, "sub_tasks": out }))
+    // The person sees them in the tracker under the epic; a chat that could
+    // not, said the epic had none (EPIC-14).
+    let not_here = match tickets_not_here(app, epic).await {
+        Ok(page) => json!(page
+            .issues
+            .iter()
+            .map(|t| json!({ "ticket": t.key, "summary": t.summary, "status": t.status }))
+            .collect::<Vec<_>>()),
+        Err(e) => json!({ "error": e.to_string() }),
+    };
+    Ok(json!({ "epic": epic.name, "planned": tab.planned, "sub_tasks": out, "not_here_yet": not_here }))
 }

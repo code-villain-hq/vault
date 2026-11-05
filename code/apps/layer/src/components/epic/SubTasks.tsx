@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, type SubTaskState } from "../../lib/epicState";
 import { useTaskAgents } from "../../lib/panes";
 import { pressKeys } from "../../lib/press";
 import { trackerOfKey } from "../../lib/tracker";
-import type { EpicView, SubTaskView, TaskView } from "../../lib/types";
+import type { EpicView, SubTaskView, TaskView, Ticket, TicketPage } from "../../lib/types";
 import { useStore } from "../../store";
 import { Confirm, ErrorMessage, Spinner, useFailure } from "../ui";
 import { FileSubTasks } from "./FileSubTasks";
@@ -19,6 +19,7 @@ import { FileSubTasks } from "./FileSubTasks";
 export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null }) {
   const setTab = useStore((s) => s.setTab);
   const [filing, setFiling] = useState(false);
+  const under = useTicketsUnder(epic, view);
 
   if (!view)
     return (
@@ -26,6 +27,33 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
         <Spinner />
       </div>
     );
+  const waiting = under.page?.issues ?? [];
+  const tracker = epic.issue_key ? trackerOfKey(epic.issue_key) : "";
+  // Tickets already under the epic, and no plan yet: the spec shares the
+  // steps out among them (EPIC-14). "No sub-tasks yet" over six of them in
+  // Jira led to a plan that filed each again.
+  if (!view.planned && view.sub_tasks.length === 0 && waiting.length > 0) {
+    return (
+      <div className="epic-subs">
+        <div className="epic-lead">
+          <div className="what">
+            <b>
+              {waiting.length === 1 ? "A ticket is" : `${waiting.length} tickets are`} under{" "}
+              {epic.issue_key} in {tracker}.
+            </b>{" "}
+            <span className="muted">
+              The spec's tasks share the steps out among them and file a new ticket only for work
+              none of them covers.
+            </span>
+          </div>
+          <button className="ui-button ui-button-primary" onClick={() => setTab("spec")}>
+            Open the spec
+          </button>
+        </div>
+        <NotHereYet tickets={waiting} more={!!under.page?.more} tracker={tracker} />
+      </div>
+    );
+  }
   // An epic made from tasks already under way has them and no spec yet (EPIC-13).
   if (!view.planned && view.sub_tasks.length === 0) {
     return (
@@ -39,6 +67,7 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
           <button className="ui-button ui-button-primary" onClick={() => setTab("spec")}>
             Open the spec
           </button>
+          <ErrorMessage>{under.error}</ErrorMessage>
         </div>
       </div>
     );
@@ -80,8 +109,76 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
             ))}
         </div>
       ))}
+      {waiting.length > 0 && (
+        <>
+          <div className="epic-group">
+            Under {epic.issue_key} in {tracker}, not in the spec
+          </div>
+          <NotHereYet tickets={waiting} more={!!under.page?.more} tracker={tracker} />
+        </>
+      )}
+      <ErrorMessage>{under.error}</ErrorMessage>
       {filing && <FileSubTasks epic={epic} count={toFile} onClose={() => setFiling(false)} />}
     </div>
+  );
+}
+
+/**
+ * The tickets under the epic's that are no sub-task here yet (EPIC-14), read
+ * again whenever its plan or its sub-tasks' tickets change.
+ */
+function useTicketsUnder(epic: TaskView, view: EpicView | null) {
+  const [page, setPage] = useState<TicketPage | null>(null);
+  const failure = useFailure();
+  const { fail, clear } = failure;
+  const known = view ? `${view.planned} ${view.sub_tasks.map((s) => s.key ?? "").join(" ")}` : null;
+  useEffect(() => {
+    if (!epic.issue_key || known === null) return;
+    let live = true;
+    api
+      .epicTickets(epic.id)
+      .then((p) => {
+        if (!live) return;
+        setPage(p);
+        clear();
+      })
+      .catch((e) => {
+        if (live) fail(e);
+      });
+    return () => {
+      live = false;
+    };
+  }, [epic.id, epic.issue_key, known, fail, clear]);
+  return { page, error: failure.error };
+}
+
+/** Tickets under the epic with no sub-task here: their key, summary and status. */
+function NotHereYet({
+  tickets,
+  more,
+  tracker,
+}: {
+  tickets: Ticket[];
+  more: boolean;
+  tracker: string;
+}) {
+  return (
+    <>
+      {tickets.map((t) => (
+        <div key={t.key} className="epic-row proposed">
+          <span className="key">{t.key}</span>
+          <span className="title">
+            <span className="dot" />
+            {t.summary}
+          </span>
+          <span className="steps">—</span>
+          <span className="steps" />
+          <span className="state">{t.status}</span>
+          <span className="act" />
+        </div>
+      ))}
+      {more && <div className="epic-group">More in {tracker} than one page shows</div>}
+    </>
   );
 }
 

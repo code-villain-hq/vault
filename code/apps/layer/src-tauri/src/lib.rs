@@ -271,6 +271,7 @@ pub fn run() {
             commands::list_projects,
             commands::epic_view,
             commands::adopt_sub_tasks,
+            commands::epic_tickets,
             commands::file_sub_tasks,
             commands::start_sub_task,
             commands::add_projects,

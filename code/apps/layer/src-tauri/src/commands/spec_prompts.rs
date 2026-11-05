@@ -168,14 +168,15 @@ pub(super) fn design_prompt(kind: Kind, folders: &[String], reqs: &str, old: Opt
     p
 }
 
-/// For an epic (`epic`), the steps are grouped into its sub-tasks, each a
-/// ticket and a task of its own (EPIC-4).
+/// For an epic (`epic`: the tickets already under it, key and summary), the
+/// steps are grouped into its sub-tasks, each a ticket and a task of its own
+/// (EPIC-4).
 pub(super) fn tasks_prompt(
     folders: &[String],
     reqs: &str,
     design: &str,
     old: &[(String, String)],
-    epic: bool,
+    epic: Option<&[(String, String)]>,
 ) -> String {
     let mut p = String::from("Break the work below into the steps coding agents will take, in order.\n\n");
     if folders.len() > 1 {
@@ -201,15 +202,30 @@ pub(super) fn tasks_prompt(
             folders.first().map(String::as_str).unwrap_or("")
         ));
     }
-    if epic {
+    if let Some(tickets) = epic {
         p.push_str(concat!(
             " This is an epic: its steps are shared out among sub-tasks, each a ticket of its own ",
             "that one agent finishes in one pull request. Instead of `## Tasks`, group the steps ",
             "under a second-level heading per sub-task, a short title of what it delivers ",
             "(`## Session refresh`), and keep numbering across the groups. A sub-task that spans ",
-            "repositories has the same heading in each. Two to six sub-tasks; a step that waits ",
-            "for another sub-task's step says so last in its parentheses: `(R-2; after 3)` for a step ",
-            "of the same repository, `after <repository> 3` for another's.",
+            "repositories has the same heading in each.",
+        ));
+        // Each new heading files a ticket: a draft that did not know these
+        // planned the work again, and filing it made a second ticket for each.
+        p.push_str(if tickets.is_empty() {
+            " Two to six sub-tasks;"
+        } else {
+            concat!(
+                " The epic already has the tickets listed under # Tickets under the epic. Share the ",
+                "steps out among them first: a group for work one of them covers is headed with its ",
+                "key and then its summary (`## ACME-104 Session refresh`). A heading without a key ",
+                "files a new ticket, so add one only for work none of them covers, and none for a ",
+                "ticket the requirements give no work;",
+            )
+        });
+        p.push_str(concat!(
+            " a step that waits for another sub-task's step says so last in its parentheses: ",
+            "`(R-2; after 3)` for a step of the same repository, `after <repository> 3` for another's.",
         ));
     }
     p.push_str(&format!(
@@ -224,6 +240,13 @@ pub(super) fn tasks_prompt(
              its number. Add steps for what the requirements now need.\n\n{}\n",
             tasks.trim()
         ));
+    }
+    if let Some(tickets) = epic.filter(|t| !t.is_empty()) {
+        p.push_str("\n# Tickets under the epic\n\n");
+        for (key, summary) in tickets {
+            // A summary is someone else's one line; keep it one.
+            p.push_str(&format!("- {key} {}\n", summary.split_whitespace().collect::<Vec<_>>().join(" ")));
+        }
     }
     p
 }
@@ -385,7 +408,7 @@ mod tests {
 
     #[test]
     fn every_repositorys_tasks_are_drafted_together_and_may_wait_on_each_other() {
-        let p = tasks_prompt(&two(), "reqs", "design", &[("web".into(), "- [x] 1. Done".into())], false);
+        let p = tasks_prompt(&two(), "reqs", "design", &[("web".into(), "- [x] 1. Done".into())], None);
         assert!(p.contains("(`# api`)"));
         assert!(p.contains("`(R-2, C-1; after api 3)`"));
         assert!(p.contains("# The tasks of `web` approved before"));
@@ -394,9 +417,26 @@ mod tests {
 
     #[test]
     fn an_epics_tasks_are_grouped_into_its_sub_tasks() {
-        let p = tasks_prompt(&two(), "reqs", "design", &[], true);
+        let p = tasks_prompt(&two(), "reqs", "design", &[], Some(&[]));
         assert!(p.contains("under a second-level heading per sub-task"), "{p}");
         assert!(p.contains("same heading in each"));
+        assert!(p.contains("Two to six sub-tasks; a step that waits"));
+        assert!(!p.contains("# Tickets under the epic"));
+    }
+
+    #[test]
+    fn an_epics_tasks_go_to_the_tickets_already_under_it_before_new_ones() {
+        let under = [
+            ("DT-22265".to_string(), "Flight (P1)".to_string()),
+            ("DT-22270".to_string(), "Cancelled state\nfor all products".to_string()),
+        ];
+        let p = tasks_prompt(&two(), "reqs", "design", &[], Some(&under));
+        assert!(p.contains("headed with its key and then its summary"), "{p}");
+        assert!(p.contains("A heading without a key files a new ticket"));
+        assert!(!p.contains("Two to six"));
+        assert!(p.ends_with(
+            "# Tickets under the epic\n\n- DT-22265 Flight (P1)\n- DT-22270 Cancelled state for all products\n"
+        ));
     }
 
     #[test]

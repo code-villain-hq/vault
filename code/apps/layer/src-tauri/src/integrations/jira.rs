@@ -322,6 +322,23 @@ impl Jira {
         Ok(())
     }
 
+    /// The tickets under `parent`, oldest first (EPIC-14). Cloud puts an
+    /// epic's on `parent`; a site that still has the Epic Link field is asked
+    /// by it too, and one that refuses that query still has the first.
+    pub async fn children(&self, parent: &str, max: u32) -> Result<TicketPage> {
+        let mut page = self.search(&children_jql(parent, None)?, max).await?;
+        let Some(field) = self.epic_field.as_deref() else { return Ok(page) };
+        let Ok(linked) = self.search(&children_jql(parent, Some(field))?, max).await else { return Ok(page) };
+        for issue in linked.issues {
+            if !page.issues.iter().any(|i| i.key == issue.key) {
+                page.issues.push(issue);
+            }
+        }
+        page.issues.sort_by(|a, b| a.created.cmp(&b.created));
+        page.more |= linked.more;
+        Ok(page)
+    }
+
     /// The id this site uses for the Epic Link field, if it still has one.
     ///
     /// Matched on the field's `schema.custom`, which is the same string on
@@ -736,9 +753,39 @@ pub fn keys_jql(keys: &[String]) -> Option<String> {
     (!keys.is_empty()).then(|| format!("key IN ({})", keys.join(", ")))
 }
 
+/// JQL for the tickets under `parent`: by `parent`, or by this site's Epic
+/// Link field (`customfield_10014`). The key comes from a task, so only its
+/// shape reaches the query.
+pub fn children_jql(parent: &str, epic_field: Option<&str>) -> Result<String> {
+    let parent = parent.trim();
+    if !looks_like_a_key(parent) {
+        return Err(Error::Other(format!("{parent} is not a Jira key")));
+    }
+    let by = match epic_field {
+        Some(field) => {
+            let id =
+                field.strip_prefix("customfield_").filter(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+            format!("cf[{}]", id.ok_or_else(|| Error::Other(format!("{field} is not a custom field")))?)
+        }
+        None => "parent".into(),
+    };
+    Ok(format!("{by} = {parent} ORDER BY created ASC"))
+}
+
 #[cfg(test)]
 mod browse_tests {
     use super::*;
+
+    #[test]
+    fn an_epics_tickets_are_asked_for_by_its_key_alone() {
+        assert_eq!(children_jql(" DT-22264 ", None).unwrap(), "parent = DT-22264 ORDER BY created ASC");
+        assert_eq!(
+            children_jql("DT-22264", Some("customfield_10014")).unwrap(),
+            "cf[10014] = DT-22264 ORDER BY created ASC"
+        );
+        assert!(children_jql("DT-1 OR project = X", None).is_err());
+        assert!(children_jql("DT-1", Some("customfield_1] OR x")).is_err());
+    }
 
     #[test]
     fn a_ticket_s_date_reaches_the_webview_in_a_form_it_can_read() {
