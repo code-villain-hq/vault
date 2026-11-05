@@ -1,6 +1,58 @@
 /* An epic (§26): its sub-tasks in the sidebar, one line each under it, and
    its page, the sub-tasks or the spec beside the epic's chat. */
 
+/* An epic heads its group (EPIC-9): its title heavier than a task's, a
+   meter no task row has, and space between one epic's group and the next.
+   Weight and space, not a colour or a line: the sidebar stays a step back. */
+.side-epic {
+  container-type: inline-size;
+}
+.side-epic + .side-epic {
+  margin-top: 8px;
+}
+.side-epic > .ws .ws-title .label {
+  font-weight: 600;
+}
+/* The words never break; a long key gives way first (it ellipsizes). */
+.side-epic .ws-meta > span {
+  white-space: nowrap;
+}
+/* Merged is calm, so its segments are muted rather than ok. At most six
+   segments (58px), so key, meter and words fit the default sidebar. */
+.meter {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+}
+.meter i {
+  width: 8px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--faint) 30%, transparent);
+}
+.meter i.done {
+  background: var(--muted);
+}
+.meter i.bar {
+  position: relative;
+  width: 58px;
+  overflow: hidden;
+}
+.meter i.bar::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--done);
+  background: var(--muted);
+}
+/* A sidebar dragged narrow has no room for it beside the words, which
+   say the same. */
+@container (width < 230px) {
+  .meter {
+    display: none;
+  }
+}
+
 .sub-row {
   display: flex;
   align-items: center;

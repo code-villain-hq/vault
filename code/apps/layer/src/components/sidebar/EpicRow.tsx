@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { type CSSProperties, memo, useEffect, useRef } from "react";
 import { api } from "../../lib/api";
 import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, useEpicViews } from "../../lib/epicState";
@@ -68,7 +68,7 @@ export const EpicRow = memo(function EpicRow({
   const toFile = all.length - filed.length;
 
   return (
-    <div>
+    <div className="side-epic">
       <div
         // A div, not a button: it holds the chevron.
         role="button"
@@ -107,9 +107,12 @@ export const EpicRow = memo(function EpicRow({
           {toFile > 0 ? (
             <span>{toFile} to file</span>
           ) : filed.length > 0 ? (
-            <span>
-              {merged} of {filed.length} merged
-            </span>
+            <>
+              <Meter merged={merged} of={filed.length} />
+              <span>
+                {merged} of {filed.length} merged
+              </span>
+            </>
           ) : (
             <span>spec</span>
           )}
@@ -161,7 +164,7 @@ export const JiraEpicRow = memo(function JiraEpicRow({
   const merged = tasks.filter((t) => taskReview(prs[t.id] ?? []) === "merged").length;
   const id = `jira:${epic.key}`;
   return (
-    <div>
+    <div className="side-epic">
       <div
         // A div, not a button: it holds the chevron.
         role="button"
@@ -192,6 +195,7 @@ export const JiraEpicRow = memo(function JiraEpicRow({
         <div className="ws-meta">
           <span className="branch">{epic.key}</span>
           <div className="spacer" />
+          <Meter merged={merged} of={tasks.length} />
           <span>
             {merged} of {tasks.length} merged
           </span>
@@ -212,6 +216,30 @@ export const JiraEpicRow = memo(function JiraEpicRow({
     </div>
   );
 });
+
+/** Most segments the meter draws, one per sub-task; past it, one bar. */
+const SEGMENTS = 6;
+
+/**
+ * How far an epic is, beside "N of M merged": one segment per sub-task,
+ * filled once it merged. No task row has one, so it marks the epic as the
+ * head of its group. The words say it already; screen readers skip it.
+ */
+function Meter({ merged, of }: { merged: number; of: number }) {
+  if (of > SEGMENTS)
+    return (
+      <span className="meter" aria-hidden="true">
+        <i className="bar" style={{ "--done": `${(merged / of) * 100}%` } as CSSProperties} />
+      </span>
+    );
+  return (
+    <span className="meter" aria-hidden="true">
+      {Array.from({ length: of }, (_, i) => (
+        <i key={i} className={i < merged ? "done" : undefined} />
+      ))}
+    </span>
+  );
+}
 
 /** One sub-task, one line: its dot (hollow while it waits), title and state. */
 function SubLine({

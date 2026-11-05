@@ -3167,8 +3167,12 @@ paper.
 ### Following them
 
 - **EPIC-9** The task list MUST show epics in a section of their own,
-  above Tasks: each epic on one row, with "N of M merged" (or "M to file"
-  before filing), and its sub-tasks under it, one line each: a dot as a
+  above Tasks: each epic on one row, heading its group so that it does not
+  read as a task: its title heavier than a task's, "N of M merged" with a
+  meter beside it where the sidebar has room (a segment per sub-task,
+  filled once merged; one bar past six) (or "M to file" before filing),
+  and space before the next epic. Its
+  sub-tasks are under it, one line each: a dot as a
   task's (hollow while it waits), its title, and its state in a word. A
   sub-task is not listed again under Tasks. It opens as any task does, with
   all of its tabs, and its header links to its epic. A sub-task whose epic
