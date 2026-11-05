@@ -465,9 +465,13 @@ body.dragging * {
   visibility: hidden;
   z-index: -1;
 }
+/* Out of `.shell`'s zoom (PANE-16): xterm maps the pointer to a cell with
+   its own unzoomed measures, so under a zoom a click landed rows away,
+   further the lower it was. Zooms multiply, so this one undoes it. */
 .term-host {
   width: 100%;
   height: 100%;
+  zoom: calc(1 / var(--ui-scale, 1));
 }
 .term-host .xterm {
   height: 100%;

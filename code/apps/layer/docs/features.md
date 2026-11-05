@@ -451,6 +451,12 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   nothing could select there, and a selection made anyway was gone with
   the next movement of the mouse, which xterm reports to the agent as
   input.
+- **PANE-16** A click or drag in a terminal MUST land on the cell under
+  the pointer at every interface scale. The terminal is not scaled with
+  the rest of the window: it has its own font size. Before this, at any
+  scale but 100% xterm read the pointer against an unscaled grid, so a
+  selection, in OpenCode or in the terminal, was right on the top row
+  and further off on every row below.
 
 Code: `pty.rs`, `agents.rs`, `commands/panes.rs` (`restart_pane`),
 `Terminals.tsx`, `Terminal.tsx`, `AgentsView.tsx`, `PaneNotice.tsx`.
