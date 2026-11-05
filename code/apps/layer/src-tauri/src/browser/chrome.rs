@@ -111,7 +111,42 @@ pub fn launch(binary: &Path, profile: &Path) -> Result<(Process, PipeWriter, Pip
     Ok((Process { child }, commands_out, answers_in))
 }
 
+/// Start Chrome on `profile` as an ordinary window on `url`, with nothing
+/// driving it (BRW-23): no pipe, not headless. Google signs no one in to a
+/// browser a program drives; the cookies this one keeps are the profile's,
+/// and the headless browser reads them once it starts again. Both use the
+/// Mac's own Chrome key in the keychain, so one can read what the other
+/// wrote.
+///
+/// Blocking: spawning waits on the disk. Call it through `off_runtime`.
+pub fn launch_window(binary: &Path, profile: &Path, url: &str) -> Result<Process> {
+    std::fs::create_dir_all(profile)?;
+    use std::os::unix::process::CommandExt;
+    let child = Command::new(binary)
+        .arg(format!("--user-data-dir={}", profile.display()))
+        .args(["--no-first-run", "--no-default-browser-check", "--disable-sync", url])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|e| Error::Other(format!("could not start {}: {e}", binary.display())))?;
+    Ok(Process { child })
+}
+
 impl Process {
+    /// Its process id, to ask it to quit (`quit`).
+    pub fn id(&self) -> u32 {
+        self.child.id()
+    }
+
+    /// Wait until it exits on its own, then kill what is left of its group.
+    /// Blocking, for as long as the user keeps the window.
+    pub fn wait(&mut self) {
+        let _ = self.child.wait();
+        // SAFETY: a signal to a process group the app started.
+        unsafe { libc::kill(-(self.child.id() as i32), libc::SIGKILL) };
+    }
     /// Wait up to `grace` for it to exit on its own (it was asked to close),
     /// then kill its whole group. Blocking.
     pub fn stop(&mut self, grace: Duration) {
@@ -126,5 +161,19 @@ impl Process {
         // SAFETY: a signal to a process group the app started.
         unsafe { libc::kill(-(self.child.id() as i32), libc::SIGKILL) };
         let _ = self.child.wait();
+    }
+}
+
+/// Ask the Chrome with this process id to quit, as ⌘Q does: it writes its
+/// cookies out before it exits. A SIGTERM did not: Chrome writes cookies
+/// every 30 seconds, and a sign-in made just before one was lost (BRW-23).
+/// NSRunningApplication is safe off the main thread. The signal is kept for
+/// a Chrome not yet known to macOS as an app, just started.
+pub fn quit(pid: u32) {
+    let asked = objc2_app_kit::NSRunningApplication::runningApplicationWithProcessIdentifier(pid as i32)
+        .is_some_and(|app| app.terminate());
+    if !asked {
+        // SAFETY: a signal to a process the app started.
+        unsafe { libc::kill(pid as i32, libc::SIGTERM) };
     }
 }

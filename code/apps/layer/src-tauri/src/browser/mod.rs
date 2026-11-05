@@ -20,6 +20,7 @@ pub mod sites;
 mod snapshot;
 mod tabs;
 pub mod tools;
+mod window;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -125,6 +126,9 @@ struct Inner {
     /// overtaken meanwhile.
     wanted: Option<(u64, String)>,
     next_watch: u64,
+    /// The sign-in window (BRW-23), while it is open: the browser stays
+    /// stopped, the window having its profile.
+    window: Option<window::Window>,
 }
 
 impl Inner {
@@ -196,8 +200,14 @@ impl Browser {
 
     /// The browser, started if it is not running.
     async fn running<R: Runtime>(&self, app: &AppHandle<R>) -> Result<(Arc<Cdp>, Option<String>)> {
-        if let Some(r) = self.inner.lock().running.as_ref().filter(|r| !r.cdp.is_closed()) {
-            return Ok((r.cdp.clone(), r.user_agent.clone()));
+        {
+            let inner = self.inner.lock();
+            if let Some(r) = inner.running.as_ref().filter(|r| !r.cdp.is_closed()) {
+                return Ok((r.cdp.clone(), r.user_agent.clone()));
+            }
+            if inner.window.is_some() {
+                return Err(Error::Other(window::WAITING.into()));
+            }
         }
         let started = match self.start(app).await {
             Ok(r) => r,
@@ -302,7 +312,15 @@ impl Browser {
     /// Ask Chrome to close, then make sure it has (BRW-7). Blocking: called
     /// as the app exits.
     pub fn shutdown(&self, grace: Duration) {
-        let running = self.inner.lock().running.take();
+        let (running, window) = {
+            let mut inner = self.inner.lock();
+            (inner.running.take(), inner.window.as_ref().and_then(|w| w.pid))
+        };
+        // The sign-in window too (BRW-23), or the next start would find
+        // its profile taken. Not waited for: it is the user's window.
+        if let Some(pid) = window {
+            chrome::quit(pid);
+        }
         let Some(r) = running else { return };
         r.cdp.send("Browser.close", json!({}), None);
         r.process.lock().stop(grace);

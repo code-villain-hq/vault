@@ -220,6 +220,30 @@ impl Browser {
     }
 }
 
+impl Browser {
+    /// Point the task's kept active tab at `url`, for when the browser next
+    /// opens its tabs (BRW-23).
+    pub(super) fn point_saved_at<R: Runtime>(&self, app: &AppHandle<R>, task: &str, url: &str) {
+        let _ = app.state::<AppState>().config.update(|c| {
+            let saved = if task == CHAT_TASK_ID {
+                c.browser.chat_tabs.get_or_insert_with(Default::default)
+            } else {
+                match c.tasks.iter_mut().find(|t| t.id == task) {
+                    Some(t) => t.browser.get_or_insert_with(Default::default),
+                    None => return,
+                }
+            };
+            match saved.urls.get_mut(saved.active) {
+                Some(u) => *u = url.to_string(),
+                None => {
+                    saved.urls.push(url.to_string());
+                    saved.active = saved.urls.len() - 1;
+                }
+            }
+        });
+    }
+}
+
 /// The tabs a task had when the app last closed (BRW-6). The chats' are kept
 /// apart, having no task to be kept with (BRW-2).
 pub(super) fn saved_tabs(config: &AppConfig, task: &str) -> SavedTabs {

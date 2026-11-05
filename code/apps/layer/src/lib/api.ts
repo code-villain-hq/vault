@@ -507,6 +507,10 @@ export const api = {
   /** The last tab is left open, empty. */
   browserCloseTab: (taskId: string, tab: string) =>
     invoke<void>("browser_close_tab", { taskId, tab }),
+  /** Opens the sign-in window on the browser's profile (BRW-23). */
+  browserSignInWindow: (taskId: string) => invoke<void>("browser_sign_in_window", { taskId }),
+  /** Quits the sign-in window; the browser starts again. */
+  browserSignInDone: () => invoke<void>("browser_sign_in_done"),
   addBrowserSignIn: (site: string, username: string, password: string) =>
     invoke<SavedSignIn>("add_browser_sign_in", { site, username, password }),
   forgetBrowserSignIn: (id: string) => invoke<void>("forget_browser_sign_in", { id }),

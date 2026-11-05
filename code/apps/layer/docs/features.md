@@ -1811,6 +1811,18 @@ ring marks where it clicked.
   file, and says the name. It is the user's own picture of what they
   see, so it is taken while an agent uses the tab, and while a
   filled-in password is on the page (BRW-19 keeps those from agents).
+- **BRW-23** On a Google sign-in page (`accounts.google.com`), the bar's ↗
+  MUST open a sign-in window instead of the user's own browser: Google
+  refuses to sign anyone in to a browser that a program drives. The
+  app closes its browser, opens the Mac's Chrome on the same profile as an
+  ordinary window, with nothing driving it, on the page the sign-in was
+  for (Google's `continue` address, else the page itself), and the
+  panel says to sign in there and quit that Chrome (⌘Q), or press Done,
+  which quits it. Agents wait meanwhile, as when the browser starts. Once
+  it has quit, the browser starts again, and the tab opens that page,
+  signed in. Opening the rejected page in the user's own browser failed:
+  its address is only good in the session that asked for it, and a sign-in
+  there never reaches the app's profile. Quitting the app quits the window.
 - **BRW-6** The tabs MUST come back where they were: each task's tabs'
   pages and which was active are kept in `config.json`, and opened when
   the task's browser is next needed. The chats' are kept the same way

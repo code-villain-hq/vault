@@ -192,7 +192,10 @@ const noTab = (): BrowserView => ({
   held: false,
   tabs: [],
   driver: null,
+  signing_in: false,
 });
+/** The sign-in window is open (BRW-23): app-wide, as the browser is. */
+let signingIn = false;
 if (world.panes.some((p) => p.task_id === "t-login")) {
   browsers.set("t-login", {
     chrome: true,
@@ -239,6 +242,7 @@ if (world.panes.some((p) => p.task_id === "t-login")) {
     ],
     // The login task's Claude, still at work, between browser calls.
     driver: { pane: "pane-claude", agent: "Claude Code", calls: 0, last_at: Date.now() - 5_000 },
+    signing_in: false,
   });
 }
 function tabOf(task: string): BrowserView {
@@ -976,7 +980,24 @@ const answer: Record<string, Answer> = {
     return null;
   },
 
-  browser_view: (a) => structuredClone(browsers.get(a.taskId as string) ?? noTab()),
+  browser_view: (a) => ({
+    ...structuredClone(browsers.get(a.taskId as string) ?? noTab()),
+    signing_in: signingIn,
+  }),
+  browser_sign_in_window: (a) => {
+    // The backend's page_for: Google's `continue` address, else the page.
+    const b = tabOf(a.taskId as string);
+    const next = new URL(b.url).searchParams.get("continue");
+    if (next?.startsWith("https://")) b.url = next;
+    signingIn = true;
+    void emit("browser:changed", "");
+    return null;
+  },
+  browser_sign_in_done: () => {
+    signingIn = false;
+    void emit("browser:changed", "");
+    return null;
+  },
   browser_open: (a) => {
     const b = tabOf(a.taskId as string);
     const url = (a.url as string | null)?.trim();

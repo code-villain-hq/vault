@@ -425,6 +425,8 @@ pub fn run() {
             commands::browser_new_tab,
             commands::browser_switch_tab,
             commands::browser_close_tab,
+            commands::browser_sign_in_window,
+            commands::browser_sign_in_done,
             commands::add_browser_sign_in,
             commands::forget_browser_sign_in,
             commands::browser_sign_in_form,

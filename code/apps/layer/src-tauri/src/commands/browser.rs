@@ -34,6 +34,8 @@ pub struct BrowserView {
     pub tabs: Vec<TabInfo>,
     /// The agent using the tab, or that last did (BRW-15).
     pub driver: Option<Driver>,
+    /// The sign-in window is open, and the browser waits for it (BRW-23).
+    pub signing_in: bool,
 }
 
 /// The task's tab, as last heard. Makes nothing: a task whose panel was
@@ -58,7 +60,21 @@ pub async fn browser_view(app: AppHandle, task_id: String) -> Result<BrowserView
         held: view.held,
         tabs: view.tabs,
         driver: view.driver,
+        signing_in: state.browser.signing_in(),
     })
+}
+
+/// ↗ on a Google sign-in page: the browser's profile in an ordinary Chrome
+/// window, to sign in there (BRW-23).
+#[tauri::command]
+pub async fn browser_sign_in_window(app: AppHandle, task_id: String) -> Result<()> {
+    app.state::<AppState>().browser.sign_in_window(&app, &task_id).await
+}
+
+/// Done, in the panel: the sign-in window quits, and the browser starts again.
+#[tauri::command]
+pub fn browser_sign_in_done(app: AppHandle) {
+    app.state::<AppState>().browser.sign_in_done();
 }
 
 /// Open the task's tab, starting the browser if it is not running, and go

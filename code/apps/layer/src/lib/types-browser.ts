@@ -34,6 +34,8 @@ export interface BrowserView {
   tabs: TabInfo[];
   /** The agent using the tab, or that last did (BRW-15). */
   driver: Driver | null;
+  /** The sign-in window is open, and the browser waits for it (BRW-23). */
+  signing_in: boolean;
 }
 
 /** The agent using a task's tab, or that last did (BRW-15). */

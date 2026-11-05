@@ -9,8 +9,9 @@ import { ago } from "../lib/time";
 import type { BrowserInput, BrowserView } from "../lib/types";
 import { useStore } from "../store";
 import { BrowserScreenshot } from "./BrowserScreenshot";
+import { OpenOutside, SigningIn } from "./BrowserSignInWindow";
 import { BrowserTabs } from "./BrowserTabs";
-import { BackIcon, CloseIcon, ExternalIcon, ForwardIcon, ReloadIcon } from "./icons";
+import { BackIcon, CloseIcon, ForwardIcon, ReloadIcon } from "./icons";
 import { SaveSignIn } from "./SaveSignIn";
 import { ErrorMessage, Spinner, useFailure } from "./ui";
 
@@ -132,8 +133,11 @@ export function BrowserPanel({
   // afresh, as is the same tab when the window comes back.
   const tab = view?.tab ?? null;
   const chrome = view?.chrome ?? false;
+  // While the sign-in window has the profile (BRW-23), watching would only
+  // be told the browser waits; its quitting is a change, and this runs again.
+  const signingIn = view?.signing_in ?? false;
   useEffect(() => {
-    if (!visible || !appActive || !chrome || !size) return;
+    if (!visible || !appActive || !chrome || !size || signingIn) return;
     let current = true;
     let pending: ArrayBuffer | null = null;
     let drawing = false;
@@ -171,7 +175,7 @@ export function BrowserPanel({
       current = false;
       void api.browserUnwatch(taskId).catch(() => {});
     };
-  }, [visible, appActive, chrome, size, tab, taskId, attempt]);
+  }, [visible, appActive, chrome, size, tab, taskId, attempt, signingIn]);
 
   // Where an agent clicked, for a moment (BRW-10).
   const last = view?.last_action ?? null;
@@ -473,14 +477,7 @@ export function BrowserPanel({
         )}
         <SaveSignIn taskId={taskId} disabled={!host || driving} />
         <BrowserScreenshot taskId={taskId} disabled={!tab} />
-        <button
-          className="ui-button ui-icon-button"
-          title="Open this page in your own browser"
-          disabled={!view?.url || view.url === "about:blank"}
-          onClick={() => view && void openUrl(view.url)}
-        >
-          <ExternalIcon />
-        </button>
+        <OpenOutside taskId={taskId} view={view} />
         <button className="ui-button ui-icon-button" title="Hide the browser" onClick={onClose}>
           <CloseIcon />
         </button>
@@ -552,6 +549,8 @@ export function BrowserPanel({
               </button>
             </div>
           </div>
+        ) : signingIn ? (
+          <SigningIn />
         ) : error ? (
           <div className="empty">
             <h2>The browser could not start</h2>
