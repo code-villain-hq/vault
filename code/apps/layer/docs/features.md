@@ -2193,7 +2193,7 @@ count and banner treats it like any other.
 |---|---|---|---|
 | `claude` | `claude-agent-acp`, installed separately (`@agentclientprotocol/claude-agent-acp`, formerly `@zed-industries/`) | load, resume, list | adapter 0.98.0 |
 | `copilot` | `copilot --acp` | load, list | 1.0.100 |
-| `opencode` | `opencode acp` | load, resume, list | 1.18.35 |
+| `opencode` | `opencode acp` | load, resume, list | 2.2.5, on its free models, signed in to nothing |
 | `gemini` | `gemini --acp` | load | 0.63.0, `initialize` only: it would not open a conversation for a personal Google account |
 
 - **ACP-1** ACP MUST be offered only for an agent whose catalogue entry
@@ -2304,9 +2304,6 @@ Known gaps:
   own (ACP-9).
 - Copilot's ACP mode is in public preview. Gemini CLI was checked only as
   far as `initialize`.
-- OpenCode 2.x is not checked: 2.2.5 on the studio's Mac answered nothing
-  even outside ACP (`opencode run`, no provider signed in), so it says Not
-  checked yet until a signed-in one passes the real-agent test.
 - Codex (`codex-acp`), Cursor, Goose and the rest of the ACP registry are
   not in the catalogue: each needs checking against a real install first,
   as PANE-1 asks.

@@ -708,7 +708,7 @@ pub const AGENTS: &[AgentDef] = &[
         resume_args: None,
         resume_by_id: None,
         session_store: None,
-        acp: Some(AcpCommand { program: "opencode", args: &["acp"], checked: "1.18.35" }),
+        acp: Some(AcpCommand { program: "opencode", args: &["acp"], checked: "2.2.5" }),
     },
     AgentDef {
         id: "copilot",
