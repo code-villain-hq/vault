@@ -444,6 +444,7 @@ pub async fn draft_pr_description(app: AppHandle, state: State<'_, AppState>, ta
         // Built in here, not before: gathering the change is a git log, a stat
         // and a patch per repository, and done out there it ran on the async
         // workers — the thing this function's own summary says it avoids.
+        let found: Vec<_> = repos.iter().map(|r| (r.repo.clone(), super::pr_template::find(&r.dir, &r.base))).collect();
         let prompt = format!(
             concat!(
                 "Write the body of a pull request description for the work on branch ",
@@ -454,9 +455,10 @@ pub async fn draft_pr_description(app: AppHandle, state: State<'_, AppState>, ta
                 "through the diff file by file, and do not pad it — a few short sections is ",
                 "right for most changes.\n\n",
                 "Reply with the Markdown body and nothing else: no preamble, no closing ",
-                "remark, no code fence around the whole thing.{spec_ask}\n\n",
+                "remark, no code fence around the whole thing.{spec_ask}\n{template}\n",
                 "# The change\n{context}\n{spec}",
             ),
+            template = super::pr_template::prompt_section(&found),
             branch = branch,
             key = issue_key.as_ref().map(|k| format!(" for {k}")).unwrap_or_default(),
             context = review_context(&repos),
@@ -583,11 +585,13 @@ pub fn request_pr_description(state: State<AppState>, task_id: String, pane_id: 
          left unfinished, and where review effort is best spent. Mention what you \
          verified and what you did not. Do not pad it, and do not restate the diff \
          file by file.\n\n\
-         Base it on the actual diff{}. Save it as Markdown to:\n{}\n\n\
+         Base it on the actual diff{}. {}\n\n\
+         Save it as Markdown to:\n{}\n\n\
          Write only that file, change nothing else, and tell me when it is saved.",
         task.branch,
         task.issue_key.as_ref().map(|k| format!(" for {k}")).unwrap_or_default(),
         if repos.len() > 1 { format!(" across {}", repos.join(", ")) } else { String::new() },
+        super::pr_template::PLACES,
         path.display(),
     );
 

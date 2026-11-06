@@ -704,9 +704,23 @@ send feedback to an agent, and finish a merged task.
   one (UPD-4). Never `--force`. Pushes run in every repo at once.
 - **PR-4** The description can be drafted. A one-shot model run gets the
   commits, the stat and the diff (lockfiles left out, 60k characters at
-  most), and the spec's requirements with their check (SPEC-16), and
-  streams its answer into the field. Failing that, a running
-  agent is asked to write `PR_DESCRIPTION.md` in the task folder.
+  most), the spec's requirements with their check (SPEC-16), and each
+  repository's pull request template, and streams its answer into the
+  field. A template is looked for where the forges keep one, whatever the
+  case of its name: Azure DevOps' for the base branch
+  (`pull_request_template/branches/<base>.md`), then
+  `pull_request_template.md` (or `.txt`) in `.github/`,
+  `.bitbucket/`, `.azuredevops/`, `.vsts/`, `.forgejo/`, `.gitea/`,
+  `docs/` or the root, or GitLab's
+  `.gitlab/merge_request_templates/Default.md`; failing those, a folder of
+  several (`PULL_REQUEST_TEMPLATE/`, GitLab's merge request templates),
+  from which the model picks the one that fits. The draft fills the
+  template in: its headings, checklists and order, a checklist item
+  ticked only where the change shows it. Repositories that share a template
+  give it once. Failing the one-shot run, a running agent is asked to
+  write `PR_DESCRIPTION.md` in the task folder, and told where templates
+  are kept. Before, the draft chose its own sections and a team's template
+  was left out.
 - **PR-5** Review threads MUST be read in full: every page, resolved and
   outdated flags kept. A verdict is each reviewer's latest decisive review.
   One "changes requested" outranks any number of approvals, and a dismissal
