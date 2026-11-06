@@ -138,6 +138,76 @@ pub(crate) fn prompt_section(found: &[(String, Templates)]) -> String {
     out
 }
 
+/// Words a template uses when it wants to see the change: customer-portal's
+/// "Visual evidence" asks for screenshots of every UI change, and a draft
+/// that only ticked the box left the reviewer without them.
+const SHOW_ME: &[&str] = &["screenshot", "screen shot", "screen recording", "screencast", "visual evidence"];
+
+/// Whether what a repository keeps asks for screenshots of a visible change.
+pub(crate) fn asks_for_images(t: &Templates) -> bool {
+    let wants = |t: &Template| {
+        let text = t.text.to_lowercase();
+        SHOW_ME.iter().any(|w| text.contains(w))
+    };
+    match t {
+        Templates::One(t) => wants(t),
+        Templates::Choice(ts) => ts.iter().any(wants),
+        Templates::None => false,
+    }
+}
+
+/// The repositories whose template asks for screenshots.
+pub(crate) fn wanting_images(found: &[(String, Templates)]) -> Vec<String> {
+    found.iter().filter(|(_, t)| asks_for_images(t)).map(|(repo, _)| repo.clone()).collect()
+}
+
+/// What the one-shot draft is told when a template wants screenshots: it
+/// has no app to run, so the part is left for them rather than made up.
+pub(crate) fn no_images_here(wanting: &[String]) -> String {
+    if wanting.is_empty() {
+        return String::new();
+    }
+    format!(
+        "\n{} for screenshots, and you cannot take them. If the change is visible, tick what \
+         the template has for a visible change and write \"Screenshots to follow.\" where they go; \
+         if it is not, tick what it has for no visible change and say why in a few words.\n",
+        ask(wanting)
+    )
+}
+
+/// What the agent asked for the draft is told when a template wants
+/// screenshots: take them, and leave a list Layer reads with the draft. It
+/// does not open the pull request or add them itself: the user sees them in
+/// the dialog first, and Open PRs adds what is still there (PR-4).
+pub(crate) fn take_images(wanting: &[String], list: &Path) -> String {
+    if wanting.is_empty() {
+        return String::new();
+    }
+    format!(
+        "\n\n{} for screenshots. If this change is visible in the app, run it, open what \
+         changed in Layer's browser (browser_navigate) and take screenshots of it in the app's dark \
+         and light themes, night first: browser_screenshot with save: true saves each and says \
+         where. Then, before the description, save the list of them as JSON to:\n{}\n\nlike \
+         [{{\"path\": \"/absolute/path.jpg\", \"caption\": \"Night\", \"repo\": \"{}\"}}], in the \
+         order to show them, at most 10. Where the template asks for them, write \"Screenshots \
+         below.\": Layer shows them in the pull request dialog and adds them to the pull request \
+         when it is opened, so do not call pr_images. If the change is not visible, tick what the \
+         template has for no visible change, say why, and save no list.",
+        ask(wanting),
+        list.display(),
+        wanting[0],
+    )
+}
+
+/// "web's template asks", "The templates of api and web ask".
+fn ask(repos: &[String]) -> String {
+    match repos {
+        [only] => format!("{only}'s template asks"),
+        [rest @ .., last] => format!("The templates of {} and {last} ask", rest.join(", ")),
+        [] => String::new(),
+    }
+}
+
 fn same(a: &Templates, b: &Templates) -> bool {
     let texts = |t: &Templates| match t {
         Templates::One(t) => vec![t.text.clone()],
@@ -286,5 +356,38 @@ mod tests {
             prompt_section(&[("api".into(), Templates::One(t.clone())), ("web".into(), Templates::One(t.clone()))]);
         assert_eq!(out.matches("<template ").count(), 1);
         assert!(out.contains("The repository keeps a pull request template, `.github/pull_request_template.md`."));
+    }
+
+    #[test]
+    fn a_template_asking_for_visual_evidence_wants_screenshots() {
+        let portal = repo(&[(
+            ".github/pull_request_template.md",
+            "## Visual evidence\n- [ ] UI change: screenshots attached\n- [ ] No UI change",
+        )]);
+        let infra = repo(&[(".github/pull_request_template.md", "## Scope\n## Apply notes\n- [ ] plan attached")]);
+        let found = vec![("portal".to_string(), find(&portal, "main")), ("infra".to_string(), find(&infra, "main"))];
+
+        assert_eq!(wanting_images(&found), ["portal"]);
+        assert!(!asks_for_images(&Templates::None));
+    }
+
+    #[test]
+    fn the_agent_is_asked_for_screenshots_only_where_a_template_wants_them() {
+        let list = Path::new("/tasks/t1/PR_IMAGES.json");
+        assert_eq!(take_images(&[], list), "");
+
+        let asked = take_images(&["customer-portal".into()], list);
+        assert!(asked.contains("customer-portal's template asks for screenshots"), "{asked}");
+        assert!(asked.contains("/tasks/t1/PR_IMAGES.json"), "{asked}");
+        assert!(asked.contains("\"repo\": \"customer-portal\""), "{asked}");
+        assert!(asked.contains("do not call pr_images"), "{asked}");
+    }
+
+    #[test]
+    fn the_one_shot_draft_is_told_it_cannot_take_screenshots() {
+        assert_eq!(no_images_here(&[]), "");
+        let told = no_images_here(&["api".into(), "web".into()]);
+        assert!(told.contains("The templates of api and web ask for screenshots, and you cannot take them."), "{told}");
+        assert!(told.contains("Screenshots to follow."), "{told}");
     }
 }

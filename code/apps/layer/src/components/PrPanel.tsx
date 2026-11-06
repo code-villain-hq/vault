@@ -1,21 +1,19 @@
-import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { reviewComments, taskReview, type TaskReview } from "../lib/derive";
-import { useRunningAgentsOf } from "../lib/panes";
 import { pressKeys } from "../lib/press";
 import { reportRepoResults } from "../lib/report";
-import { trackerOfKey } from "../lib/tracker";
 import type { CheckoutPr, CheckRun, Review, TaskView } from "../lib/types";
 import { useStore } from "../store";
 import { CopyButton } from "./CopyButton";
 import { FinishTask } from "./FinishTask";
 import { ChevronIcon, ExternalIcon, PlusIcon } from "./icons";
 import { Outgoing } from "./Outgoing";
+import { PrDescriptionField, usePrDescription } from "./PrDescription";
 import { PrFeedback } from "./PrFeedback";
 import { PrReadErrors } from "./PrReadErrors";
-import { BusyLabel, Combo, ErrorMessage, Field, Modal, Spinner, useFailure } from "./ui";
+import { BusyLabel, Combo, ErrorMessage, Field, Modal, useFailure } from "./ui";
 
 /**
  * The latest review from each reviewer, which is the one GitHub itself shows.
@@ -131,12 +129,12 @@ export function PrPanel({
   onUpdateFromBase: () => void;
 }) {
   const settings = useStore((s) => s.settings);
-  const agentPanes = useRunningAgentsOf(task.id);
   const toggleSettings = useStore((s) => s.toggleSettings);
   // The panel's own actions fail under its buttons, the dialog's above its
   // footer (NOTE-6).
   const panel = useFailure();
   const dialog = useFailure();
+  const description = usePrDescription(task, dialog);
   const fail = panel.fail;
   const clear = panel.clear;
 
@@ -175,16 +173,11 @@ export function PrPanel({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState(task.name);
-  const [body, setBody] = useState("");
   const [draft, setDraft] = useState(true);
   /** Repos the user unticked in the dialog: no push, no PR. Everything starts picked. */
   const [leftOut, setLeftOut] = useState<string[]>([]);
-  const [drafting, setDrafting] = useState(false);
-  /** The agent asked for the draft when the fast model could not write it. */
-  const [askedPane, setAskedPane] = useState<string | null>(null);
   /** What the review step before pushing asks a second look at (PR-11). */
   const [flags, setFlags] = useState(0);
-  const pollRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     if (!settings?.github_connected) return;
@@ -229,35 +222,9 @@ export function PrPanel({
     };
   }, [checkoutIds, creating]);
 
-  // Stop waiting for a draft if the panel goes away.
-  useEffect(
-    () => () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-    },
-    [],
-  );
-
-  // The description arrives a few words at a time. Showing it as it is written
-  // is most of what makes this feel quick: the wait is the same, but it starts
-  // reading like an answer straight away instead of a spinner.
-  //
-  // Only while a draft is being written: a chunk still in flight when the
-  // finished text landed was appended to it, repeating the end.
-  const streaming = useRef(false);
-  useEffect(() => {
-    const p = listen<{ task_id: string; text: string }>("pr:draft", (e) => {
-      if (e.payload.task_id !== task.id || !streaming.current) return;
-      setBody((current) => current + e.payload.text);
-    });
-    return () => {
-      void p.then((un) => un());
-    };
-  }, [task.id]);
-
   useEffect(() => {
     setTitle(task.name);
-    setBody(task.issue_url ? `${trackerOfKey(task.issue_key ?? "")}: ${task.issue_url}\n` : "");
-  }, [task.id, task.name, task.issue_url, task.issue_key]);
+  }, [task.id, task.name]);
 
   function openPr(url: string) {
     void openUrl(url).catch(() => fail("Couldn't open the browser. Try again."));
@@ -293,63 +260,6 @@ export function PrPanel({
     }
   }
 
-  /// Draft the description from the diff, with a cheap one-shot model.
-  ///
-  /// Fast because it asks nothing of the working agent: no shared context to
-  /// re-read, no waiting for it to finish its turn, no file to hand back. If
-  /// that is not possible, fall back to asking the agent itself — slower, but
-  /// it knows what the diff cannot say.
-  async function draftWithAgent() {
-    setDrafting(true);
-    setAskedPane(null);
-    dialog.clear();
-    // Cleared so the streamed text is not appended to whatever was there.
-    setBody("");
-    streaming.current = true;
-    try {
-      const drafted = await api.draftPrDescription(task.id);
-      streaming.current = false;
-      setBody(drafted.trim());
-      setDrafting(false);
-      return;
-    } catch (e) {
-      // Whatever was streamed before it failed is half an answer, not an answer.
-      streaming.current = false;
-      setBody("");
-      const pane = agentPanes[0];
-      if (!pane) {
-        setDrafting(false);
-        dialog.fail(e);
-        return;
-      }
-      setAskedPane(pane.title);
-    }
-
-    const pane = agentPanes[0];
-    try {
-      await api.requestPrDescription(task.id, pane.id);
-
-      const started = Date.now();
-      if (pollRef.current) window.clearInterval(pollRef.current);
-      // guard: allow poll — waits for a file the agent writes; nothing announces it. Gives up after 5 minutes.
-      pollRef.current = window.setInterval(async () => {
-        const text = await api.takePrDescription(task.id).catch(() => null);
-        if (text) {
-          setBody(text.trim());
-          setDrafting(false);
-          if (pollRef.current) window.clearInterval(pollRef.current);
-        } else if (Date.now() - started > 5 * 60 * 1000) {
-          setDrafting(false);
-          if (pollRef.current) window.clearInterval(pollRef.current);
-          dialog.fail("Gave up waiting for the draft. The agent may still be working.");
-        }
-      }, 2000);
-    } catch (e) {
-      setDrafting(false);
-      dialog.fail(e);
-    }
-  }
-
   async function push() {
     setBusy(true);
     panel.clear();
@@ -367,7 +277,15 @@ export function PrPanel({
     setBusy(true);
     dialog.clear();
     try {
-      const results = await api.githubOpenPrs(task.id, title.trim(), body, draft, leftOut);
+      const opened = await api.githubOpenPrs(
+        task.id,
+        title.trim(),
+        description.body,
+        draft,
+        leftOut,
+      );
+      const skipped = rows.filter((r) => leftOut.includes(r.checkout_id)).map((r) => r.repo);
+      const results = [...opened, ...(await description.addImages(task.id, opened, skipped))];
       reportRepoResults(dialog.fail, results);
       // A repository that refused keeps the dialog open, its reason in it.
       if (results.length > 0 && results.every((r) => r.ok)) setCreating(false);
@@ -831,34 +749,7 @@ export function PrPanel({
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </Field>
-              <Field
-                label="Description"
-                hint={
-                  drafting
-                    ? askedPane
-                      ? `Asking ${askedPane} instead. This one takes longer.`
-                      : "Writing — it appears here as it goes."
-                    : "Written from the diff by a fast model, as a handoff for whoever reviews this."
-                }
-              >
-                <textarea
-                  className="ui-field"
-                  rows={8}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                />
-                <div className="row" style={{ marginTop: 8 }}>
-                  <button
-                    className="ui-button"
-                    disabled={drafting}
-                    title="Write the description from the diff on this branch"
-                    onClick={() => void draftWithAgent()}
-                  >
-                    {drafting ? "Drafting…" : "✨ Draft description"}
-                  </button>
-                  {drafting && <Spinner />}
-                </div>
-              </Field>
+              <PrDescriptionField d={description} />
               <div className="row" style={{ marginBottom: 12 }}>
                 <label className="row" style={{ gap: 6, cursor: "pointer" }}>
                   <input

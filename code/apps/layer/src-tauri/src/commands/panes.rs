@@ -438,6 +438,7 @@ const GENERATED_FILES: &[&str] = &[
     "CONFLICTS.md",
     "REVIEW_COMMENTS.md",
     "PR_DRAFT_REQUEST.md",
+    "PR_IMAGES.json",
     FIRST_PROMPT,
     crate::loops::CHECKS_FILE,
 ];

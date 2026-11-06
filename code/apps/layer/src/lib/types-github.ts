@@ -239,3 +239,18 @@ export interface AuthoredPr {
   unresolved_more: boolean;
   conflicts: boolean;
 }
+
+/** A screenshot a drafted description came with (PR-4). `preview` is the image as a data URL. */
+export interface DraftImage {
+  path: string;
+  caption: string;
+  repo: string | null;
+  preview?: string;
+}
+
+/** A drafted description, the screenshots it came with, and what could not be shown. */
+export interface PrDraft {
+  text: string;
+  images: DraftImage[];
+  problems: string[];
+}

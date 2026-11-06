@@ -721,6 +721,29 @@ send feedback to an agent, and finish a merged task.
   write `PR_DESCRIPTION.md` in the task folder, and told where templates
   are kept. Before, the draft chose its own sections and a team's template
   was left out.
+
+  A template that asks for screenshots (it says screenshot, screen
+  recording, screencast or visual evidence) needs someone who can run the
+  app, so with an agent running, Draft asks it rather than the one-shot
+  model, and says so while it waits (up to 10 minutes). The agent is told
+  which repositories' templates ask. If the change is visible, it runs
+  the app and takes screenshots in Layer's browser, night then day
+  (`browser_screenshot` with `save: true`), lists them in `PR_IMAGES.json`
+  beside the description (path, caption, repository), and writes
+  "Screenshots below." where the template wants them. If not, it ticks
+  what the template has for no visible change and says why. The dialog
+  shows the screenshots under the description, each with its caption and
+  a way to leave it out, and says that Open stores them in the
+  repository. A file that is not an image, or a list that does not read,
+  is said in the dialog rather than dropped. Once Open PRs has opened the
+  pull requests, it adds the screenshots still there to each one's
+  repository's PR as PR-13 does (a row per repository, not to a PR that
+  failed to open). Pressing Open with them shown is the user's agreement.
+  With no agent running, the one-shot model is told it cannot take
+  screenshots: it ticks the visible-change box and writes "Screenshots to
+  follow." where they go, and the dialog says no agent was running to
+  take them. Before, a draft for customer-portal ticked "UI change" and
+  attached nothing.
 - **PR-5** Review threads MUST be read in full: every page, resolved and
   outdated flags kept. A verdict is each reviewer's latest decisive review.
   One "changes requested" outranks any number of approvals, and a dismissal
@@ -1438,7 +1461,7 @@ Known gaps:
 | `~/Library/Application Support/eu.codevillain.villain-layer/` | `config.json`: repos, tasks, settings, saved panes, the Slack threads handed to chats (BOT-4). `messages.json`: the message center (MSG-4). `notes.json`: this Mac's copy of the repo notes (MEM-7). `runs.json`: the run log (RUN-5). `postgres/`: the workspace's Postgres, its data, password and binaries (PROF-11). At agent launch also `.mcp.json` (0600), `claude-hooks.json`, `copilot-plugin/`, `opencode-plugin.js` |
 | Keychain, service `eu.codevillain.villain-layer` | one item holding every token, paired phones' included (PHONE-3), the workspace's session on its server (`layer-session`, PROF-16), and the passwords of the browser's saved sign-ins (BRW-18) |
 | `~/.villain-worktrees/` (settable) | task folders, `_chat/` rooms, and `.repos/`: the app's own copy of each repo (REPO-4) |
-| a task folder | the worktrees, `AGENTS.md` and `CLAUDE.md` (task context), `TICKET.md` (PANE-13), `.spec-drafts/`: spec drafts, what was approved, and checks (SPEC-2, SPEC-6, SPEC-15), `.mcp.json`, and `.gemini/settings.json`, `PR_DESCRIPTION.md`, `PR_FEEDBACK.md`, and hand-offs too long to type (`CONFLICTS.md`, `REVIEW_COMMENTS.md`, `PR_DRAFT_REQUEST.md`, `FIRST_PROMPT.md`, `CHECKS.md` (LOOP-6), PANE-11) as they come up |
+| a task folder | the worktrees, `AGENTS.md` and `CLAUDE.md` (task context), `TICKET.md` (PANE-13), `.spec-drafts/`: spec drafts, what was approved, and checks (SPEC-2, SPEC-6, SPEC-15), `.mcp.json`, and `.gemini/settings.json`, `PR_DESCRIPTION.md` and `PR_IMAGES.json` (PR-4), `PR_FEEDBACK.md`, and hand-offs too long to type (`CONFLICTS.md`, `REVIEW_COMMENTS.md`, `PR_DRAFT_REQUEST.md`, `FIRST_PROMPT.md`, `CHECKS.md` (LOOP-6), PANE-11) as they come up |
 | `~/.claude.json` | trust entries for the app's own folders only (PANE-10) |
 | `<config folder>/browser/` | the browser's own Chrome profile (BRW-1): cookies, sign-ins and storage of the pages opened there |
 | `~/Library/Logs/villain-layer/panic.log` | a crash's location and backtrace |

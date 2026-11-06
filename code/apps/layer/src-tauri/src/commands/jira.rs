@@ -290,6 +290,17 @@ pub(crate) fn pr_draft_path(state: &AppState, task: &Task) -> Option<PathBuf> {
     agent_file_dir(state, task).map(|d| d.join("PR_DESCRIPTION.md"))
 }
 
+/// Beside it, the screenshots the agent took for a template that asks for
+/// them (PR-4), as a list.
+fn pr_images_path(state: &AppState, task: &Task) -> Option<PathBuf> {
+    agent_file_dir(state, task).map(|d| d.join("PR_IMAGES.json"))
+}
+
+/// Each repository's pull request template.
+fn templates_of(repos: &[Reviewed]) -> Vec<(String, super::pr_template::Templates)> {
+    repos.iter().map(|r| (r.repo.clone(), super::pr_template::find(&r.dir, &r.base))).collect()
+}
+
 /// Generated files that are noise at review time: machine-written, enormous,
 /// and never what a reviewer is asked to look at. They stay in the summary of
 /// changed files but are kept out of the diff body, so the model spends its
@@ -444,7 +455,8 @@ pub async fn draft_pr_description(app: AppHandle, state: State<'_, AppState>, ta
         // Built in here, not before: gathering the change is a git log, a stat
         // and a patch per repository, and done out there it ran on the async
         // workers — the thing this function's own summary says it avoids.
-        let found: Vec<_> = repos.iter().map(|r| (r.repo.clone(), super::pr_template::find(&r.dir, &r.base))).collect();
+        let found = templates_of(&repos);
+        let wanting = super::pr_template::wanting_images(&found);
         let prompt = format!(
             concat!(
                 "Write the body of a pull request description for the work on branch ",
@@ -458,7 +470,7 @@ pub async fn draft_pr_description(app: AppHandle, state: State<'_, AppState>, ta
                 "remark, no code fence around the whole thing.{spec_ask}\n{template}\n",
                 "# The change\n{context}\n{spec}",
             ),
-            template = super::pr_template::prompt_section(&found),
+            template = super::pr_template::prompt_section(&found) + &super::pr_template::no_images_here(&wanting),
             branch = branch,
             key = issue_key.as_ref().map(|k| format!(" for {k}")).unwrap_or_default(),
             context = review_context(&repos),
@@ -561,58 +573,95 @@ pub async fn optimize_issue_description(
 /// The agent has just done the work, so it knows things the diff does not:
 /// what it tried, what it deliberately left out, where a reviewer should look
 /// hardest. It writes to a file rather than the terminal so the app can pick
-/// the text up cleanly.
+/// the text up cleanly. And it can run the app: where a template asks for
+/// screenshots, it takes them too (PR-4).
 #[tauri::command]
-pub fn request_pr_description(state: State<AppState>, task_id: String, pane_id: String) -> Result<String> {
-    let task = state.config.task(&task_id)?;
-    let path = pr_draft_path(&state, &task)
-        .ok_or_else(|| Error::Other("this task has no folder outside its worktrees to write the draft into".into()))?;
+pub async fn request_pr_description(app: AppHandle, task_id: String, pane_id: String) -> Result<String> {
+    // Off the main thread: the templates are looked for on disk.
+    super::blocking(app, move |state| {
+        let task = state.config.task(&task_id)?;
+        let no_folder = || Error::Other("this task has no folder outside its worktrees to write the draft into".into());
+        let path = pr_draft_path(state, &task).ok_or_else(no_folder)?;
+        let list = pr_images_path(state, &task).ok_or_else(no_folder)?;
 
-    // A stale draft would look like an instant answer.
-    let _ = std::fs::remove_file(&path);
+        // A stale draft would look like an instant answer, and stale
+        // screenshots like this change's.
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&list);
 
-    let repos: Vec<String> = state
-        .config
-        .checkouts_of(&task_id)
-        .iter()
-        .filter_map(|c| state.config.project(&c.project_id).ok().map(|p| p.name))
-        .collect();
+        let repos = reviewed_repos(state, &task);
+        let wanting = super::pr_template::wanting_images(&templates_of(&repos));
+        let names: Vec<&str> = repos.iter().map(|r| r.repo.as_str()).collect();
 
-    let prompt = format!(
-        "Write the pull request description for the work on branch `{}`{}.\n\n\
-         Write it for a reviewer who has not seen any of this and was not in the \
-         conversation. Cover: what changed and why, anything you decided against or \
-         left unfinished, and where review effort is best spent. Mention what you \
-         verified and what you did not. Do not pad it, and do not restate the diff \
-         file by file.\n\n\
-         Base it on the actual diff{}. {}\n\n\
-         Save it as Markdown to:\n{}\n\n\
-         Write only that file, change nothing else, and tell me when it is saved.",
-        task.branch,
-        task.issue_key.as_ref().map(|k| format!(" for {k}")).unwrap_or_default(),
-        if repos.len() > 1 { format!(" across {}", repos.join(", ")) } else { String::new() },
-        super::pr_template::PLACES,
-        path.display(),
-    );
+        let prompt = format!(
+            "Write the pull request description for the work on branch `{}`{}.\n\n\
+             Write it for a reviewer who has not seen any of this and was not in the \
+             conversation. Cover: what changed and why, anything you decided against or \
+             left unfinished, and where review effort is best spent. Mention what you \
+             verified and what you did not. Do not pad it, and do not restate the diff \
+             file by file.\n\n\
+             Base it on the actual diff{}. {}{}\n\n\
+             Save it as Markdown to:\n{}\n\n\
+             {}",
+            task.branch,
+            task.issue_key.as_ref().map(|k| format!(" for {k}")).unwrap_or_default(),
+            if names.len() > 1 { format!(" across {}", names.join(", ")) } else { String::new() },
+            super::pr_template::PLACES,
+            super::pr_template::take_images(&wanting, &list),
+            path.display(),
+            if wanting.is_empty() {
+                "Write only that file, change nothing else, and tell me when it is saved."
+            } else {
+                "Change nothing in the repositories, and tell me when the description is saved."
+            },
+        );
 
-    super::hand_over(&state, &task, &pane_id, "PR_DRAFT_REQUEST.md", &prompt)?;
-    Ok(path.to_string_lossy().to_string())
+        super::hand_over(state, &task, &pane_id, "PR_DRAFT_REQUEST.md", &prompt)?;
+        Ok(path.to_string_lossy().to_string())
+    })
+    .await
 }
 
-/// The drafted description, if the agent has saved it yet. Reading it takes it.
+/// A drafted description, and the screenshots it came with.
+#[derive(Debug, Serialize)]
+pub struct PrDraft {
+    pub text: String,
+    pub images: Vec<super::pr_images::DraftImage>,
+    /// What could not be shown: a list that would not read, a file that is
+    /// not an image.
+    pub problems: Vec<String>,
+}
+
+/// The drafted description, if the agent has saved it yet, with the
+/// screenshots it listed. Reading them takes them.
 #[tauri::command]
-pub fn take_pr_description(state: State<AppState>, task_id: String) -> Result<Option<String>> {
-    let task = state.config.task(&task_id)?;
-    let Some(path) = pr_draft_path(&state, &task) else {
-        return Ok(None);
-    };
-    match std::fs::read_to_string(&path) {
-        Ok(text) => {
-            let _ = std::fs::remove_file(&path);
-            Ok(Some(text))
-        }
-        Err(_) => Ok(None),
-    }
+pub async fn take_pr_description(app: AppHandle, task_id: String) -> Result<Option<PrDraft>> {
+    // Off the main thread: the screenshots are read and checked, up to ten
+    // of 10 MB.
+    super::blocking(app, move |state| {
+        let task = state.config.task(&task_id)?;
+        let (Some(path), Some(list)) = (pr_draft_path(state, &task), pr_images_path(state, &task)) else {
+            return Ok(None);
+        };
+        let Ok(text) = std::fs::read_to_string(&path) else { return Ok(None) };
+        let _ = std::fs::remove_file(&path);
+        let (images, problems) = super::pr_images::listed_images(&list);
+        let _ = std::fs::remove_file(&list);
+        Ok(Some(PrDraft { text, images, problems }))
+    })
+    .await
+}
+
+/// The task's repositories whose pull request template asks for screenshots
+/// (PR-4). Draft description asks a running agent for those, as the
+/// one-shot model has no app to run.
+#[tauri::command]
+pub async fn pr_screenshots_wanted(app: AppHandle, task_id: String) -> Result<Vec<String>> {
+    super::blocking(app, move |state| {
+        let task = state.config.task(&task_id)?;
+        Ok(super::pr_template::wanting_images(&templates_of(&reviewed_repos(state, &task))))
+    })
+    .await
 }
 
 /// Everything a different agent needs to pick this work up.

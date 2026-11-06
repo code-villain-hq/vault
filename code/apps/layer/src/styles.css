@@ -910,6 +910,53 @@ body.dragging * {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The screenshots a drafted description came with (PR-4). */
+.pr-shots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: var(--type-ui-small-size);
+}
+.pr-shots-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pr-shot {
+  position: relative;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pr-shot img {
+  display: block;
+  height: 96px;
+  max-width: 200px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+}
+.pr-shot figcaption {
+  color: var(--muted);
+}
+.pr-shot-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: var(--type-ui-small-size);
+  line-height: 1;
+  background: var(--surface);
+}
+.pr-shot-remove:hover {
+  color: var(--status-danger-ink);
+}
 .md .suggestion {
   background: var(--surface);
   border-radius: var(--radius-md);

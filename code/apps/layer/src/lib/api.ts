@@ -13,6 +13,7 @@ import type {
   CleanupItem,
   RequiredField,
   DiffScope,
+  DraftImage,
   FeedbackItem,
   FlowStatus,
   Finished,
@@ -23,6 +24,7 @@ import type {
   JiraTransition,
   LoopView,
   PaneInfo,
+  PrDraft,
   AddedRepos,
   Project,
   ProjectNotes,
@@ -304,7 +306,9 @@ export const api = {
     invoke<void>("set_project_specs", { projectId, inApp, folder }),
   requestPrDescription: (taskId: string, paneId: string) =>
     invoke<string>("request_pr_description", { taskId, paneId }),
-  takePrDescription: (taskId: string) => invoke<string | null>("take_pr_description", { taskId }),
+  takePrDescription: (taskId: string) => invoke<PrDraft | null>("take_pr_description", { taskId }),
+  /** The task's repositories whose pull request template asks for screenshots (PR-4). */
+  prScreenshotsWanted: (taskId: string) => invoke<string[]>("pr_screenshots_wanted", { taskId }),
   jiraSyncStatus: (key: string) => invoke<string | null>("jira_sync_status", { key }),
   jiraProjectStatuses: (projectKey: string) =>
     invoke<ProjectStatus[]>("jira_project_statuses", { projectKey }),
@@ -380,6 +384,12 @@ export const api = {
   /** `skip`: checkout ids left out of this call, neither pushed nor opened. */
   githubOpenPrs: (taskId: string, title: string, body: string, draft: boolean, skip: string[]) =>
     invoke<RepoResult[]>("github_open_prs", { taskId, title, body, draft, skip }),
+  /** The draft's screenshots, each into its repository's open PR (PR-4). */
+  showPrImages: (taskId: string, images: DraftImage[]) =>
+    invoke<RepoResult[]>("show_pr_images", {
+      taskId,
+      images: images.map(({ path, caption, repo }) => ({ path, caption, repo })),
+    }),
   githubPrFeedback: (taskId: string) => invoke<RepoFeedback[]>("github_pr_feedback", { taskId }),
   /** Typed into `paneId` when given; otherwise only returned, to start an agent with. */
   sendPrFeedback: (
