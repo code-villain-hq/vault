@@ -231,6 +231,20 @@ export interface AgentStatus {
   acp: boolean;
 }
 
+/** Where an installed ACP agent stands against the version checked (ACP-17). */
+export type AcpStanding = "supported" | "older" | "newer" | "unknown" | "missing";
+
+export interface AcpVersion {
+  id: string;
+  name: string;
+  /** The ACP command, as typed: `opencode acp`. */
+  command: string;
+  path: string | null;
+  version: string | null;
+  checked: string;
+  standing: AcpStanding;
+}
+
 export interface Resumable {
   agent_id: string;
   name: string;

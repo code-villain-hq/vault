@@ -299,6 +299,7 @@ pub fn run() {
             commands::suggest_repos,
             commands::set_project_group,
             commands::list_agents,
+            commands::acp_versions,
             commands::list_panes,
             commands::spawn_shell,
             commands::spawn_agent,

@@ -528,6 +528,45 @@ const answer: Record<string, Answer> = {
   // A copy too: a pane pushed onto the same array read as no change.
   list_panes: () => structuredClone(world.panes),
   list_agents: () => world.agents,
+  // One of each standing, so Settings → ACP shows them all (ACP-17).
+  acp_versions: () => [
+    {
+      id: "claude",
+      name: "Claude Code",
+      command: "claude-agent-acp",
+      path: "/usr/local/bin/claude-agent-acp",
+      version: "0.98.0",
+      checked: "0.98.0",
+      standing: "supported",
+    },
+    {
+      id: "gemini",
+      name: "Gemini CLI",
+      command: "gemini --acp",
+      path: null,
+      version: null,
+      checked: "0.63.0",
+      standing: "missing",
+    },
+    {
+      id: "opencode",
+      name: "OpenCode",
+      command: "opencode acp",
+      path: "/opt/homebrew/bin/opencode",
+      version: "2.2.5",
+      checked: "1.18.35",
+      standing: "newer",
+    },
+    {
+      id: "copilot",
+      name: "GitHub Copilot CLI",
+      command: "copilot --acp",
+      path: "/opt/homebrew/bin/copilot",
+      version: "1.0.93",
+      checked: "1.0.100",
+      standing: "older",
+    },
+  ],
 
   // Terminals.
   pty_attach: (a): Catchup => {

@@ -1,6 +1,7 @@
 import type { Operation, TrackerKind } from "@layer/types";
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
+  AcpVersion,
   AcpView,
   AddedRepo,
   AgentStatus,
@@ -143,6 +144,7 @@ export const api = {
 
   // panes
   listAgents: () => invoke<AgentStatus[]>("list_agents"),
+  acpVersions: () => invoke<AcpVersion[]>("acp_versions"),
   listPanes: (taskId?: string) => invoke<PaneInfo[]>("list_panes", { taskId: taskId ?? null }),
   spawnShell: (taskId: string, checkoutId?: string | null) =>
     invoke<PaneInfo>("spawn_shell", { taskId, checkoutId: checkoutId ?? null }),

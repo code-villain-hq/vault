@@ -28,6 +28,13 @@ pub async fn list_agents(app: AppHandle) -> Result<Vec<agents::AgentStatus>> {
     super::blocking(app, |_| Ok(agents::available())).await
 }
 
+/// Each ACP agent's installed version against the one checked (ACP-17):
+/// it runs each one's `--version`, so off the command thread.
+#[tauri::command]
+pub async fn acp_versions(app: AppHandle) -> Result<Vec<crate::acp::version::AcpVersion>> {
+    super::blocking(app, |_| Ok(crate::acp::version::installed())).await
+}
+
 #[tauri::command]
 pub fn list_panes(state: State<AppState>, task_id: Option<String>) -> Vec<PaneInfo> {
     state.ptys.list(task_id.as_deref())

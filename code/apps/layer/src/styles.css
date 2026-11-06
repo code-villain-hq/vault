@@ -744,6 +744,14 @@ body.dragging * {
 .site-row {
   padding: 2px 0;
 }
+.acp-version {
+  padding: 4px 0;
+  align-items: center;
+}
+.acp-version-name {
+  gap: 2px;
+  min-width: 0;
+}
 .btn-add.active {
   color: var(--fg);
   background: var(--selected);

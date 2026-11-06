@@ -1341,7 +1341,8 @@ Known gaps:
 
 - **SET-6** Settings' tabs MUST be named for what each does, not the
   product behind it: Appearance, Tickets (Jira), Code (GitHub), Messaging
-  (Slack), Observability, Remote access (the phone), Browser, General. A page
+  (Slack), Observability, Remote access (the phone), Browser, ACP (agents
+  as conversations, §20: a protocol, not a product), General. A page
   connecting a service says which one at its top. A product's name said
   nothing to someone who had not set it up, and would be wrong the day a
   second one is supported.
@@ -2190,8 +2191,8 @@ count and banner treats it like any other.
 
 | Agent | ACP command | Picks a conversation up by | Checked against |
 |---|---|---|---|
-| `claude` | `claude-agent-acp`, installed separately (`@agentclientprotocol/claude-agent-acp`, formerly `@zed-industries/`) | load, resume, list | adapter 0.87.0 (and 0.22.2) |
-| `copilot` | `copilot --acp` | load, list | 1.0.93 |
+| `claude` | `claude-agent-acp`, installed separately (`@agentclientprotocol/claude-agent-acp`, formerly `@zed-industries/`) | load, resume, list | adapter 0.98.0 |
+| `copilot` | `copilot --acp` | load, list | 1.0.100 |
 | `opencode` | `opencode acp` | load, resume, list | 1.18.35 |
 | `gemini` | `gemini --acp` | load | 0.63.0, `initialize` only: it would not open a conversation for a personal Google account |
 
@@ -2277,11 +2278,19 @@ count and banner treats it like any other.
   (`promptCapabilities.image`) is said to, and the prompt is refused
   rather than sent without them. The conversation names each image
   `[image]`, as a replay does.
+- **ACP-17** Settings → ACP MUST show, for each agent in the table above,
+  its ACP command, the version installed (its `--version`, given 5
+  seconds), the version it was checked against, and where it stands:
+  Supported (the checked version, or a later one in the same major
+  release), Too old (before it), Not checked yet (a later major release),
+  Version unknown, or Not installed. Each is read as the tab opens and on
+  "Check again". It is advice: no version is refused (ACP-1 still offers
+  any one on the PATH).
 
 Code: `acp/` (`conn.rs` the protocol, `user.rs`, `conversation.rs`,
-`entry.rs`, `read.rs`, `process.rs`), `pty/acp.rs`,
+`entry.rs`, `read.rs`, `process.rs`, `version.rs` for ACP-17), `pty/acp.rs`,
 `commands/acp_panes.rs`, `agents.rs` (`AcpCommand`), `AcpPane.tsx`,
-`lib/acpUpdates.ts`, `lib/types-acp.ts`. A real agent is checked with
+`lib/acpUpdates.ts`, `lib/types-acp.ts`, `AcpSettings.tsx`. A real agent is checked with
 `VILLAIN_ACP_AGENT="opencode acp" cargo test --lib real_agent -- --ignored`.
 
 Known gaps:
@@ -2295,6 +2304,9 @@ Known gaps:
   own (ACP-9).
 - Copilot's ACP mode is in public preview. Gemini CLI was checked only as
   far as `initialize`.
+- OpenCode 2.x is not checked: 2.2.5 on the studio's Mac answered nothing
+  even outside ACP (`opencode run`, no provider signed in), so it says Not
+  checked yet until a signed-in one passes the real-agent test.
 - Codex (`codex-acp`), Cursor, Goose and the rest of the ACP registry are
   not in the catalogue: each needs checking against a real install first,
   as PANE-1 asks.

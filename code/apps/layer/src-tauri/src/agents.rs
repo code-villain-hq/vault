@@ -51,6 +51,9 @@ pub struct AgentDef {
 pub struct AcpCommand {
     pub program: &'static str,
     pub args: &'static [&'static str],
+    /// The version §20's table says it was checked against: an older one, or
+    /// a newer major release, is not supported (ACP-17).
+    pub checked: &'static str,
 }
 
 /// How the app plugs into an agent CLI for one launch: how the CLI says
@@ -681,7 +684,7 @@ pub const AGENTS: &[AgentDef] = &[
         session_store: Some(SessionStore::SlugUnderHome { dir: ".claude/projects", ext: "jsonl" }),
         // Not Claude Code itself: Zed's adapter around the Claude Agent SDK,
         // installed on its own, with the SDK version it bundles.
-        acp: Some(AcpCommand { program: "claude-agent-acp", args: &[] }),
+        acp: Some(AcpCommand { program: "claude-agent-acp", args: &[], checked: "0.98.0" }),
     },
     AgentDef {
         id: "gemini",
@@ -693,7 +696,7 @@ pub const AGENTS: &[AgentDef] = &[
         resume_args: None,
         resume_by_id: None,
         session_store: None,
-        acp: Some(AcpCommand { program: "gemini", args: &["--acp"] }),
+        acp: Some(AcpCommand { program: "gemini", args: &["--acp"], checked: "0.63.0" }),
     },
     AgentDef {
         id: "opencode",
@@ -705,7 +708,7 @@ pub const AGENTS: &[AgentDef] = &[
         resume_args: None,
         resume_by_id: None,
         session_store: None,
-        acp: Some(AcpCommand { program: "opencode", args: &["acp"] }),
+        acp: Some(AcpCommand { program: "opencode", args: &["acp"], checked: "1.18.35" }),
     },
     AgentDef {
         id: "copilot",
@@ -723,8 +726,8 @@ pub const AGENTS: &[AgentDef] = &[
         resume_args: None,
         resume_by_id: None,
         session_store: None,
-        // In public preview, as of 1.0.93.
-        acp: Some(AcpCommand { program: "copilot", args: &["--acp"] }),
+        // In public preview, as of 1.0.100.
+        acp: Some(AcpCommand { program: "copilot", args: &["--acp"], checked: "1.0.100" }),
     },
 ];
 

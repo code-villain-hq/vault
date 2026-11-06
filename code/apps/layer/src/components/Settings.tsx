@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
+import { AcpSettings } from "./AcpSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { BrowserSettings } from "./BrowserSettings";
 import { ObservabilitySettings } from "./ObservabilitySettings";
@@ -25,6 +26,7 @@ type Section =
   | "observability"
   | "phone"
   | "browser"
+  | "acp"
   | "general";
 
 export function Settings() {
@@ -191,6 +193,7 @@ export function Settings() {
               ["observability", "Observability"],
               ["phone", "Remote access"],
               ["browser", "Browser"],
+              ["acp", "ACP"],
               ["general", "General"],
             ] as [Section, string][]
           ).map(([id, label]) => (
@@ -213,6 +216,8 @@ export function Settings() {
       {section === "appearance" && <AppearanceSettings />}
 
       {section === "slack" && <SlackSettings />}
+
+      {section === "acp" && <AcpSettings />}
 
       {section === "jira" && (
         <>

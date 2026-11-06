@@ -21,6 +21,7 @@ mod entry;
 mod process;
 mod read;
 mod user;
+pub mod version;
 
 use serde::{Deserialize, Serialize};
 
