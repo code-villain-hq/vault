@@ -3253,10 +3253,12 @@ paper.
 - **EPIC-14** The tickets under the epic's ticket in its tracker that are
   not done and are no sub-task here (no task has one, and no heading of its
   plan names one) MUST be shown and planned for, never filed again:
-  1. The Sub-tasks tab lists each: its key, its summary and its status.
-     With no plan and no sub-task yet, they take the place of "No
-     sub-tasks yet", led by how many there are ("3 tickets are under
-     ACME-300 in Jira") and Open the spec. With either, they come last,
+  1. The Sub-tasks tab lists each: its key, its summary and its status,
+     and Start work, which opens Start work on its ticket (TKT-1). The
+     task it makes sits under the epic's ticket, so it becomes the epic's
+     sub-task (EPIC-13). With no plan and no sub-task yet, they take the
+     place of "No sub-tasks yet", led by how many there are ("3 tickets
+     are under ACME-300 in Jira") and Open the spec. With either, they come last,
      under "Under ACME-300 in Jira, not in the spec". They are read again
      when the plan or the sub-tasks change, and a failure to read them is
      said under them.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import { taskReview } from "../../lib/derive";
 import { openWaits, STATE_COLOR, subTaskState, type SubTaskState } from "../../lib/epicState";
@@ -7,6 +7,8 @@ import { pressKeys } from "../../lib/press";
 import { trackerOfKey } from "../../lib/tracker";
 import type { EpicView, SubTaskView, TaskView, Ticket, TicketPage } from "../../lib/types";
 import { useStore } from "../../store";
+import { typeMap } from "../IssueType";
+import { StartWorkDialog } from "../tickets/StartWorkDialog";
 import { Confirm, ErrorMessage, Spinner, useFailure } from "../ui";
 import { FileSubTasks } from "./FileSubTasks";
 
@@ -19,7 +21,9 @@ import { FileSubTasks } from "./FileSubTasks";
 export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null }) {
   const setTab = useStore((s) => s.setTab);
   const [filing, setFiling] = useState(false);
+  const [starting, setStarting] = useState<Ticket | null>(null);
   const under = useTicketsUnder(epic, view);
+  const startWork = starting && <StartWork ticket={starting} onClose={() => setStarting(null)} />;
 
   if (!view)
     return (
@@ -42,15 +46,21 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
               {epic.issue_key} in {tracker}.
             </b>{" "}
             <span className="muted">
-              The spec's tasks share the steps out among them and file a new ticket only for work
-              none of them covers.
+              Start work on one now, or let the spec's tasks share the steps out among them and file
+              a new ticket only for work none of them covers.
             </span>
           </div>
           <button className="ui-button ui-button-primary" onClick={() => setTab("spec")}>
             Open the spec
           </button>
         </div>
-        <NotHereYet tickets={waiting} more={!!under.page?.more} tracker={tracker} />
+        <NotHereYet
+          tickets={waiting}
+          more={!!under.page?.more}
+          tracker={tracker}
+          onStart={setStarting}
+        />
+        {startWork}
       </div>
     );
   }
@@ -114,12 +124,39 @@ export function SubTasks({ epic, view }: { epic: TaskView; view: EpicView | null
           <div className="epic-group">
             Under {epic.issue_key} in {tracker}, not in the spec
           </div>
-          <NotHereYet tickets={waiting} more={!!under.page?.more} tracker={tracker} />
+          <NotHereYet
+            tickets={waiting}
+            more={!!under.page?.more}
+            tracker={tracker}
+            onStart={setStarting}
+          />
         </>
       )}
       <ErrorMessage>{under.error}</ErrorMessage>
       {filing && <FileSubTasks epic={epic} count={toFile} onClose={() => setFiling(false)} />}
+      {startWork}
     </div>
+  );
+}
+
+/**
+ * Start work on a ticket under the epic (EPIC-14), as from Tickets (TKT-1).
+ * The task it makes sits under the epic's ticket, so it becomes the epic's
+ * sub-task (EPIC-13) and leaves the tickets not here yet.
+ */
+function StartWork({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
+  const projects = useStore((s) => s.projects);
+  const agents = useStore((s) => s.agents);
+  const issueTypes = useStore((s) => s.issueTypes);
+  const types = useMemo(() => typeMap(issueTypes), [issueTypes]);
+  return (
+    <StartWorkDialog
+      issue={ticket}
+      projects={projects}
+      agents={agents}
+      types={types}
+      onClose={onClose}
+    />
   );
 }
 
@@ -152,15 +189,21 @@ function useTicketsUnder(epic: TaskView, view: EpicView | null) {
   return { page, error: failure.error };
 }
 
-/** Tickets under the epic with no sub-task here: their key, summary and status. */
+/**
+ * Tickets under the epic with no sub-task here: their key, summary and
+ * status, and Start work. Before, the row had no action, and starting one
+ * meant finding it again under Tickets.
+ */
 function NotHereYet({
   tickets,
   more,
   tracker,
+  onStart,
 }: {
   tickets: Ticket[];
   more: boolean;
   tracker: string;
+  onStart: (ticket: Ticket) => void;
 }) {
   return (
     <>
@@ -174,7 +217,11 @@ function NotHereYet({
           <span className="steps">—</span>
           <span className="steps" />
           <span className="state">{t.status}</span>
-          <span className="act" />
+          <span className="act">
+            <button className="ui-button" onClick={() => onStart(t)}>
+              Start work
+            </button>
+          </span>
         </div>
       ))}
       {more && <div className="epic-group">More in {tracker} than one page shows</div>}
