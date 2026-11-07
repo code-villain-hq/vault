@@ -347,8 +347,10 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
 - **PANE-1** Only a CLI that can report its own state MUST be offered.
   Output alone cannot tell working from idle: Claude Code repaints every
   few seconds while idle. CLIs dropped for this are in git history.
-- **PANE-2** At most 32 panes run at once (`MAX_PANES`), however many
-  spawns race. It is a ceiling, not a setting.
+- **PANE-2** At most 64 panes run at once (`MAX_PANES`), however many
+  spawns race. It is a ceiling, not a setting: high enough that real work
+  never meets it (32 was met by idle agents on tasks in review), low
+  enough to stop anything opening panes on its own.
 - **PANE-3** A pane MUST start in an existing folder. A missing one is an
   error, never a silent fallback to `$HOME`, where `--continue` resumes the
   wrong conversation.

@@ -439,7 +439,12 @@ pub struct SpawnOptions {
 /// to a restore to a tool an agent calls on the app's own MCP server, comes
 /// through here. A bug upstream of this that asks for hundreds gets an error
 /// instead of the machine.
-pub(crate) const MAX_PANES: usize = 32;
+///
+/// It was 32, and someone working on many tickets at once reached it with
+/// nothing running away: 27 of the 32 were agents left idle at their prompt,
+/// each the one conversation of a task still in review. Every new task then
+/// failed to start until panes were closed by hand. 64 still stops a runaway.
+pub(crate) const MAX_PANES: usize = 64;
 
 #[derive(Default)]
 pub struct PtyManager {
@@ -1820,8 +1825,8 @@ mod tests {
         assert_eq!(told.load(Ordering::SeqCst), 2);
     }
 
-    /// The cap holds when spawns race: forty at once from separate threads,
-    /// and no more than `MAX_PANES` get a pane.
+    /// The cap holds when spawns race: more than `MAX_PANES` at once from
+    /// separate threads, and no more than `MAX_PANES` get a pane.
     #[test]
     fn the_pane_cap_holds_against_spawns_at_once() {
         let app = tauri::test::mock_app();
@@ -1831,7 +1836,7 @@ mod tests {
         let ok = std::sync::atomic::AtomicUsize::new(0);
         let refused = parking_lot::Mutex::new(Vec::new());
         std::thread::scope(|scope| {
-            for _ in 0..40 {
+            for _ in 0..MAX_PANES + 8 {
                 scope.spawn(|| {
                     let spawned = ptys.spawn(
                         &handle,
