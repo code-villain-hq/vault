@@ -3292,12 +3292,18 @@ paper.
   sees it under an epic made here, and stays linked if its ticket later
   leaves the epic. A task on the epic's own ticket made before epics
   existed stays an ordinary task. A Jira epic that has tasks here but is
-  not an epic here yet opens Start work on its ticket (EPIC-2), with its
-  tasks' repositories picked. The epic it makes opens on Sub-tasks, with
-  those tasks under it, and drafts no requirements: its work is already
-  under way, and a spec can still be written on its Spec tab. Before, only
-  epics made from then on had sub-tasks, and every task started earlier
-  stayed under Tasks.
+  not an epic here yet opens as every epic does, on Sub-tasks, with those
+  tasks under it: clicked, it is made an epic there and then (EPIC-2), in
+  its tasks' repositories, with no dialog. Its page shows at once, its
+  title and repositories in the header and "Opening…" where its sub-tasks
+  will be, and its row says "Opening…" too; once made, the epic takes the
+  page's place. A failure is said there, with Try again. Picking anything
+  else meanwhile gives the page up: the epic is still made, and opens when
+  clicked. It drafts no requirements: its work is already under way, and
+  a spec can still be written on its Spec tab. Before, only epics made
+  from then on had sub-tasks, and every task started earlier stayed under
+  Tasks; and such an epic opened Start work instead, so one click on two
+  epic rows did two different things.
 - **EPIC-14** The tickets under the epic's ticket in its tracker that are
   not done and are no sub-task here (no task has one, and no heading of its
   plan names one) MUST be shown and planned for, never filed again:
@@ -3327,10 +3333,11 @@ starting, telling, `adopt_sub_tasks` for EPIC-13, `tickets_under` and
 `epic_tickets` for EPIC-14), `tickets.rs` (`children`),
 `commands/spec_prompts.rs` (the grouped tasks draft),
 `commands/task_context.rs` (the epic chat's context), `mcp.rs`
-(`epic_subtasks`, `subtask_start`, `subtask_tell`), `EpicView.tsx`,
-`epic/` (the Sub-tasks tab, filing, the chat column), `lib/epicState.ts`
-(EPIC-10), `sidebar/EpicRow.tsx`, `sidebar/EpicsSection.tsx` (EPIC-9,
-EPIC-13), `tickets/StartWorkDialog.tsx` (EPIC-2, EPIC-13),
+(`epic_subtasks`, `subtask_start`, `subtask_tell`), `EpicView.tsx`
+(`EpicOpening` for EPIC-13), `epic/` (the Sub-tasks tab, filing, the
+chat column), `lib/epicState.ts` (EPIC-10; `openJiraEpic` for EPIC-13),
+`sidebar/EpicRow.tsx`, `sidebar/EpicsSection.tsx` (EPIC-9,
+EPIC-13), `tickets/StartWorkDialog.tsx` (EPIC-2),
 `tickets/CreateEpicDialog.tsx` (EPIC-3).
 
 Known gaps:

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { api, errMessage, failureText } from "./lib/api";
 import { CHAT_TASK_ID } from "./lib/derive";
+import type { EpicOf } from "./lib/grouping";
 import { forgetAllBut, read, readOneOf, write } from "./lib/persist";
 import { keep, only, reuse, sameJson } from "./lib/same";
 import { useSpecs } from "./lib/specs";
@@ -65,7 +66,7 @@ export interface ReviewNote {
   code: string;
 }
 
-interface State {
+export interface State {
   projects: Project[];
   /**
    * How each repository is doing, by project id (REPO-5). Read at launch,
@@ -95,6 +96,8 @@ interface State {
   issuesTruncated: boolean;
 
   selectedTask: string | null;
+  /** A Jira epic a click is making one, shown until it is or anything is picked (EPIC-13). */
+  opening: { epic: EpicOf; repos: string[]; error: string | null } | null;
   view: View;
   tab: Tab;
   sidebarHidden: boolean;
@@ -390,6 +393,7 @@ export const useStore = create<State>((set, get) => {
     // Where the app was left. Restored so reopening lands on the work in
     // progress rather than on an empty shell, alongside the panes themselves.
     selectedTask: read<string | null>("selectedTask", null),
+    opening: null,
     view: readOneOf("view", VIEWS, "work"),
     tab: readOneOf("tab", TABS, "terminals"),
     sidebarHidden: read("sidebarHidden", false),
@@ -406,7 +410,7 @@ export const useStore = create<State>((set, get) => {
     booted: false,
 
     // Selecting a task is always a request to look at it.
-    select: (id) => set({ selectedTask: id, tab: "terminals", view: "work" }),
+    select: (id) => set({ selectedTask: id, opening: null, tab: "terminals", view: "work" }),
     setView: (view) => set({ view }),
     setTab: (tab) => set({ tab }),
     toggleSidebar: () => set((s) => ({ sidebarHidden: !s.sidebarHidden })),

@@ -1,6 +1,8 @@
 import { create } from "zustand";
-import { api } from "./api";
+import { useStore } from "../store";
+import { api, failureText } from "./api";
 import { taskReview, type TaskReview } from "./derive";
+import type { EpicOf } from "./grouping";
 import type { CheckoutPr, EpicView, SubTaskView } from "./types";
 
 /** Where a sub-task stands, in the order EPIC-10 asks the questions. */
@@ -76,3 +78,25 @@ export const useEpicViews = create<{
   },
   put: (epicId, view) => set((s) => ({ byEpic: { ...s.byEpic, [epicId]: view } })),
 }));
+
+/**
+ * Make a Jira epic one here, in `repos`, its tasks' repositories, and open it
+ * on Sub-tasks (EPIC-13). Its page shows meanwhile, "Opening…" where its
+ * sub-tasks will be, and why when it could not be made. No agent starts and
+ * its ticket stays put (EPIC-2).
+ */
+export async function openJiraEpic(epic: EpicOf, repos: string[]) {
+  const { opening, select } = useStore.getState();
+  if (opening?.epic.key === epic.key && !opening.error) return;
+  select(null);
+  useStore.setState({ opening: { epic, repos, error: null } });
+  // Something picked meanwhile keeps its place, and is not told of a failure.
+  const still = () => useStore.getState().opening?.epic.key === epic.key;
+  try {
+    const made = await api.startWorkOnTicket(epic.key, repos, null, null, null, true);
+    await useStore.getState().refreshTasks();
+    if (still()) select(made.id);
+  } catch (e) {
+    if (still()) useStore.setState({ opening: { epic, repos, error: failureText(e) } });
+  }
+}

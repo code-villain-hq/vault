@@ -6,6 +6,16 @@ export interface EpicOf {
   summary: string;
 }
 
+/**
+ * The repositories `tasks` are in, each once, in the order first met: where
+ * a Jira epic made an epic from its tasks here works (EPIC-13).
+ */
+export function reposOf(
+  tasks: readonly { checkouts: readonly { project_id: string }[] }[],
+): string[] {
+  return [...new Set(tasks.flatMap((t) => t.checkouts.map((c) => c.project_id)))];
+}
+
 /** One heading of a grouped list, and what is under it. */
 export interface Group<T> {
   /** Stable across redraws: what remembers a group's fold. `""` is the "none" group. */

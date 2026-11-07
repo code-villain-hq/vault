@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { byEpic, epicsOf, groupBy, sortPrs, ticketKeyIn } from "../src/lib/grouping";
+import { byEpic, epicsOf, groupBy, reposOf, sortPrs, ticketKeyIn } from "../src/lib/grouping";
 import type { Ticket } from "../src/lib/types";
 
 const issue = (
@@ -90,5 +90,17 @@ describe("sorting pull requests", () => {
     expect(sortPrs(prs, "oldest").map((p) => p.n)).toEqual([1, 3, 2]);
     // Equal sizes fall back to the newest first.
     expect(sortPrs(prs, "smallest").map((p) => p.n)).toEqual([2, 3, 1]);
+  });
+});
+
+describe("a Jira epic clicked in the sidebar (EPIC-13)", () => {
+  const task = (...repos: string[]) => ({ checkouts: repos.map((project_id) => ({ project_id })) });
+
+  test("is made an epic in the repositories its tasks here are in, each once", () => {
+    expect(reposOf([task("web", "api"), task("api"), task("mobile", "web")])).toEqual([
+      "web",
+      "api",
+      "mobile",
+    ]);
   });
 });

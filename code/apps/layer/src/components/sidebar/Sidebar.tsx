@@ -82,6 +82,8 @@ export function Sidebar() {
   const { tasks, epics } = sections;
   const prs = useStore((s) => s.prs);
   const selected = useStore((s) => s.selectedTask);
+  // A Jira epic being opened is on the page, not the fleet (EPIC-13).
+  const opening = useStore((s) => s.opening !== null);
   const select = useStore((s) => s.select);
   const setView = useStore((s) => s.setView);
   const showIssue = useStore((s) => s.showIssue);
@@ -386,7 +388,7 @@ export function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-body" style={{ paddingTop: 6 }}>
-        <FleetRow selected={selected === null} onSelect={() => select(null)} />
+        <FleetRow selected={selected === null && !opening} onSelect={() => select(null)} />
 
         <EpicsSection
           sections={sections}

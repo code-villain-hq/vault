@@ -1,12 +1,9 @@
-import { useMemo, useState } from "react";
-import { api } from "../../lib/api";
+import { useMemo } from "react";
 import { useEpics } from "../../lib/epics";
-import type { EpicOf } from "../../lib/grouping";
-import { trackerOfKey } from "../../lib/tracker";
-import type { Ticket, TaskView } from "../../lib/types";
+import { openJiraEpic } from "../../lib/epicState";
+import { reposOf, type EpicOf } from "../../lib/grouping";
+import type { TaskView } from "../../lib/types";
 import { useStore } from "../../store";
-import { typeMap } from "../IssueType";
-import { StartWorkDialog } from "../tickets/StartWorkDialog";
 import { EpicRow, JiraEpicRow } from "./EpicRow";
 
 export type EpicSections = {
@@ -62,8 +59,10 @@ export function useEpicSections(everyTask: TaskView[]): EpicSections {
 
 /**
  * The sidebar's Epics section. An epic is open until closed: its sub-tasks
- * are what it is. A Jira epic that is not one here yet opens Start work on
- * its ticket, with its tasks' repositories picked (EPIC-13).
+ * are what it is. A Jira epic that is not one here yet is made one when
+ * clicked, in its tasks' repositories, and opens on Sub-tasks as every epic
+ * does, its page showing while it is made (EPIC-13). It used to open Start
+ * work, so one click on two epic rows did two different things.
  */
 export function EpicsSection({
   sections,
@@ -81,24 +80,7 @@ export function EpicsSection({
   onMenu: (x: number, y: number, task: TaskView) => void;
 }) {
   const { layerEpics, subsOf, jiraEpics } = sections;
-  const projects = useStore((s) => s.projects);
-  const agents = useStore((s) => s.agents);
-  const issueTypes = useStore((s) => s.issueTypes);
-  const fail = useStore((s) => s.fail);
-  const types = useMemo(() => typeMap(issueTypes), [issueTypes]);
-  const [making, setMaking] = useState<{ issue: Ticket; tasks: TaskView[] } | null>(null);
-
-  async function open(epic: EpicOf, tasks: TaskView[]) {
-    try {
-      const issue =
-        useStore.getState().issues.find((i) => i.key === epic.key) ??
-        (await api.ticketsByKey([epic.key]))[0];
-      if (issue) setMaking({ issue, tasks });
-      else fail(`${trackerOfKey(epic.key)} did not return ${epic.key}.`);
-    } catch (e) {
-      fail(e);
-    }
-  }
+  const opening = useStore((s) => s.opening);
 
   if (layerEpics.length + jiraEpics.length === 0) return null;
   return (
@@ -123,22 +105,14 @@ export function EpicsSection({
           tasks={tasks}
           selected={selected}
           open={!(expanded[`jira:${epic.key}`] ?? false)}
-          onOpen={(e, t) => void open(e, t)}
+          shown={opening?.epic.key === epic.key}
+          opening={opening?.epic.key === epic.key && !opening.error}
+          onOpen={(e, t) => void openJiraEpic(e, reposOf(t))}
           onSelect={onSelect}
           onToggle={onToggle}
           onMenu={onMenu}
         />
       ))}
-      {making && (
-        <StartWorkDialog
-          issue={making.issue}
-          projects={projects}
-          agents={agents}
-          types={types}
-          subTasks={making.tasks}
-          onClose={() => setMaking(null)}
-        />
-      )}
     </>
   );
 }

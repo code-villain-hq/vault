@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AgentsView } from "./components/AgentsView";
 import { ChatView } from "./components/ChatView";
 import { DiffView } from "./components/DiffView";
-import { EpicMain } from "./components/EpicView";
+import { EpicMain, EpicOpening } from "./components/EpicView";
 import { FrameStatus } from "./components/FrameStatus";
 import { CupIcon, GearIcon } from "./components/icons";
 import { MessageCenter } from "./components/MessageCenter";
@@ -413,6 +413,7 @@ export default function App() {
 
 function Shell() {
   const task = useStore(selectedTask);
+  const opening = useStore((s) => s.opening);
   const view = useStore((s) => s.view);
   const settingsOpen = useStore((s) => s.settingsOpen);
   const sidebarHidden = useStore((s) => s.sidebarHidden);
@@ -434,6 +435,8 @@ function Shell() {
                 ) : (
                   <TaskMain key={task.id} task={task} />
                 )
+              ) : opening ? (
+                <EpicOpening opening={opening} />
               ) : (
                 // With nothing selected, show what every agent is doing rather
                 // than an empty panel — the sidebar covers the task list, this

@@ -139,13 +139,16 @@ export const EpicRow = memo(function EpicRow({
 
 /**
  * A Jira epic that tasks here sit under but that is not an epic here yet
- * (EPIC-13): the same row, with those tasks under it. Opening it makes it one.
+ * (EPIC-13): the same row, with those tasks under it. Clicked, it is made
+ * one and opens as every epic does; its page says why when it could not be.
  */
 export const JiraEpicRow = memo(function JiraEpicRow({
   epic,
   tasks,
   selected,
   open,
+  shown,
+  opening,
   onOpen,
   onSelect,
   onToggle,
@@ -155,6 +158,10 @@ export const JiraEpicRow = memo(function JiraEpicRow({
   tasks: TaskView[];
   selected: string | null;
   open: boolean;
+  /** Its page is the one shown, while it is made or after that failed. */
+  shown: boolean;
+  /** While it is made an epic. */
+  opening: boolean;
   onOpen: (epic: EpicOf, tasks: TaskView[]) => void;
   onSelect: (taskId: string) => void;
   onToggle: (id: string) => void;
@@ -169,8 +176,8 @@ export const JiraEpicRow = memo(function JiraEpicRow({
         // A div, not a button: it holds the chevron.
         role="button"
         tabIndex={0}
-        className="ws"
-        title="Not an epic here yet: open it to make it one"
+        className={`ws${shown ? " active" : ""}`}
+        aria-busy={opening}
         onClick={() => onOpen(epic, tasks)}
         onKeyDown={pressKeys(() => onOpen(epic, tasks))}
       >
@@ -195,10 +202,16 @@ export const JiraEpicRow = memo(function JiraEpicRow({
         <div className="ws-meta">
           <span className="branch">{epic.key}</span>
           <div className="spacer" />
-          <Meter merged={merged} of={tasks.length} />
-          <span>
-            {merged} of {tasks.length} merged
-          </span>
+          {opening ? (
+            <span>Opening…</span>
+          ) : (
+            <>
+              <Meter merged={merged} of={tasks.length} />
+              <span>
+                {merged} of {tasks.length} merged
+              </span>
+            </>
+          )}
         </div>
       </div>
       {open &&

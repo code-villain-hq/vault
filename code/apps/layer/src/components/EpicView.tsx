@@ -1,16 +1,16 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect } from "react";
 import { taskReview } from "../lib/derive";
-import { useEpicViews } from "../lib/epicState";
+import { openJiraEpic, useEpicViews } from "../lib/epicState";
 import { specProgress, useSpecs } from "../lib/specs";
 import { trackerOfKey } from "../lib/tracker";
 import type { TaskView } from "../lib/types";
-import { useStore } from "../store";
+import { type State, useStore } from "../store";
 import { EpicChat } from "./epic/EpicChat";
 import { SubTasks } from "./epic/SubTasks";
 import { SpecView } from "./SpecView";
 import { statusClass } from "./tickets/status";
-import { SidebarToggle } from "./ui";
+import { ErrorMessage, SidebarToggle, Spinner } from "./ui";
 
 /**
  * An epic's page (§26): its sub-tasks and its spec, and beside them its
@@ -100,6 +100,67 @@ export function EpicMain({ epic }: { epic: TaskView }) {
           {onSpec ? <SpecView task={epic} /> : <SubTasks epic={epic} view={view ?? null} />}
         </div>
         <EpicChat epic={epic} />
+      </div>
+    </>
+  );
+}
+
+/**
+ * A Jira epic's page while a click makes it one (EPIC-13): its title where
+ * it will be, and "Opening…" where its sub-tasks will be, so the page does
+ * not wait on the sidebar. Why it could not be made is said there too.
+ */
+export function EpicOpening({ opening }: { opening: NonNullable<State["opening"]> }) {
+  const { epic, repos, error } = opening;
+  const projects = useStore((s) => s.projects);
+  return (
+    <>
+      <div className="ws-header">
+        <SidebarToggle />
+        <h1>{`${epic.key} ${epic.summary}`.trim()}</h1>
+        <div className="chips">
+          <span className="ui-chip">epic</span>
+          {repos.map((id) => (
+            <span key={id} className="ui-chip">
+              {projects.find((p) => p.id === id)?.name ?? id}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="ui-tabs task-tabs" role="tablist">
+        <button className="ui-tab" role="tab" aria-selected>
+          Sub-tasks
+        </button>
+        <button className="ui-tab" role="tab" aria-selected={false} disabled>
+          Spec
+        </button>
+      </div>
+
+      <div className="content epic">
+        <div className="epic-main">
+          <div className="epic-subs">
+            {error ? (
+              <div className="empty">
+                <h2>Not opened</h2>
+                <ErrorMessage>{error}</ErrorMessage>
+                <button
+                  className="ui-button ui-button-primary"
+                  onClick={() => void openJiraEpic(epic, repos)}
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
+              <div className="empty" aria-busy>
+                <div className="row">
+                  <Spinner />
+                  Opening…
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </>
   );
