@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { CHAT_TASK_ID } from "../lib/derive";
 import { goTo } from "../lib/goto";
-import { pressKeys } from "../lib/press";
+import type { Pins } from "../lib/pins";
+import { menuKeys, pressKeys } from "../lib/press";
 import type { WaitingPane } from "../lib/types";
 import { useStore } from "../store";
+import { ContextMenu } from "./menu";
 import { Confirm, ErrorMessage, useFailure } from "./ui";
 
 const NONE: WaitingPane[] = [];
@@ -23,7 +25,7 @@ function useWaiting(taskId: string): WaitingPane[] {
  * They used to be forgotten at launch, and a chat with a day's work in it
  * went with them: nothing in the app could open it again.
  */
-function useActions(taskId: string) {
+function useActions(taskId: string, onForgot?: (w: WaitingPane) => void) {
   // Fails under the list it was done from (NOTE-6).
   const failure = useFailure();
   const [busy, setBusy] = useState<string | null>(null);
@@ -51,6 +53,7 @@ function useActions(taskId: string) {
     failure.clear();
     try {
       await api.forgetWaitingPane(w.id);
+      onForgot?.(w);
       await useStore.getState().refreshWaiting();
     } catch (e) {
       failure.fail(e);
@@ -80,21 +83,25 @@ function useActions(taskId: string) {
 interface WaitingChatsProps {
   /** Which of them this list holds: the Slack bot's go under its heading (CHAT-5). */
   keep: (w: WaitingPane) => boolean;
+  /** Pinned from its right-click menu, and unpinned when forgotten (CHAT-6). */
+  pins: Pins;
   heading?: boolean;
   /** What to call one its CLI has not named. */
   label?: (w: WaitingPane) => string | undefined;
-  sub?: string;
+  sub?: string | ((w: WaitingPane) => string);
 }
 
 /** Chats the last launch did not put back, under the open ones in the Chat view. */
 export function WaitingChats({
   keep,
+  pins,
   heading = true,
   label,
   sub = "not reopened at launch · click to reopen",
 }: WaitingChatsProps) {
   const waiting = useWaiting(CHAT_TASK_ID).filter(keep);
-  const { busy, reopen, ask, confirm, problem } = useActions(CHAT_TASK_ID);
+  const { busy, reopen, ask, confirm, problem } = useActions(CHAT_TASK_ID, (w) => pins.drop(w.cwd));
+  const [menu, setMenu] = useState<{ x: number; y: number; w: WaitingPane } | null>(null);
   if (waiting.length === 0) return null;
   return (
     <>
@@ -114,13 +121,19 @@ export function WaitingChats({
           tabIndex={0}
           className="chat-item waiting"
           onClick={() => void reopen(w)}
-          onKeyDown={pressKeys(() => void reopen(w))}
+          onKeyDown={menuKeys(pressKeys(() => void reopen(w)))}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, w });
+          }}
           title="Reopen this chat where it left off"
         >
           <span className="dot" />
           <span className="chat-item-text">
             <span className="chat-item-title">{w.title ?? label?.(w) ?? "Chat"}</span>
-            <span className="chat-item-sub">{busy === w.id ? "Reopening…" : sub}</span>
+            <span className="chat-item-sub">
+              {busy === w.id ? "Reopening…" : typeof sub === "string" ? sub : sub(w)}
+            </span>
           </span>
           <span
             role="button"
@@ -139,6 +152,22 @@ export function WaitingChats({
       ))}
       {problem}
       {confirm}
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={[
+            {
+              label: pins.has(menu.w) ? "Unpin" : "Pin",
+              onSelect: () => menu.w.cwd !== null && pins.toggle(menu.w.cwd),
+              disabled: menu.w.cwd === null,
+            },
+            { label: "Reopen", onSelect: () => void reopen(menu.w), disabled: busy !== null },
+            { label: "Forget…", onSelect: () => ask(menu.w), danger: true, separated: true },
+          ]}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </>
   );
 }

@@ -2373,11 +2373,16 @@ body.dragging * {
 .chat-item .x:hover {
   color: var(--status-danger-ink);
 }
-/* Chats the last launch did not put back (PANE-7), under the open ones. */
-.chat-list-waiting {
+/* Chats the last launch did not put back (PANE-7), under the open ones; and
+   Pinned and Open above them while a chat is pinned (CHAT-6). */
+.chat-list-waiting,
+.chat-list-group {
   padding: 12px 8px 4px;
   color: var(--faint);
   font-size: var(--type-ui-small-size);
+}
+.chat-list-group:first-child {
+  padding-top: 4px;
 }
 .chat-item.waiting .chat-item-title {
   color: var(--muted);

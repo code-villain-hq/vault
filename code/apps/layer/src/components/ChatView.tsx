@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { CHAT_TASK_ID, showsFolded } from "../lib/derive";
+import { canRestart, CHAT_TASK_ID, showsFolded } from "../lib/derive";
 import { useFocusedPane } from "../lib/goto";
 import { usePanesOf } from "../lib/panes";
 import { read, write } from "../lib/persist";
+import { pinnedFirst, usePins } from "../lib/pins";
 import { useSlackBot } from "../lib/slackBot";
 import type { PaneInfo } from "../lib/types";
 import { useStore } from "../store";
@@ -38,14 +39,23 @@ export function ChatView() {
   const slack = useSlackBot();
   const rooms = useMemo(() => new Map((slack?.threads ?? []).map((t) => [t.room, t])), [slack]);
   const isSlack = (p: { cwd: string | null }) => p.cwd !== null && rooms.has(p.cwd);
-  const mine = panes.filter((p) => !isSlack(p));
-  const bots = panes.filter(isSlack);
-  const lastMine = mine.length ? mine[mine.length - 1].id : null;
+  // Pinned chats first, yours or the Slack bot's (CHAT-6).
+  const pins = usePins();
+  const { pinned, rest } = pinnedFirst(panes, pins.rooms);
+  const mine = rest.filter((p) => !isSlack(p));
+  const bots = rest.filter(isSlack);
+  const pinnedWaiting = useStore((s) => s.waiting).some(
+    (w) => w.task_id === CHAT_TASK_ID && pins.has(w),
+  );
+  const anyPinned = pinned.length > 0 || pinnedWaiting;
+  const yours = panes.filter((p) => !isSlack(p));
+  const lastMine = yours.length ? yours[yours.length - 1].id : null;
   const [slackOpen, toggleSlack] = useSlackFold();
 
   const [active, setActive] = useState<string | null>(null);
   const { restarting, restart } = useRestart(setActive);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ x: number; y: number; pane: PaneInfo } | null>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const addRef = useRef<HTMLButtonElement>(null);
   const installed = agents.filter((a) => a.installed);
@@ -79,9 +89,11 @@ export function ChatView() {
 
   // Ctrl+Tab moves between chats, as it does between terminals, in the
   // list's order and past none it hides under the folded Slack heading.
-  const order = [...mine, ...bots.filter((p) => slackOpen || showsFolded(p, active))].map(
-    (p) => p.id,
-  );
+  const order = [
+    ...pinned,
+    ...mine,
+    ...bots.filter((p) => slackOpen || showsFolded(p, active)),
+  ].map((p) => p.id);
   const orderKey = order.join("\n");
   useEffect(() => {
     const shown = orderKey ? orderKey.split("\n") : [];
@@ -118,8 +130,10 @@ export function ChatView() {
 
   async function close(id: string) {
     failure.clear();
+    const room = panes.find((p) => p.id === id)?.cwd ?? null;
     try {
       await api.closePane(id);
+      pins.drop(room);
       await refreshPanes();
     } catch (e) {
       failure.fail(e);
@@ -140,6 +154,20 @@ export function ChatView() {
       ]
     : [{ label: "No agent CLIs on your PATH", onSelect: () => {}, disabled: true }];
 
+  const rowItems = (p: PaneInfo): MenuItem[] => [
+    { label: pins.has(p) ? "Unpin" : "Pin", onSelect: () => pins.toggle(p.cwd) },
+    ...(canRestart(p, agents)
+      ? [
+          {
+            label: p.running ? "Restart" : "Resume",
+            onSelect: () => void restart(p),
+            disabled: restarting.has(p.id),
+          },
+        ]
+      : []),
+    { label: "Close…", onSelect: () => setClosing(p.id), danger: true, separated: true },
+  ];
+
   const doomed = panes.find((p) => p.id === closing);
 
   const item = (p: PaneInfo) => (
@@ -152,6 +180,7 @@ export function ChatView() {
       onSelect={setActive}
       onRestart={restart}
       onClose={setClosing}
+      onMenu={(x, y, pane) => setRowMenu({ x, y, pane })}
     />
   );
 
@@ -185,13 +214,28 @@ export function ChatView() {
         {panes.length > 0 && <ErrorMessage>{failure.error}</ErrorMessage>}
 
         <div className="chat-list-body">
+          {anyPinned && <div className="chat-list-group">Pinned</div>}
+          {pinned.map(item)}
+          <WaitingChats
+            keep={pins.has}
+            pins={pins}
+            heading={false}
+            label={(w) => rooms.get(w.cwd ?? "")?.label}
+            sub={(w) =>
+              isSlack(w)
+                ? "stopped while idle · click to reopen"
+                : "not reopened at launch · click to reopen"
+            }
+          />
+          {anyPinned && mine.length > 0 && <div className="chat-list-group">Open</div>}
           {mine.map(item)}
           {panes.length === 0 && <div className="chat-list-empty">No chats open.</div>}
-          <WaitingChats keep={(w) => !isSlack(w)} />
+          <WaitingChats keep={(w) => !isSlack(w) && !pins.has(w)} pins={pins} />
           <SlackChats
             open={slackOpen}
             onToggle={toggleSlack}
             panes={bots}
+            pins={pins}
             rooms={rooms}
             active={active}
             item={item}
@@ -256,6 +300,14 @@ export function ChatView() {
           ignore={addRef}
           items={addItems}
           onClose={() => setMenu(null)}
+        />
+      )}
+      {rowMenu && (
+        <ContextMenu
+          x={rowMenu.x}
+          y={rowMenu.y}
+          items={rowItems(rowMenu.pane)}
+          onClose={() => setRowMenu(null)}
         />
       )}
 

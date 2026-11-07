@@ -607,14 +607,23 @@ const answer: Record<string, Answer> = {
     return p;
   },
   spawn_shell: (a) => newPane(a, "shell", a.taskId as string),
-  spawn_chat: (a) => newPane(a, "agent", "chat"),
+  // Each in a room of its own, as `open_chat` makes (CHAT-1): pins are kept by room (CHAT-6).
+  spawn_chat: (a) => {
+    const p = newPane(a, "agent", "chat");
+    p.cwd = `/Users/you/.villain-worktrees/_chat/${p.id.slice(-8)}`;
+    return p;
+  },
   waiting_panes: () => world.waiting,
   reopen_waiting_pane: (a) => {
     const w = world.waiting.find((x) => x.id === a.id);
     if (!w) throw new Error("That pane is no longer waiting to be reopened.");
     world.waiting = world.waiting.filter((x) => x !== w);
     void emit("panes:waiting");
-    return newPane({ agentId: w.agent_id }, w.kind, w.task_id);
+    const p = newPane({ agentId: w.agent_id }, w.kind, w.task_id);
+    // Back in its own folder, as the app reopens it: a chat in its room (CHAT-1).
+    if (w.cwd !== null) p.cwd = w.cwd;
+    if (w.title !== null) p.topic = w.title;
+    return p;
   },
   forget_waiting_pane: (a) => {
     world.waiting = world.waiting.filter((x) => x.id !== a.id);

@@ -2,8 +2,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type ReactNode } from "react";
 import { canRestart, paneName, paneState, showsFolded } from "../lib/derive";
 import { read, write } from "../lib/persist";
-import { pressKeys } from "../lib/press";
-import type { PaneInfo, SlackThreadView } from "../lib/types";
+import type { Pins } from "../lib/pins";
+import { menuKeys, pressKeys } from "../lib/press";
+import type { PaneInfo, SlackThreadView, WaitingPane } from "../lib/types";
 import { useStore } from "../store";
 import { ChevronIcon } from "./icons";
 import { RestartButton } from "./Restart";
@@ -30,6 +31,8 @@ interface ItemProps {
   onSelect: (id: string) => void;
   onRestart: (pane: PaneInfo) => void;
   onClose: (id: string) => void;
+  /** Its right-click menu (CHAT-6), at a point in the window. */
+  onMenu: (x: number, y: number, pane: PaneInfo) => void;
 }
 
 /** One open chat in the Chat view's list. */
@@ -41,6 +44,7 @@ export function ChatItem({
   onSelect,
   onRestart,
   onClose,
+  onMenu,
 }: ItemProps) {
   const agents = useStore((s) => s.agents);
   return (
@@ -50,7 +54,11 @@ export function ChatItem({
       tabIndex={0}
       className={`chat-item${active ? " active" : ""}`}
       onClick={() => onSelect(p.id)}
-      onKeyDown={pressKeys(() => onSelect(p.id))}
+      onKeyDown={menuKeys(pressKeys(() => onSelect(p.id)))}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu(e.clientX, e.clientY, p);
+      }}
     >
       <span className={`dot ${paneState(p).dot}`} title={paneState(p).label} />
       <span className="chat-item-text">
@@ -115,8 +123,9 @@ export function useSlackFold(): [boolean, () => void] {
 interface SlackProps {
   open: boolean;
   onToggle: () => void;
-  /** The Slack bot's open chats. */
+  /** The Slack bot's open chats, but for the pinned ones (CHAT-6). */
   panes: PaneInfo[];
+  pins: Pins;
   /** The rooms of every thread handed over (BOT-4). */
   rooms: Map<string, SlackThreadView>;
   active: string | null;
@@ -128,8 +137,9 @@ interface SlackProps {
  * (CHAT-5). Each thread the bot was mentioned in keeps a chat, so mixed in
  * with yours they buried the chats you started.
  */
-export function SlackChats({ open, onToggle, panes, rooms, active, item }: SlackProps) {
-  const waiting = useStore((s) => s.waiting).filter((w) => w.cwd !== null && rooms.has(w.cwd));
+export function SlackChats({ open, onToggle, panes, pins, rooms, active, item }: SlackProps) {
+  const keep = (w: WaitingPane) => w.cwd !== null && rooms.has(w.cwd) && !pins.has(w);
+  const waiting = useStore((s) => s.waiting).filter(keep);
   const count = panes.length + waiting.length;
   if (count === 0) return null;
   const asking = panes.filter((p) => p.running && p.activity === "asking").length;
@@ -153,7 +163,8 @@ export function SlackChats({ open, onToggle, panes, rooms, active, item }: Slack
       {shown.map(item)}
       {open && (
         <WaitingChats
-          keep={(w) => w.cwd !== null && rooms.has(w.cwd)}
+          keep={keep}
+          pins={pins}
           heading={false}
           label={(w) => rooms.get(w.cwd ?? "")?.label}
           sub="stopped while idle · click to reopen"

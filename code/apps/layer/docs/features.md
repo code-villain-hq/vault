@@ -545,8 +545,19 @@ integrations, the app's tools, the repos and the tasks in flight.
   being idle (BOT-14) waits under the heading, not under Not reopened.
   Each thread keeps a chat, so mixed in with yours they buried the chats
   you started.
+- **CHAT-6** A chat MUST be pinned and unpinned from its right-click menu
+  (Pin, Unpin). Pinned chats are listed first, under a Pinned heading, in
+  the order they were pinned; the other open chats follow under an Open
+  heading. With nothing pinned, neither heading shows. A pin is kept by the
+  chat's room folder (CHAT-1), so it outlives restarting the chat or the
+  app, and it goes when the chat is closed or forgotten. A pinned chat that
+  was not reopened at launch (PANE-7) waits under Pinned, after the open
+  ones, not under Not reopened; reopened, it takes its place in the pin
+  order again. A pinned Slack chat (CHAT-5) is listed there, not under
+  the Slack heading. Pins stay on this Mac. After a day of chats, the few
+  you kept going back to were buried among the rest.
 
-Code: `ChatView.tsx`, `ChatList.tsx` (CHAT-5), `ChatLink.tsx`, `sidebar/SidebarGrip.tsx` (CHAT-4),
+Code: `ChatView.tsx`, `ChatList.tsx` (CHAT-5, CHAT-6), `lib/pins.ts` (CHAT-6), `ChatLink.tsx`, `sidebar/SidebarGrip.tsx` (CHAT-4),
 `commands/panes.rs` (`open_chat`, `write_chat_context`), `mcp.rs` (`caller_chat`).
 
 Known gaps:
@@ -1542,7 +1553,7 @@ to fix on Repos. A running agent or chat is a live dot.
   keyboard too, as macOS does: ⇧F10 or the context-menu key on the
   focused row opens its menu at the row's foot. That is the sidebar's
   task, epic and sub-task rows, ticket cards and epic heads in Tickets,
-  and the cards in Reviews. In any menu, ↑/↓ move through the items,
+  the cards in Reviews, and the chats in the Chat view. In any menu, ↑/↓ move through the items,
   Enter picks one and Esc closes it. Opened from the keyboard, the first
   item is chosen; opened with the mouse, nothing is until an arrow is
   pressed. Closed with keys, the menu gives the focus back to what opened
