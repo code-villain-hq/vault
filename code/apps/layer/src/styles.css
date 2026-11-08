@@ -259,6 +259,11 @@ body.dragging * {
   flex: 1;
   overflow-y: auto;
 }
+/* Finding a task (TASK-19): above the lists it narrows, and not scrolled away with them. */
+.sidebar-search {
+  margin-top: 8px;
+  width: 100%;
+}
 .ws {
   display: flex;
   flex-direction: column;

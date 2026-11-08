@@ -310,7 +310,17 @@ count, running agents, uncommitted changes and the review verdict.
   but the task stayed in the sidebar with its worktrees until someone
   opened the dialog.)
 
-Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `commands/finish_tool.rs` (TASK-18), `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17).
+- **TASK-19** A field at the top of the sidebar MUST find a task by its
+  ticket's key (`DT-4826`, or part of it), its title, its branch, its
+  epic's key and title, and, for a ticket on your own list, its
+  description. Every word typed must be found, in any order and case. It
+  narrows Epics and Tasks alike: an epic stays when it or one of its tasks
+  matches, and an epic that matches keeps all its tasks. Typing asks the
+  tracker nothing; a ticket not started yet is in Find work (TKT-12).
+  Escape clears it, and it is not remembered across launches, so no task
+  is hidden at the next start. With twenty tasks under six epics, the one
+  being worked on could only be found by reading every row.
+Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `commands/finish_tool.rs` (TASK-18), `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17), `lib/task-search.ts` (TASK-19).
 
 Known gaps:
 - A folder cut off before its last commit was recorded, or whose last
@@ -882,7 +892,8 @@ requirement below names Jira, GitHub Issues and Forge do the same in their
 own terms (TKT-17).
 
 The Tickets view has two tabs. **Mine** is your assigned, not-done tickets,
-grouped by epic, by status or not at all (TKT-14), with a filter, type toggles
+grouped by epic, by status or not at all (TKT-14), with a filter (key,
+title, description, labels, components), type toggles
 and a sort (TKT-13). **Find work** searches
 beyond them: not mine / unassigned / anyone, done included or not, by type,
 by text, or by key. A ticket opens its task if there is one; otherwise it

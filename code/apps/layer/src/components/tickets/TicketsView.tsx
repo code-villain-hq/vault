@@ -282,6 +282,7 @@ export function TicketsView() {
             (!q ||
               i.key.toLowerCase().includes(q) ||
               i.summary.toLowerCase().includes(q) ||
+              i.description.toLowerCase().includes(q) ||
               i.labels.some((l) => l.toLowerCase().includes(q)) ||
               i.components.some((c) => c.toLowerCase().includes(q))),
         ),

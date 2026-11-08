@@ -16,6 +16,7 @@ import { RepoPicker } from "../RepoPicker";
 import { BusyOverlay, Confirm, ErrorMessage, Field, Modal, useFailure } from "../ui";
 import { DeleteTask } from "./DeleteTask";
 import { EpicsSection, useEpicSections } from "./EpicsSection";
+import { NoTasks } from "./NoTasks";
 import { ProfileMenu } from "./ProfileMenu";
 import { SyncStatus } from "./SyncStatus";
 import { TaskRow } from "./TaskRow";
@@ -78,14 +79,15 @@ function FleetRow({ selected, onSelect }: { selected: boolean; onSelect: () => v
 export function Sidebar() {
   const projects = useStore((s) => s.projects);
   const everyTask = useStore((s) => s.tasks);
-  const sections = useEpicSections(everyTask);
+  // Not remembered: a search left in place would hide work at the next launch.
+  const [query, setQuery] = useState("");
+  const sections = useEpicSections(everyTask, query);
   const { tasks, epics } = sections;
   const prs = useStore((s) => s.prs);
   const selected = useStore((s) => s.selectedTask);
   // A Jira epic being opened is on the page, not the fleet (EPIC-13).
   const opening = useStore((s) => s.opening !== null);
   const select = useStore((s) => s.select);
-  const setView = useStore((s) => s.setView);
   const showIssue = useStore((s) => s.showIssue);
   const refreshTasks = useStore((s) => s.refreshTasks);
   const refreshPanes = useStore((s) => s.refreshPanes);
@@ -387,6 +389,19 @@ export function Sidebar() {
 
   return (
     <div className="sidebar">
+      {everyTask.length > 0 && (
+        <input
+          type="search"
+          className="ui-field sidebar-search"
+          placeholder="Find a task: key, title, epic…"
+          aria-label="Find a task by its ticket's key, title, epic or description"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setQuery("");
+          }}
+        />
+      )}
       <div className="sidebar-body" style={{ paddingTop: 6 }}>
         <FleetRow selected={selected === null && !opening} onSelect={() => select(null)} />
 
@@ -418,41 +433,11 @@ export function Sidebar() {
         </div>
 
         {tasks.length === 0 && (
-          <div className="muted" style={{ padding: "4px 8px 10px", lineHeight: 1.5 }}>
-            {projects.length === 0 ? (
-              <>
-                No repositories yet —{" "}
-                {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- a link in the sentence; a view has no URL */}
-                <a
-                  className="ui-link"
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setView("repos");
-                  }}
-                >
-                  add some in the Repos tab
-                </a>
-                .
-              </>
-            ) : (
-              <>
-                No tasks yet. A task starts from a ticket —{" "}
-                {/* oxlint-disable-next-line jsx-a11y/anchor-is-valid -- a link in the sentence; a view has no URL */}
-                <a
-                  className="ui-link"
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setView("tickets");
-                  }}
-                >
-                  pick one in Tickets
-                </a>
-                .
-              </>
-            )}
-          </div>
+          <NoTasks
+            query={query.trim()}
+            epics={sections.layerEpics.length + sections.jiraEpics.length}
+            repos={projects.length}
+          />
         )}
 
         {groups?.map((g) => (
