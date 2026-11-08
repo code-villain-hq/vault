@@ -46,6 +46,10 @@
 .settings-shared dd.muted {
   color: var(--faint);
 }
+/* A control kept beside folded rows (SET-14), Grafana's datasource. */
+.settings-shared + .field {
+  margin-top: 14px;
+}
 
 /* A connected page, folded: Change…, and a line on what it opens (SET-14). */
 .settings-change {
