@@ -432,7 +432,7 @@ pub struct SpawnOptions {
     pub title_topic: Option<fn(&str) -> Option<String>>,
 }
 
-/// The most panes that may exist at once.
+/// The most panes that may run at once.
 ///
 /// A backstop, not a feature. Every pane is a real process — usually an agent
 /// CLI, which is not a cheap one — and every way of opening one, from a click
@@ -480,12 +480,17 @@ impl PtyManager {
         // Checked before anything is allocated, so refusing costs nothing.
         let slot = {
             let panes = self.panes.lock();
-            let live = panes.len() + self.starting.load(Ordering::Acquire);
+            // Only panes still running. One whose agent exited or was stopped
+            // stays in the map until it is closed, holding no process; counted,
+            // a day of finished agents left open filled the cap while thirteen
+            // ran, and the next one was refused.
+            let running = panes.values().filter(|p| p.meta.lock().info.running).count();
+            let live = running + self.starting.load(Ordering::Acquire);
             if live >= MAX_PANES {
                 return Err(Error::Pty(format!(
-                    "{live} terminals are already open, which is the limit. Close some \
-                     before starting another — and if you did not open this many, \
-                     something is starting them on its own."
+                    "{live} terminals are already running, which is the limit. Stop or \
+                     close some before starting another — and if you did not start \
+                     this many, something is starting them on its own."
                 )));
             }
             self.starting.fetch_add(1, Ordering::AcqRel);
@@ -1866,5 +1871,43 @@ mod tests {
         ptys.shutdown(Duration::from_secs(2));
         assert_eq!(started, MAX_PANES, "refused: {:?}", refused.lock());
         assert_eq!(ptys.list(None).len(), MAX_PANES);
+    }
+
+    /// A day of agents that finished and were left open refused the next one
+    /// while thirteen ran: the cap counted every pane, not the running ones.
+    #[test]
+    fn panes_that_ended_leave_room_for_a_new_one() {
+        let app = tauri::test::mock_app();
+        let handle = app.handle().clone();
+        let ptys = PtyManager::default();
+        let dir = std::env::temp_dir().to_string_lossy().to_string();
+        let opts = |program: &str| SpawnOptions {
+            task_id: "t".into(),
+            checkout_id: None,
+            cwd: dir.clone(),
+            kind: PaneKind::Agent,
+            title: "t".into(),
+            program: program.into(),
+            args: Vec::new(),
+            agent_id: None,
+            rows: None,
+            cols: None,
+            initial_input: None,
+            prompted: false,
+            env: Vec::new(),
+            title_activity: None,
+            title_topic: None,
+        };
+        for _ in 0..MAX_PANES {
+            ptys.spawn(&handle, opts("/usr/bin/true")).unwrap();
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while ptys.list(None).iter().any(|p| p.running) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(ptys.list(None).len(), MAX_PANES, "the ended panes are still there to look at");
+        let next = ptys.spawn(&handle, opts("/bin/cat"));
+        ptys.shutdown(Duration::from_secs(2));
+        assert!(next.is_ok(), "refused: {:?}", next.err().map(|e| e.to_string()));
     }
 }
