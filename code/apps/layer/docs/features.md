@@ -858,7 +858,7 @@ send feedback to an agent, and finish a merged task.
   added to a PR, never the reason one is opened.
 
 Code: `commands/github.rs`, `commands/open_prs.rs`, `commands/pr_images.rs`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `integrations/github/images.rs`, `PrPanel.tsx`, `PrReadErrors.tsx`,
-`PrFeedback.tsx`, `Markdown.tsx`, `lib/markdown.ts`.
+`PrFeedback.tsx`, `Markdown.tsx`, `lib/markdown.ts`; its connection in `CodeSettings.tsx`.
 
 Known gaps:
 - Only the first 100 check runs of a commit are read.
@@ -1042,8 +1042,8 @@ Code: `tickets.rs` (the tracker: `Tracker`; Jira's side in
 `tickets/jira.rs`, GitHub's in `tickets/github.rs`), `commands/tickets.rs`
 (`set_tracker`), `commands/jira.rs`, `commands/ticket_flow.rs`,
 `integrations/jira.rs`, `integrations/jira/flow.rs`,
-`integrations/github/issues.rs`, `components/tickets/`, `TrackerChoice.tsx`
-(TKT-15, TKT-16), `lib/tracker.ts`, `TicketFlow.tsx`,
+`integrations/github/issues.rs`, `components/tickets/`, `TicketsSettings.tsx`,
+`TrackerChoice.tsx` (TKT-15, TKT-16), `lib/tracker.ts`, `TicketFlow.tsx`,
 `sidebar/DeleteTask.tsx`, `commands/tracker_tools.rs` (TKT-20). The
 choice is the workspace's `tracker` connection; `AppConfig::tracker_in_use`
 reads it, and `jira_client` refuses every Jira-only path (moves,

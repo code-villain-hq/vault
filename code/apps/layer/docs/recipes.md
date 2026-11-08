@@ -71,15 +71,16 @@ To remove a command, undo every step, in the same commit.
    field by field so each value can be clamped (the compiler asks for this
    one).
 3. **Mirror it** in `src/lib/types.ts` (`UiPrefs`, `Settings`, …).
-4. **Add the control** in `src/components/Settings.tsx`, in the section it
-   belongs to. For a switch:
+4. **Add the control** on the tab of what it changes (SET-6): each tab is
+   a file of its own, `AppearanceSettings.tsx`, `AgentSettings.tsx` and so
+   on, and `useUiPrefs` saves it. For a switch:
 
    ```tsx
    <Switch
      label="Say what it does"
      detail="What turning it on changes, and why someone would not want it."
-     checked={settings.ui.the_field}
-     onChange={(v) => void saveUi({ the_field: v })}
+     checked={ui.the_field}
+     onChange={(v) => void saveUi({ the_field: v }, "the-place")}
    />
    ```
 

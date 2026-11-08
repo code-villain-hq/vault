@@ -1,22 +1,16 @@
 import { getVersion } from "@tauri-apps/api/app";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
-import { api } from "../lib/api";
-import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
 import { AgentSettings } from "./AgentSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { BrowserSettings } from "./BrowserSettings";
+import { CodeSettings } from "./CodeSettings";
 import { NotificationSettings } from "./NotificationSettings";
 import { ObservabilitySettings } from "./ObservabilitySettings";
 import { PhoneSettings } from "./PhoneSettings";
-import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
 import { SlackSettings } from "./SlackSettings";
-import { TicketFlowSettings } from "./TicketFlow";
-import { TrackerChoice } from "./TrackerChoice";
-import { BusyLabel, ErrorMessage, Field, Modal, useFailure } from "./ui";
-
-const ATLASSIAN_TOKENS = "https://id.atlassian.com/manage-profile/security/api-tokens";
+import { TicketsSettings } from "./TicketsSettings";
+import { Modal } from "./ui";
 
 type Section =
   | "appearance"
@@ -48,7 +42,6 @@ const TABS: [Section, string][] = [
 const CONNECTIONS: Section = "jira";
 
 export function Settings() {
-  const settings = useStore((s) => s.settings);
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     void getVersion()
@@ -56,113 +49,9 @@ export function Settings() {
       .catch(() => {});
   }, []);
   const toggleSettings = useStore((s) => s.toggleSettings);
-  const refreshSettings = useStore((s) => s.refreshSettings);
-  const refreshIssues = useStore((s) => s.refreshIssues);
-  const refreshPrs = useStore((s) => s.refreshPrs);
-  const ghRejected = useStore((s) => githubRejected(s.prs));
-  // Each section's actions fail under what was pressed (NOTE-6): connecting
-  // under its button, disconnecting under the connected row.
-  const jira = useFailure();
-  const github = useFailure();
-  const unlink = useFailure();
-
   const [section, setSection] = useState<Section>(
     () => (useStore.getState().settingsSection as Section | null) ?? "appearance",
   );
-  const [busy, setBusy] = useState(false);
-
-  const [jiraUrl, setJiraUrl] = useState("");
-  const [jiraEmail, setJiraEmail] = useState("");
-  const [jiraToken, setJiraToken] = useState("");
-  const [jiraProject, setJiraProject] = useState("");
-  const [jiraJql, setJiraJql] = useState("");
-
-  const [ghApi, setGhApi] = useState("https://api.github.com");
-  const [ghWeb, setGhWeb] = useState("https://github.com");
-  const [ghTeam, setGhTeam] = useState("");
-  const [ghToken, setGhToken] = useState("");
-
-  const workspace = useWorkspace();
-  const heldJira = useHeld("jira");
-  const heldGithub = useHeld("github");
-  const flowLocked = workspace?.admin === false && heldJira !== null;
-
-  // Each form follows what is stored for it, and only when that changes.
-  // Keyed on the whole settings object, every save anywhere — a switch on
-  // Appearance — refreshed it and reset every field, so a JQL half typed on
-  // the Jira page was gone by the time you came back to it.
-  const loaded = settings !== null;
-  const j = settings?.jira;
-  // Not connected here: the workspace's settings, so connecting takes only
-  // yours (SET-8), and a Disconnect leaves them showing (SET-9).
-  const jiraUrlNow = j ? j.base_url : heldText(heldJira, "base_url");
-  const jiraProjectNow = j ? j.project_key : heldText(heldJira, "project_key");
-  const jiraJqlNow = j ? j.jql : heldText(heldJira, "jql");
-  useEffect(() => {
-    if (!loaded) return;
-    setJiraUrl(jiraUrlNow ?? "");
-    setJiraEmail(j?.email ?? "");
-    setJiraProject(jiraProjectNow ?? "");
-    setJiraJql(jiraJqlNow ?? "");
-  }, [loaded, jiraUrlNow, j?.email, jiraProjectNow, jiraJqlNow]);
-  const g = settings?.github;
-  const ghApiNow = g ? g.api_url : heldText(heldGithub, "api_url");
-  const ghWebNow = g ? g.web_url : heldText(heldGithub, "web_url");
-  const ghTeamNow = g ? g.review_team : heldText(heldGithub, "review_team");
-  useEffect(() => {
-    if (!loaded) return;
-    setGhApi(ghApiNow ?? "https://api.github.com");
-    setGhWeb(ghWebNow ?? "https://github.com");
-    setGhTeam(ghTeamNow ?? "");
-  }, [loaded, ghApiNow, ghWebNow, ghTeamNow]);
-
-  async function connectJira() {
-    setBusy(true);
-    jira.clear();
-    try {
-      // The connected row names who it signed in as: no toast (studio/design/behaviour.md).
-      await api.jiraConnect(
-        jiraUrl.trim(),
-        jiraEmail.trim(),
-        jiraToken.trim(),
-        jiraProject.trim() || null,
-        jiraJql.trim() || null,
-      );
-      setJiraToken("");
-      await refreshSettings();
-      await refreshIssues();
-    } catch (e) {
-      jira.fail(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function connectGithub() {
-    setBusy(true);
-    github.clear();
-    try {
-      await api.githubConnect(ghApi.trim(), ghWeb.trim(), ghToken.trim(), ghTeam.trim() || null);
-      setGhToken("");
-      await refreshSettings();
-      // The PR tabs still hold what the old token was told.
-      void refreshPrs();
-    } catch (e) {
-      github.fail(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disconnect(which: "jira" | "github") {
-    unlink.clear();
-    try {
-      await api.disconnect(which);
-      await refreshSettings();
-    } catch (e) {
-      unlink.fail(e);
-    }
-  }
 
   return (
     <Modal
@@ -179,10 +68,7 @@ export function Settings() {
               className={`ui-tab${id === CONNECTIONS ? " settings-tab-gap" : ""}`}
               role="tab"
               aria-selected={section === id}
-              onClick={() => {
-                unlink.clear();
-                setSection(id);
-              }}
+              onClick={() => setSection(id)}
             >
               {label}
             </button>
@@ -198,244 +84,8 @@ export function Settings() {
 
       {section === "slack" && <SlackSettings />}
 
-      {section === "jira" && (
-        <>
-          <TrackerChoice />
-          {settings?.tracker_chosen === "github" ? (
-            <>
-              <p className="muted">
-                Issues come from the workspace's repositories on GitHub: the open ones assigned to
-                you, each started as a task, and closed when its pull request merges. They use the
-                token under Code.
-              </p>
-              {settings.github_connected ? (
-                <div className="row">
-                  <span className="ui-status">connected</span>
-                  <span className="muted">{settings.github?.web_url}</span>
-                </div>
-              ) : (
-                <button
-                  className="ui-button ui-button-primary"
-                  onClick={() => setSection("github")}
-                >
-                  Connect GitHub
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="muted">
-                Tickets come from Jira: the ones assigned to you, each started as a task, and moved
-                along as the work goes.
-              </p>
-              {settings?.jira_connected && (
-                <div className="row" style={{ marginBottom: 14 }}>
-                  <span className="ui-status">connected</span>
-                  <span className="muted">{settings.jira?.email}</span>
-                  <div className="spacer" />
-                  <button
-                    className="ui-button ui-button-danger"
-                    onClick={() => void disconnect("jira")}
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              )}
-              <ErrorMessage>{unlink.error}</ErrorMessage>
-              <Theirs
-                kind="jira"
-                what="Jira"
-                rows={[
-                  ["Site", jiraUrl],
-                  ["Project", jiraProject],
-                  ["Query", jiraJql, true],
-                ]}
-              >
-                <Field label="Site URL">
-                  <input
-                    className="ui-field"
-                    value={jiraUrl}
-                    onChange={(e) => setJiraUrl(e.target.value)}
-                    placeholder="https://your-team.atlassian.net"
-                  />
-                </Field>
-                <Field label="Project key" hint="Optional. Scopes the default task query.">
-                  <input
-                    className="ui-field"
-                    value={jiraProject}
-                    onChange={(e) => setJiraProject(e.target.value.toUpperCase())}
-                    placeholder="ACME"
-                  />
-                </Field>
-                <Field
-                  label="JQL"
-                  hint="Optional. Overrides the default 'assigned to me, not done' query."
-                >
-                  <input
-                    className="ui-field"
-                    value={jiraJql}
-                    onChange={(e) => setJiraJql(e.target.value)}
-                    placeholder="assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
-                  />
-                </Field>
-              </Theirs>
-              <Yours>
-                <Field label="Account email">
-                  <input
-                    className="ui-field"
-                    value={jiraEmail}
-                    onChange={(e) => setJiraEmail(e.target.value)}
-                  />
-                </Field>
-                <Field
-                  label="API token"
-                  hint={
-                    <>
-                      Stored in your macOS keychain, never in config files.{" "}
-                      <a
-                        className="ui-link"
-                        href={ATLASSIAN_TOKENS}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          void openUrl(ATLASSIAN_TOKENS);
-                        }}
-                      >
-                        Create one ↗
-                      </a>
-                    </>
-                  }
-                >
-                  <input
-                    className="ui-field"
-                    type="password"
-                    value={jiraToken}
-                    onChange={(e) => setJiraToken(e.target.value)}
-                    placeholder={settings?.jira_connected ? "•••••••• (leave blank to keep)" : ""}
-                  />
-                </Field>
-              </Yours>
-              <button
-                className="ui-button ui-button-primary"
-                // A blank token keeps the stored one, so once connected the
-                // project key and JQL can be changed without pasting it again.
-                disabled={
-                  busy ||
-                  !jiraUrl.trim() ||
-                  !jiraEmail.trim() ||
-                  (!jiraToken.trim() && !settings?.jira_connected)
-                }
-                onClick={() => void connectJira()}
-              >
-                {/* One button, named by what it does (SET-12). */}
-                <BusyLabel
-                  busy={busy}
-                  idle={settings?.jira_connected ? "Reconnect" : "Connect"}
-                  working="Connecting…"
-                />
-              </button>
-              <ErrorMessage>{jira.error}</ErrorMessage>
-              {settings?.jira_connected && (
-                // Where tickets go is the workspace's too (SET-7).
-                <fieldset className="settings-locked" disabled={flowLocked}>
-                  <TicketFlowSettings />
-                  {flowLocked && (
-                    <p className="settings-alone">
-                      How tickets follow the work is {workspace.name}'s: admins change it.
-                    </p>
-                  )}
-                </fieldset>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {section === "github" && (
-        <>
-          <p className="muted" style={{ marginTop: 0 }}>
-            Pull requests, their checks and reviews come from GitHub, or GitHub Enterprise Server.
-          </p>
-          {settings?.github_connected && (
-            <div className="row" style={{ marginBottom: 14 }}>
-              {ghRejected ? (
-                <span className="ui-status ui-status-danger">token rejected</span>
-              ) : (
-                <span className="ui-status">connected</span>
-              )}
-              <span className="muted">{settings.github?.api_url}</span>
-              <div className="spacer" />
-              <button
-                className="ui-button ui-button-danger"
-                onClick={() => void disconnect("github")}
-              >
-                Disconnect
-              </button>
-            </div>
-          )}
-          <ErrorMessage>{unlink.error}</ErrorMessage>
-          <Theirs
-            kind="github"
-            what="GitHub"
-            rows={[
-              ["API URL", ghApi],
-              ["Web URL", ghWeb],
-              ["Review team", ghTeam],
-            ]}
-          >
-            <Field
-              label="API URL"
-              hint="github.com uses https://api.github.com. Enterprise Server uses https://ghe.example.com/api/v3."
-            >
-              <input
-                className="ui-field"
-                value={ghApi}
-                onChange={(e) => setGhApi(e.target.value)}
-              />
-            </Field>
-            <Field label="Web URL" hint="Used for building links back to the browser.">
-              <input
-                className="ui-field"
-                value={ghWeb}
-                onChange={(e) => setGhWeb(e.target.value)}
-              />
-            </Field>
-            <Field
-              label="Review team"
-              hint="Optional. A second list of pull requests requested of this team, as @fe or org/fe. A bare name is looked up from the teams you belong to, which needs the read:org scope; org/fe does not."
-            >
-              <input
-                className="ui-field"
-                value={ghTeam}
-                onChange={(e) => setGhTeam(e.target.value)}
-                placeholder="@fe"
-              />
-            </Field>
-          </Theirs>
-          <Yours>
-            <Field label="Personal access token" hint="Needs repo scope. Stored in your keychain.">
-              <input
-                className="ui-field"
-                type="password"
-                value={ghToken}
-                onChange={(e) => setGhToken(e.target.value)}
-                placeholder={settings?.github_connected ? "•••••••• (leave blank to keep)" : ""}
-              />
-            </Field>
-          </Yours>
-          <button
-            className="ui-button ui-button-primary"
-            disabled={busy || !ghApi.trim() || (!ghToken.trim() && !settings?.github_connected)}
-            onClick={() => void connectGithub()}
-          >
-            <BusyLabel
-              busy={busy}
-              idle={settings?.github_connected ? "Reconnect" : "Connect"}
-              working="Connecting…"
-            />
-          </button>
-          <ErrorMessage>{github.error}</ErrorMessage>
-        </>
-      )}
+      {section === "jira" && <TicketsSettings toCode={() => setSection("github")} />}
+      {section === "github" && <CodeSettings />}
 
       {section === "observability" && <ObservabilitySettings />}
       {section === "phone" && <PhoneSettings />}
