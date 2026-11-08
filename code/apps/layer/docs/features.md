@@ -1371,11 +1371,9 @@ Known gaps:
 | Remote access: Tailscale | off | PHONE-1, PHONE-2 |
 | Remote access: Home network and router VPN | off | PHONE-1, PHONE-2 |
 | Remote access: Let phones type into agents | off | PHONE-7 |
-| Tickets: issue tracker | none | Jira, GitHub Issues or Forge, one per workspace (TKT-15) |
+| Tickets: issue tracker | none | Jira or GitHub Issues, one per workspace (TKT-15); Forge, and GitHub Issues' epic type (TKT-17), are not built |
 | Tickets: Jira | — | site URL, email, API token, optional project key and JQL |
 | Tickets follow the work (Jira) | work starts: first in-progress status; review, merged: not chosen | TKT-1, TKT-8, per Jira project |
-| Tickets: Forge | — | site URL, then a sign-in in the browser; optional team key |
-| Tickets: GitHub Issues | — | the issue type epics are, when the organisation has issue types (TKT-17) |
 | Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug; a fine-grained token also needs Issues, read and write, when GitHub Issues is the tracker), review team |
 | Messaging: Slack | — | the bot: bot token (`xoxb-`), app-level token (`xapp-`, `connections:write`), the owner's member ID, the agent and its model (BOT-17), on/off, work without asking, personality (BOT-*) |
 | Logs: Grafana | — | site URL, service account token (reads and queries datasources), OBS-1; the Loki datasource for your services' logs, none chosen, OBS-5 |
