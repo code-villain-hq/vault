@@ -24,10 +24,12 @@
   font-size: var(--type-ui-small-size);
 }
 
-/* A member's view of the workspace's settings: label, then value. */
+/* Settings as text: a member's view of the workspace's, and a connected page folded (SET-14). */
 .settings-shared {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  /* Wide enough for "Personal access token", so the workspace's block and
+     yours line up. */
+  grid-template-columns: minmax(150px, max-content) minmax(0, 1fr);
   gap: 4px 24px;
   margin: 0;
 }
@@ -43,6 +45,12 @@
 }
 .settings-shared dd.muted {
   color: var(--faint);
+}
+
+/* A connected page, folded: Change…, and a line on what it opens (SET-14). */
+.settings-change {
+  gap: 12px;
+  margin-top: 4px;
 }
 
 /* The last thing in Settings, on every page: "Layer 0.1.0" (SET-11). */

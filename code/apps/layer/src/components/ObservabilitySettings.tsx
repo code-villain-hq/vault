@@ -3,8 +3,18 @@ import { api } from "../lib/api";
 import type { GrafanaDatasource } from "../lib/types";
 import { useStore } from "../store";
 import { S3LogSources } from "./S3LogSources";
-import { heldText, Theirs, useHeld, Yours } from "./SharedSettings";
-import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
+import {
+  ChangeRow,
+  ConnectRow,
+  heldText,
+  IN_KEYCHAIN,
+  Theirs,
+  useFold,
+  useHeld,
+  useTheirsLocked,
+  Yours,
+} from "./SharedSettings";
+import { ErrorMessage, Field, useFailure } from "./ui";
 
 /**
  * Settings → Logs: where agents read your services' logs (§23):
@@ -23,7 +33,11 @@ export function ObservabilitySettings() {
   );
 }
 
-/** Grafana's Loki (OBS-1). */
+/**
+ * Grafana's Loki (OBS-1). Connected, the connection is text and its form
+ * opens behind Change… (SET-14); the datasource agents read stays out, as
+ * it is chosen day to day.
+ */
 function GrafanaSource() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
@@ -40,6 +54,8 @@ function GrafanaSource() {
   const [busy, setBusy] = useState(false);
   const [sources, setSources] = useState<GrafanaDatasource[] | null>(null);
   const baseUrl = settings?.grafana?.base_url;
+  const { folded, change, fold } = useFold(connected);
+  const locked = useTheirsLocked("grafana");
 
   // Asked of the site, not kept: a datasource added in Grafana shows up here
   // the next time the tab opens. Reconnecting can change the site, so it
@@ -66,6 +82,13 @@ function GrafanaSource() {
     }
   }
 
+  function cancel() {
+    setUrl(baseUrl ?? heldText(held, "base_url") ?? "");
+    setToken("");
+    connecting.clear();
+    fold();
+  }
+
   async function connect() {
     setBusy(true);
     connecting.clear();
@@ -73,6 +96,7 @@ function GrafanaSource() {
       await api.grafanaConnect(url.trim(), token.trim());
       setToken("");
       await refreshSettings();
+      fold();
     } catch (e) {
       connecting.fail(e);
     } finally {
@@ -89,6 +113,32 @@ function GrafanaSource() {
       unlink.fail(e);
     }
   }
+
+  const site = baseUrl ?? heldText(held, "base_url");
+  const datasource =
+    sources?.find((s) => s.uid === settings?.grafana?.datasource)?.name ??
+    heldText(held, "datasource");
+  // Saved as it changes, so it stays out of the fold.
+  const choice = sources && sources.length > 1 && (
+    <Field
+      label="Your services' logs"
+      hint="The Loki datasource agents read when they don't name one. Grafana Cloud adds datasources of its own beside yours. One missing here is one the token may not query: give its service account access to it in Grafana."
+    >
+      <select
+        className="ui-field"
+        value={settings?.grafana?.datasource ?? ""}
+        onChange={(e) => void choose(e.target.value)}
+      >
+        <option value="">Not chosen: agents name one each time</option>
+        {sources.map((s) => (
+          <option key={s.uid} value={s.uid}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <ErrorMessage>{choosing.error}</ErrorMessage>
+    </Field>
+  );
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
@@ -117,35 +167,19 @@ function GrafanaSource() {
       <Theirs
         kind="grafana"
         what="Grafana"
-        rows={[
-          ["Site", url],
-          [
-            "Your services' logs",
-            sources?.find((s) => s.uid === settings?.grafana?.datasource)?.name ??
-              heldText(held, "datasource"),
-          ],
-        ]}
+        rows={
+          // An admin's datasource is the list kept beside the text, as today.
+          locked
+            ? [
+                ["Site", site],
+                ["Your services' logs", datasource],
+              ]
+            : [["Site", site]]
+        }
+        folded={folded}
+        keep={choice}
       >
-        {sources && sources.length > 1 && (
-          <Field
-            label="Your services' logs"
-            hint="The Loki datasource agents read when they don't name one. Grafana Cloud adds datasources of its own beside yours. One missing here is one the token may not query: give its service account access to it in Grafana."
-          >
-            <select
-              className="ui-field"
-              value={settings?.grafana?.datasource ?? ""}
-              onChange={(e) => void choose(e.target.value)}
-            >
-              <option value="">Not chosen: agents name one each time</option>
-              {sources.map((s) => (
-                <option key={s.uid} value={s.uid}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <ErrorMessage>{choosing.error}</ErrorMessage>
-          </Field>
-        )}
+        {choice}
         <Field label="Site URL" hint="Where you open Grafana, e.g. https://acme.grafana.net.">
           <input
             className="ui-field"
@@ -155,7 +189,7 @@ function GrafanaSource() {
           />
         </Field>
       </Theirs>
-      <Yours>
+      <Yours rows={[["Service account token", IN_KEYCHAIN]]} folded={folded}>
         <Field
           label="Service account token"
           hint="Administration → Users and access → Service accounts. Its role has to read and query datasources. Stored in your keychain."
@@ -169,14 +203,24 @@ function GrafanaSource() {
           />
         </Field>
       </Yours>
-      <button
-        className="ui-button ui-button-primary"
-        disabled={busy || !url.trim() || (!token.trim() && !connected)}
-        onClick={() => void connect()}
-      >
-        {/* One button, named by what it does (SET-12). */}
-        <BusyLabel busy={busy} idle={connected ? "Reconnect" : "Connect"} working="Connecting…" />
-      </button>
+      {folded ? (
+        <ChangeRow
+          note={
+            locked
+              ? "Your token: it is tried before it is kept."
+              : "The site or the token: they are tried together."
+          }
+          onClick={change}
+        />
+      ) : (
+        <ConnectRow
+          connected={connected}
+          busy={busy}
+          disabled={!url.trim() || (!token.trim() && !connected)}
+          onConnect={() => void connect()}
+          onCancel={cancel}
+        />
+      )}
       <ErrorMessage>{connecting.error}</ErrorMessage>
     </div>
   );

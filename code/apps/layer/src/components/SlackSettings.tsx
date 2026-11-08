@@ -4,7 +4,8 @@ import { api } from "../lib/api";
 import { BOT_NAME_MAX, botManifest, newAppUrl, useSlackBot } from "../lib/slackBot";
 import type { AgentStatus, SlackBotConfig, SlackBotStatus } from "../lib/types";
 import { useStore } from "../store";
-import { BusyLabel, ErrorMessage, Field, Switch, useFailure } from "./ui";
+import { ChangeRow, ConnectRow, useFold } from "./SharedSettings";
+import { ErrorMessage, Field, Switch, useFailure } from "./ui";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
   connected: ["connected", "ui-status"],
@@ -17,7 +18,8 @@ const STATE: Record<SlackBotStatus["state"], [string, string]> = {
  * Settings → Messaging: the Slack bot (§24), a Slack app of your own, named by you,
  * that hands a thread to a chat when you mention it and posts the chat's
  * replies back to the thread. What it posts to a channel is under
- * Notifications (§11).
+ * Notifications (§11). Connected, its tokens, your member ID and the steps
+ * that made it fold behind Change tokens… (SET-14).
  */
 export function SlackSettings() {
   const settings = useStore((s) => s.settings);
@@ -41,6 +43,15 @@ export function SlackSettings() {
   const [busy, setBusy] = useState(false);
   const [personality, setPersonality] = useState(bot?.personality ?? "");
   const personalityChanged = personality.trim() !== (bot?.personality ?? "");
+  const { folded, change, fold } = useFold(bot !== null);
+
+  function cancel() {
+    setBotToken("");
+    setAppToken("");
+    setOwner(bot?.owner ?? "");
+    connecting.clear();
+    fold();
+  }
 
   async function connect() {
     setBusy(true);
@@ -55,6 +66,7 @@ export function SlackSettings() {
       setBotToken("");
       setAppToken("");
       await refreshSettings();
+      fold();
     } catch (e) {
       connecting.fail(e);
     } finally {
@@ -216,127 +228,140 @@ export function SlackSettings() {
         </div>
       )}
 
-      <div className="card" style={{ marginBottom: 14 }}>
-        <h3>Making the bot</h3>
-        <Field
-          label="Its name"
-          hint="What you will type after the @. Slack keeps the name; change it there later."
-        >
-          <input
-            className="ui-field"
-            value={name}
-            maxLength={BOT_NAME_MAX}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="drdoom"
-          />
-        </Field>
-        <div className="muted" style={{ lineHeight: 1.7 }}>
-          <ol style={{ margin: "0 0 0", paddingLeft: 18 }}>
-            <li>
-              {link(newAppUrl(name), "Create the app in Slack ↗")}, pick your workspace, and create
-              it from the manifest filled in. (Or <b>Create New App</b> →{" "}
-              <b>From an app manifest</b> and paste the one below.)
-            </li>
-            <li>
-              <b>Install to Workspace</b>. Your admin may have to approve it.
-            </li>
-            <li>
-              Copy the <b>Bot User OAuth Token</b> (<code>xoxb-</code>) from{" "}
-              <b>OAuth &amp; Permissions</b>.
-            </li>
-            <li>
-              Under <b>Basic Information</b> → <b>App-Level Tokens</b>, generate one with the{" "}
-              <code>connections:write</code> scope (<code>xapp-</code>).
-            </li>
-            <li>
-              Your member ID: in Slack, open your profile, then <b>⋯</b> → <b>Copy member ID</b>.
-            </li>
-            <li>
-              Invite the bot to the channels you want it in:{" "}
-              <code>/invite @{name.trim() || "layer"}</code>.
-            </li>
-          </ol>
-        </div>
-        <div className="row" style={{ marginTop: 10 }}>
-          <button className="ui-button" onClick={() => setShowManifest((v) => !v)}>
-            {showManifest ? "Hide manifest" : "Show app manifest"}
-          </button>
-        </div>
-        {showManifest && (
-          <textarea
-            className="ui-field"
-            readOnly
-            rows={16}
-            value={JSON.stringify(botManifest(name), null, 2)}
-            onFocus={(e) => e.currentTarget.select()}
-            style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}
-          />
-        )}
-      </div>
-
-      <Field
-        label="Bot token"
-        hint="OAuth & Permissions → Bot User OAuth Token. Stored in your keychain."
-      >
-        <input
-          className="ui-field"
-          type="password"
-          value={botToken}
-          onChange={(e) => setBotToken(e.target.value)}
-          placeholder={bot ? "•••••••• (leave blank to keep)" : "xoxb-…"}
+      {folded ? (
+        <ChangeRow
+          label="Change tokens…"
+          note="Bot token, app-level token, your member ID, and the steps that made the bot."
+          onClick={change}
         />
-      </Field>
-      <Field
-        label="App-level token"
-        hint="Basic Information → App-Level Tokens, with connections:write. Stored in your keychain."
-      >
-        <input
-          className="ui-field"
-          type="password"
-          value={appToken}
-          onChange={(e) => setAppToken(e.target.value)}
-          placeholder={bot ? "•••••••• (leave blank to keep)" : "xapp-…"}
-        />
-      </Field>
-      <Field label="Your member ID" hint="The one person the bot takes requests from.">
-        <input
-          className="ui-field"
-          value={owner}
-          onChange={(e) => setOwner(e.target.value)}
-          placeholder="U0123ABCD"
-        />
-      </Field>
-      {!bot && (
-        <Field
-          label="Agent"
-          hint="Who a thread is handed to: an agent that runs as a conversation (ACP)."
-        >
-          <select className="ui-field" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
-            {conversational.length === 0 && (
-              <option value="">No agent on your PATH runs over ACP</option>
+      ) : (
+        <>
+          <div className="card" style={{ marginBottom: 14 }}>
+            <h3>Making the bot</h3>
+            <Field
+              label="Its name"
+              hint="What you will type after the @. Slack keeps the name; change it there later."
+            >
+              <input
+                className="ui-field"
+                value={name}
+                maxLength={BOT_NAME_MAX}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="drdoom"
+              />
+            </Field>
+            <div className="muted" style={{ lineHeight: 1.7 }}>
+              <ol style={{ margin: "0 0 0", paddingLeft: 18 }}>
+                <li>
+                  {link(newAppUrl(name), "Create the app in Slack ↗")}, pick your workspace, and
+                  create it from the manifest filled in. (Or <b>Create New App</b> →{" "}
+                  <b>From an app manifest</b> and paste the one below.)
+                </li>
+                <li>
+                  <b>Install to Workspace</b>. Your admin may have to approve it.
+                </li>
+                <li>
+                  Copy the <b>Bot User OAuth Token</b> (<code>xoxb-</code>) from{" "}
+                  <b>OAuth &amp; Permissions</b>.
+                </li>
+                <li>
+                  Under <b>Basic Information</b> → <b>App-Level Tokens</b>, generate one with the{" "}
+                  <code>connections:write</code> scope (<code>xapp-</code>).
+                </li>
+                <li>
+                  Your member ID: in Slack, open your profile, then <b>⋯</b> → <b>Copy member ID</b>
+                  .
+                </li>
+                <li>
+                  Invite the bot to the channels you want it in:{" "}
+                  <code>/invite @{name.trim() || "layer"}</code>.
+                </li>
+              </ol>
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <button className="ui-button" onClick={() => setShowManifest((v) => !v)}>
+                {showManifest ? "Hide manifest" : "Show app manifest"}
+              </button>
+            </div>
+            {showManifest && (
+              <textarea
+                className="ui-field"
+                readOnly
+                rows={16}
+                value={JSON.stringify(botManifest(name), null, 2)}
+                onFocus={(e) => e.currentTarget.select()}
+                style={{ marginTop: 10, fontSize: "var(--type-ui-small-size)" }}
+              />
             )}
-            {conversational.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+          </div>
+
+          <Field
+            label="Bot token"
+            hint="OAuth & Permissions → Bot User OAuth Token. Stored in your keychain."
+          >
+            <input
+              className="ui-field"
+              type="password"
+              value={botToken}
+              onChange={(e) => setBotToken(e.target.value)}
+              placeholder={bot ? "•••••••• (leave blank to keep)" : "xoxb-…"}
+            />
+          </Field>
+          <Field
+            label="App-level token"
+            hint="Basic Information → App-Level Tokens, with connections:write. Stored in your keychain."
+          >
+            <input
+              className="ui-field"
+              type="password"
+              value={appToken}
+              onChange={(e) => setAppToken(e.target.value)}
+              placeholder={bot ? "•••••••• (leave blank to keep)" : "xapp-…"}
+            />
+          </Field>
+          <Field label="Your member ID" hint="The one person the bot takes requests from.">
+            <input
+              className="ui-field"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              placeholder="U0123ABCD"
+            />
+          </Field>
+          {!bot && (
+            <Field
+              label="Agent"
+              hint="Who a thread is handed to: an agent that runs as a conversation (ACP)."
+            >
+              <select
+                className="ui-field"
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+              >
+                {conversational.length === 0 && (
+                  <option value="">No agent on your PATH runs over ACP</option>
+                )}
+                {conversational.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <ConnectRow
+            connected={bot !== null}
+            busy={busy}
+            disabled={
+              !owner.trim() ||
+              !(bot?.agent_id || agentId) ||
+              (!bot && (!botToken.trim() || !appToken.trim()))
+            }
+            onConnect={() => void connect()}
+            onCancel={cancel}
+          />
+          <ErrorMessage>{connecting.error}</ErrorMessage>
+        </>
       )}
-      <button
-        className="ui-button ui-button-primary"
-        disabled={
-          busy ||
-          !owner.trim() ||
-          !(bot?.agent_id || agentId) ||
-          (!bot && (!botToken.trim() || !appToken.trim()))
-        }
-        onClick={() => void connect()}
-      >
-        {/* One button, named by what it does (SET-12). */}
-        <BusyLabel busy={busy} idle={bot ? "Reconnect" : "Connect"} working="Connecting…" />
-      </button>
-      <ErrorMessage>{connecting.error}</ErrorMessage>
     </>
   );
 }

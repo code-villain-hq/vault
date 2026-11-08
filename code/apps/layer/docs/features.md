@@ -1455,7 +1455,8 @@ Known gaps:
   and the app has to try them. It is named by what it does: "Connect"
   until it is connected, "Reconnect" after, and "Connecting…" while it
   tries (`studio/design/behaviour.md`, "Settings"). Connecting raises no
-  toast: the connected row says it (NOTE-7).
+  toast: the connected row says it (NOTE-7). Opened on a connected page
+  (SET-14), Cancel beside it puts the form back as stored, untried.
 - **SET-13** Layer's server (§25), not the app, MUST read its settings
   from `layer.toml` (`--config <file>`, else `LAYER_CONFIG`, else
   `./layer.toml`), with the environment over it: `[oidc] issuer` is
@@ -1466,12 +1467,20 @@ Known gaps:
   setting missing, or one the server doesn't know, stops it, naming the
   setting. `layer.example.toml` has them all. The app's own server on
   this Mac (PROF-11) reads none of them.
+- **SET-14** A connected page MUST fold its form: its settings as text
+  (the workspace's block and yours, a token as "in your keychain"), then
+  Change… with a line on what it holds. Change… opens the form as it
+  was; connecting folds it again. What is used day to day stays out of
+  the fold: how tickets follow the work, the Slack bot's switches, agent,
+  model and personality, Grafana's Loki datasource. Messaging's button
+  is "Change tokens…", over the Slack bot's tokens, your member ID and
+  the steps that made it.
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `NotificationSettings.tsx`, `AgentSettings.tsx`
 (`useUiPrefs.tsx` saves the prefs for all three), `integrations/mod.rs` (`require_https`); the
 server's settings (SET-13) in `crates/server/src/config.rs`; the
-workspace's and yours (SET-7 to SET-10) in `SharedSettings.tsx` and
+workspace's and yours (SET-7 to SET-10), and the fold (SET-14), in `SharedSettings.tsx` and
 `config/shared.rs` (`held`, `WorkspaceAt.admin`); the
 theme in `theme.css`, `lib/theme.ts`, `lib/terminal.ts` and `theme.rs`.
 

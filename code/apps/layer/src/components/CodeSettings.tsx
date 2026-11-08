@@ -2,10 +2,23 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
-import { heldText, Theirs, useHeld, Yours } from "./SharedSettings";
-import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
+import {
+  ChangeRow,
+  ConnectRow,
+  heldText,
+  IN_KEYCHAIN,
+  Theirs,
+  useFold,
+  useHeld,
+  useTheirsLocked,
+  Yours,
+} from "./SharedSettings";
+import { ErrorMessage, Field, useFailure } from "./ui";
 
-/** Settings → Code: GitHub's connection, for pull requests and their checks. */
+/**
+ * Settings → Code: GitHub's connection, for pull requests and their checks.
+ * Connected, it is text, and the form opens behind Change… (SET-14).
+ */
 export function CodeSettings() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
@@ -16,6 +29,9 @@ export function CodeSettings() {
   const github = useFailure();
   const unlink = useFailure();
   const [busy, setBusy] = useState(false);
+  const connected = settings?.github_connected ?? false;
+  const { folded, change, fold } = useFold(connected);
+  const locked = useTheirsLocked("github");
 
   const [ghApi, setGhApi] = useState("https://api.github.com");
   const [ghWeb, setGhWeb] = useState("https://github.com");
@@ -37,6 +53,15 @@ export function CodeSettings() {
     setGhTeam(ghTeamNow ?? "");
   }, [loaded, ghApiNow, ghWebNow, ghTeamNow]);
 
+  function cancel() {
+    setGhApi(ghApiNow ?? "https://api.github.com");
+    setGhWeb(ghWebNow ?? "https://github.com");
+    setGhTeam(ghTeamNow ?? "");
+    setGhToken("");
+    github.clear();
+    fold();
+  }
+
   async function connectGithub() {
     setBusy(true);
     github.clear();
@@ -44,6 +69,7 @@ export function CodeSettings() {
       await api.githubConnect(ghApi.trim(), ghWeb.trim(), ghToken.trim(), ghTeam.trim() || null);
       setGhToken("");
       await refreshSettings();
+      fold();
       // The PR tabs still hold what the old token was told.
       void refreshPrs();
     } catch (e) {
@@ -68,14 +94,14 @@ export function CodeSettings() {
       <p className="muted" style={{ marginTop: 0 }}>
         Pull requests, their checks and reviews come from GitHub, or GitHub Enterprise Server.
       </p>
-      {settings?.github_connected && (
+      {connected && (
         <div className="row" style={{ marginBottom: 14 }}>
           {ghRejected ? (
             <span className="ui-status ui-status-danger">token rejected</span>
           ) : (
             <span className="ui-status">connected</span>
           )}
-          <span className="muted">{settings.github?.api_url}</span>
+          <span className="muted">{settings?.github?.api_url}</span>
           <div className="spacer" />
           <button className="ui-button ui-button-danger" onClick={() => void disconnect()}>
             Disconnect
@@ -87,10 +113,11 @@ export function CodeSettings() {
         kind="github"
         what="GitHub"
         rows={[
-          ["API URL", ghApi],
-          ["Web URL", ghWeb],
-          ["Review team", ghTeam],
+          ["API URL", ghApiNow],
+          ["Web URL", ghWebNow],
+          ["Review team", ghTeamNow],
         ]}
+        folded={folded}
       >
         <Field
           label="API URL"
@@ -113,28 +140,35 @@ export function CodeSettings() {
           />
         </Field>
       </Theirs>
-      <Yours>
+      <Yours rows={[["Personal access token", IN_KEYCHAIN]]} folded={folded}>
         <Field label="Personal access token" hint="Needs repo scope. Stored in your keychain.">
           <input
             className="ui-field"
             type="password"
             value={ghToken}
             onChange={(e) => setGhToken(e.target.value)}
-            placeholder={settings?.github_connected ? "•••••••• (leave blank to keep)" : ""}
+            placeholder={connected ? "•••••••• (leave blank to keep)" : ""}
           />
         </Field>
       </Yours>
-      <button
-        className="ui-button ui-button-primary"
-        disabled={busy || !ghApi.trim() || (!ghToken.trim() && !settings?.github_connected)}
-        onClick={() => void connectGithub()}
-      >
-        <BusyLabel
-          busy={busy}
-          idle={settings?.github_connected ? "Reconnect" : "Connect"}
-          working="Connecting…"
+      {folded ? (
+        <ChangeRow
+          note={
+            locked
+              ? "Your token: it is tried before it is kept."
+              : "The addresses, the review team or the token: they are tried together."
+          }
+          onClick={change}
         />
-      </button>
+      ) : (
+        <ConnectRow
+          connected={connected}
+          busy={busy}
+          disabled={!ghApi.trim() || (!ghToken.trim() && !connected)}
+          onConnect={() => void connectGithub()}
+          onCancel={cancel}
+        />
+      )}
       <ErrorMessage>{github.error}</ErrorMessage>
     </>
   );

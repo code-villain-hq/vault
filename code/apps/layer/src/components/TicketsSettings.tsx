@@ -2,10 +2,20 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { useStore } from "../store";
-import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
+import {
+  ChangeRow,
+  ConnectRow,
+  heldText,
+  IN_KEYCHAIN,
+  Theirs,
+  useFold,
+  useHeld,
+  useWorkspace,
+  Yours,
+} from "./SharedSettings";
 import { TicketFlowSettings } from "./TicketFlow";
 import { TrackerChoice } from "./TrackerChoice";
-import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
+import { ErrorMessage, Field, useFailure } from "./ui";
 
 const ATLASSIAN_TOKENS = "https://id.atlassian.com/manage-profile/security/api-tokens";
 
@@ -44,7 +54,11 @@ export function TicketsSettings({ toCode }: { toCode: () => void }) {
   );
 }
 
-/** Jira's connection, and how tickets follow the work once connected. */
+/**
+ * Jira's connection, and how tickets follow the work once connected.
+ * Connected, the connection is text, and its form opens behind Change…
+ * (SET-14); how tickets follow the work stays out, being used day to day.
+ */
 function JiraSettings() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
@@ -54,6 +68,8 @@ function JiraSettings() {
   const jira = useFailure();
   const unlink = useFailure();
   const [busy, setBusy] = useState(false);
+  const connected = settings?.jira_connected ?? false;
+  const { folded, change, fold } = useFold(connected);
 
   const [jiraUrl, setJiraUrl] = useState("");
   const [jiraEmail, setJiraEmail] = useState("");
@@ -84,6 +100,16 @@ function JiraSettings() {
     setJiraJql(jiraJqlNow ?? "");
   }, [loaded, jiraUrlNow, j?.email, jiraProjectNow, jiraJqlNow]);
 
+  function cancel() {
+    setJiraUrl(jiraUrlNow ?? "");
+    setJiraEmail(j?.email ?? "");
+    setJiraProject(jiraProjectNow ?? "");
+    setJiraJql(jiraJqlNow ?? "");
+    setJiraToken("");
+    jira.clear();
+    fold();
+  }
+
   async function connectJira() {
     setBusy(true);
     jira.clear();
@@ -98,6 +124,7 @@ function JiraSettings() {
       );
       setJiraToken("");
       await refreshSettings();
+      fold();
       await refreshIssues();
     } catch (e) {
       jira.fail(e);
@@ -122,10 +149,10 @@ function JiraSettings() {
         Tickets come from Jira: the ones assigned to you, each started as a task, and moved along as
         the work goes.
       </p>
-      {settings?.jira_connected && (
+      {connected && (
         <div className="row" style={{ marginBottom: 14 }}>
           <span className="ui-status">connected</span>
-          <span className="muted">{settings.jira?.email}</span>
+          <span className="muted">{settings?.jira?.email}</span>
           <div className="spacer" />
           <button className="ui-button ui-button-danger" onClick={() => void disconnect()}>
             Disconnect
@@ -137,10 +164,11 @@ function JiraSettings() {
         kind="jira"
         what="Jira"
         rows={[
-          ["Site", jiraUrl],
-          ["Project", jiraProject],
-          ["Query", jiraJql, true],
+          ["Site", jiraUrlNow],
+          ["Project", jiraProjectNow],
+          ["Query", jiraJqlNow, true],
         ]}
+        folded={folded}
       >
         <Field label="Site URL">
           <input
@@ -167,7 +195,13 @@ function JiraSettings() {
           />
         </Field>
       </Theirs>
-      <Yours>
+      <Yours
+        rows={[
+          ["Account email", j?.email],
+          ["API token", IN_KEYCHAIN],
+        ]}
+        folded={folded}
+      >
         <Field label="Account email">
           <input
             className="ui-field"
@@ -198,31 +232,32 @@ function JiraSettings() {
             type="password"
             value={jiraToken}
             onChange={(e) => setJiraToken(e.target.value)}
-            placeholder={settings?.jira_connected ? "•••••••• (leave blank to keep)" : ""}
+            placeholder={connected ? "•••••••• (leave blank to keep)" : ""}
           />
         </Field>
       </Yours>
-      <button
-        className="ui-button ui-button-primary"
-        // A blank token keeps the stored one, so once connected the
-        // project key and JQL can be changed without pasting it again.
-        disabled={
-          busy ||
-          !jiraUrl.trim() ||
-          !jiraEmail.trim() ||
-          (!jiraToken.trim() && !settings?.jira_connected)
-        }
-        onClick={() => void connectJira()}
-      >
-        {/* One button, named by what it does (SET-12). */}
-        <BusyLabel
-          busy={busy}
-          idle={settings?.jira_connected ? "Reconnect" : "Connect"}
-          working="Connecting…"
+      {folded ? (
+        <ChangeRow
+          note={
+            flowLocked
+              ? "Your email or the token: they are tried together."
+              : "The site, project, query, your email or the token: they are tried together."
+          }
+          onClick={change}
         />
-      </button>
+      ) : (
+        <ConnectRow
+          connected={connected}
+          busy={busy}
+          // A blank token keeps the stored one, so the project key and JQL
+          // can be changed without pasting it again.
+          disabled={!jiraUrl.trim() || !jiraEmail.trim() || (!jiraToken.trim() && !connected)}
+          onConnect={() => void connectJira()}
+          onCancel={cancel}
+        />
+      )}
       <ErrorMessage>{jira.error}</ErrorMessage>
-      {settings?.jira_connected && (
+      {connected && (
         // Where tickets go is the workspace's too (SET-7).
         <fieldset className="settings-locked" disabled={flowLocked}>
           <TicketFlowSettings />
