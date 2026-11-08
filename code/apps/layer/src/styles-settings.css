@@ -1,3 +1,10 @@
+/* Quiet text in Settings is quiet. Layer had no `.muted` outside cards, so a
+   page's intro and the second line under an agent read as loud as the
+   settings themselves, and every page looked like a wall of text. */
+.settings .muted {
+  color: var(--muted);
+}
+
 /* ------------------------------- settings: the workspace's and yours (SET-7) */
 
 .settings-block {

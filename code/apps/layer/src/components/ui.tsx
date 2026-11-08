@@ -13,6 +13,7 @@ export function Modal({
   onClose,
   wide,
   tall,
+  className,
 }: {
   title: string;
   children: ReactNode;
@@ -23,6 +24,8 @@ export function Modal({
   wide?: boolean;
   /** Fixed height, so switching sections does not resize the window. */
   tall?: boolean;
+  /** Added to the dialog's own, for styles of one dialog only. */
+  className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useModalFocus(box);
@@ -40,7 +43,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`ui-dialog modal${tall ? " tall" : ""}`}
+        className={`ui-dialog modal${tall ? " tall" : ""}${className ? ` ${className}` : ""}`}
         style={wide ? { maxWidth: 720 } : undefined}
         onMouseDown={(e) => e.stopPropagation()}
       >

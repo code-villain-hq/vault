@@ -178,6 +178,7 @@ export function Settings() {
   return (
     <Modal
       title="Settings"
+      className="settings"
       wide
       tall
       onClose={() => toggleSettings(false)}
