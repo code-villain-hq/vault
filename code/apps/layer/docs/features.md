@@ -1398,7 +1398,7 @@ Known gaps:
   product behind it, this Mac's first: Appearance (how it looks),
   Notifications (banners here, posts to Slack), Agents (the agents found,
   their terminals, the task folder), Browser, Remote access (the phone).
-  Then, a gap apart, what it connects to: Tickets (Jira or GitHub Issues),
+  Then what it connects to: Tickets (Jira or GitHub Issues),
   Code (GitHub), Messaging (the Slack bot), Logs (Grafana and S3). A page
   connecting a service says which one at its top. A product's name said
   nothing to someone who had not set it up, and would be wrong the day a

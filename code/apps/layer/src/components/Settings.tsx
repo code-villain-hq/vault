@@ -24,7 +24,7 @@ type Section =
   | "observability";
 
 /**
- * The tabs (SET-6): this Mac's own first, then, after a gap, what it connects
+ * The tabs (SET-6): this Mac's own first, then what it connects
  * to. Named for what each does, not the product behind it.
  */
 const TABS: [Section, string][] = [
@@ -38,8 +38,6 @@ const TABS: [Section, string][] = [
   ["slack", "Messaging"],
   ["observability", "Logs"],
 ];
-/** The first tab of the connections. */
-const CONNECTIONS: Section = "jira";
 
 export function Settings() {
   const [version, setVersion] = useState<string | null>(null);
@@ -65,7 +63,7 @@ export function Settings() {
           {TABS.map(([id, label]) => (
             <button
               key={id}
-              className={`ui-tab${id === CONNECTIONS ? " settings-tab-gap" : ""}`}
+              className="ui-tab"
               role="tab"
               aria-selected={section === id}
               onClick={() => setSection(id)}
