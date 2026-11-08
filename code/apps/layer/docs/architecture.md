@@ -650,7 +650,9 @@ middleware on every route), then a paired phone's bearer token (the
   to inspect and to back up. The cost is that two instances cannot share
   it, hence a separate identity for the dev build.
 - **Ceilings, not settings** (`MAX_PANES`, `RESTORE_LIMIT`). They stop a
-  runaway; nobody needs to tune them.
+  runaway; nobody needs to tune them. The pane limit (`PANE_LIMIT`, 32)
+  can be raised in Settings for someone who runs more agents, up to
+  `MAX_PANES` (64) and no further.
 - **The git CLI, not libgit2**, so the user's hooks, credential helpers and
   signing keep working. The price is the config table under "Git".
 - **Handoff moves the work, not the conversation.** No CLI can resume

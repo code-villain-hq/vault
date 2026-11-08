@@ -102,7 +102,8 @@ To remove a command, undo every step, in the same commit.
    workspace sends back, `merge` in `workspace/mirror.rs`. What is one
    person's own (a token, the Jira email) stays out of all of them.
 
-Never add a setting for `MAX_PANES` or `RESTORE_LIMIT`.
+Never add a setting for `MAX_PANES` or `RESTORE_LIMIT`. The pane limit's
+setting (PANE-2) raises `PANE_LIMIT`, and only as far as `MAX_PANES`.
 
 ## Add a backend event
 

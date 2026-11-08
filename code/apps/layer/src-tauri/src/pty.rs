@@ -432,18 +432,32 @@ pub struct SpawnOptions {
     pub title_topic: Option<fn(&str) -> Option<String>>,
 }
 
-/// The most panes that may run at once.
+/// The most panes that may run at once, unless Settings raises it (PANE-2).
 ///
 /// A backstop, not a feature. Every pane is a real process — usually an agent
 /// CLI, which is not a cheap one — and every way of opening one, from a click
 /// to a restore to a tool an agent calls on the app's own MCP server, comes
 /// through here. A bug upstream of this that asks for hundreds gets an error
 /// instead of the machine.
-pub(crate) const MAX_PANES: usize = 32;
+pub(crate) const PANE_LIMIT: usize = 32;
+
+/// The highest Settings may raise `PANE_LIMIT` to. Still a ceiling: whatever
+/// the setting or a hand-edited config says, a runaway stops here.
+pub(crate) const MAX_PANES: usize = 64;
+
+/// How many panes may run at once: `PANE_LIMIT` until Settings says more.
+struct Limit(std::sync::atomic::AtomicUsize);
+
+impl Default for Limit {
+    fn default() -> Self {
+        Self(std::sync::atomic::AtomicUsize::new(PANE_LIMIT))
+    }
+}
 
 #[derive(Default)]
 pub struct PtyManager {
     panes: Mutex<HashMap<String, Arc<Pane>>>,
+    limit: Limit,
     /// Spawns past the cap check and not yet in `panes`. Spawns run in
     /// parallel now — the blocking pool, the restore thread, MCP — and
     /// several checking the count at 31 before any of them had inserted all
@@ -474,7 +488,18 @@ struct ExitEvent<'a> {
 }
 
 impl PtyManager {
-    /// A place under `MAX_PANES` for a pane about to start, in a folder that
+    /// How many panes may run at once.
+    pub fn limit(&self) -> usize {
+        self.limit.0.load(Ordering::Acquire)
+    }
+
+    /// The limit from Settings, kept between `PANE_LIMIT` and `MAX_PANES`
+    /// however the config file got its number.
+    pub fn set_limit(&self, n: usize) {
+        self.limit.0.store(n.clamp(PANE_LIMIT, MAX_PANES), Ordering::Release);
+    }
+
+    /// A place under the limit for a pane about to start, in a folder that
     /// exists.
     fn reserve(&self, cwd: &str) -> Result<Reserved<'_>> {
         // Checked before anything is allocated, so refusing costs nothing.
@@ -486,11 +511,12 @@ impl PtyManager {
             // ran, and the next one was refused.
             let running = panes.values().filter(|p| p.meta.lock().info.running).count();
             let live = running + self.starting.load(Ordering::Acquire);
-            if live >= MAX_PANES {
+            if live >= self.limit() {
                 return Err(Error::Pty(format!(
                     "{live} terminals are already running, which is the limit. Stop or \
-                     close some before starting another — and if you did not start \
-                     this many, something is starting them on its own."
+                     close some before starting another, or raise the limit in Settings → \
+                     Appearance — and if you did not start this many, something is \
+                     starting them on its own."
                 )));
             }
             self.starting.fetch_add(1, Ordering::AcqRel);
@@ -1826,7 +1852,7 @@ mod tests {
     }
 
     /// The cap holds when spawns race: forty at once from separate threads,
-    /// and no more than `MAX_PANES` get a pane.
+    /// and no more than `PANE_LIMIT` get a pane.
     #[test]
     fn the_pane_cap_holds_against_spawns_at_once() {
         let app = tauri::test::mock_app();
@@ -1869,8 +1895,8 @@ mod tests {
         });
         let started = ok.load(Ordering::SeqCst);
         ptys.shutdown(Duration::from_secs(2));
-        assert_eq!(started, MAX_PANES, "refused: {:?}", refused.lock());
-        assert_eq!(ptys.list(None).len(), MAX_PANES);
+        assert_eq!(started, PANE_LIMIT, "refused: {:?}", refused.lock());
+        assert_eq!(ptys.list(None).len(), PANE_LIMIT);
     }
 
     /// A day of agents that finished and were left open refused the next one
@@ -1898,16 +1924,30 @@ mod tests {
             title_activity: None,
             title_topic: None,
         };
-        for _ in 0..MAX_PANES {
+        for _ in 0..PANE_LIMIT {
             ptys.spawn(&handle, opts("/usr/bin/true")).unwrap();
         }
         let deadline = Instant::now() + Duration::from_secs(10);
         while ptys.list(None).iter().any(|p| p.running) && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));
         }
-        assert_eq!(ptys.list(None).len(), MAX_PANES, "the ended panes are still there to look at");
+        assert_eq!(ptys.list(None).len(), PANE_LIMIT, "the ended panes are still there to look at");
         let next = ptys.spawn(&handle, opts("/bin/cat"));
         ptys.shutdown(Duration::from_secs(2));
         assert!(next.is_ok(), "refused: {:?}", next.err().map(|e| e.to_string()));
+    }
+
+    /// Settings raises the limit, never past `MAX_PANES` and never under
+    /// `PANE_LIMIT`, whatever number reaches it.
+    #[test]
+    fn the_limit_stays_between_the_default_and_the_ceiling() {
+        let ptys = PtyManager::default();
+        assert_eq!(ptys.limit(), PANE_LIMIT);
+        ptys.set_limit(48);
+        assert_eq!(ptys.limit(), 48);
+        ptys.set_limit(10_000);
+        assert_eq!(ptys.limit(), MAX_PANES);
+        ptys.set_limit(0);
+        assert_eq!(ptys.limit(), PANE_LIMIT);
     }
 }

@@ -449,6 +449,8 @@ export interface UiPrefs {
   /** An ACP conversation's text, in px (ACP-15). */
   conversation_font_size: number;
   restore_panes: boolean;
+  /** How many panes may run at once (PANE-2): 32 to 64. */
+  pane_limit: number;
   trust_agent_dirs: boolean;
   sync_jira_status: boolean;
   /** A banner for a new review or an assigned ticket, while the window is in the background. */

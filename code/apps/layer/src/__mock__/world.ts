@@ -74,6 +74,7 @@ const ui: UiPrefs = {
   terminal_font_size: 13,
   conversation_font_size: 14,
   restore_panes: true,
+  pane_limit: 32,
   trust_agent_dirs: true,
   sync_jira_status: true,
   system_notifications: true,

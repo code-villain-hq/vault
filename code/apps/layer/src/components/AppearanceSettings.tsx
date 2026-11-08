@@ -5,12 +5,16 @@ import type { ThemeChoice, UiPrefs } from "../lib/types";
 import { useStore } from "../store";
 import { ErrorMessage, Field, Switch, useFailure } from "./ui";
 
+/** The pane limit's choices (PANE-2): the default, and up to `MAX_PANES` in `pty.rs`. */
+const PANE_LIMITS = [32, 48, 64];
+
 /** Which setting a failed save shows under. */
 type Place =
   | "theme"
   | "scale"
   | "notifications"
   | "terminals"
+  | "pane-limit"
   | "terminal-text"
   | "conversation-text";
 
@@ -159,6 +163,25 @@ export function AppearanceSettings() {
           />
         </div>
         {failedUnder("terminals")}
+      </Field>
+
+      <Field
+        label="Most terminals running at once"
+        hint="Every agent is a process of its own, and not a small one. The limit stops a bug, or an agent, from starting more than this Mac can hold. Terminals that have ended don't count."
+      >
+        <div className="ui-segmented">
+          {PANE_LIMITS.map((n) => (
+            <button
+              key={n}
+              className="ui-segment"
+              aria-pressed={settings.ui.pane_limit === n}
+              onClick={() => void saveUi({ pane_limit: n }, "pane-limit")}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        {failedUnder("pane-limit")}
       </Field>
 
       <TextSize

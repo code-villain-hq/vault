@@ -347,11 +347,15 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
 - **PANE-1** Only a CLI that can report its own state MUST be offered.
   Output alone cannot tell working from idle: Claude Code repaints every
   few seconds while idle. CLIs dropped for this are in git history.
-- **PANE-2** At most 32 panes run at once (`MAX_PANES`), however many
-  spawns race. It is a ceiling, not a setting. A pane that has ended, its
-  agent exited or stopped, MUST NOT count: it holds no process. Counted,
-  a day of finished agents left open filled the limit while thirteen ran,
-  and the next one was refused.
+- **PANE-2** At most 32 panes run at once (`PANE_LIMIT`), however many
+  spawns race. Settings → Appearance MAY raise it to 48 or 64, never past
+  64 (`MAX_PANES`), whatever the config file says. A pane that has ended,
+  its agent exited or stopped, MUST NOT count: it holds no process.
+  Counted, a day of finished agents left open filled the limit while
+  thirteen ran, and the next one was refused. The refusal says how many
+  are running and where the limit is raised. As many panes as may run,
+  and eight more, are remembered for PANE-7, so a raised limit loses
+  none at quit.
 - **PANE-3** A pane MUST start in an existing folder. A missing one is an
   error, never a silent fallback to `$HOME`, where `--continue` resumes the
   wrong conversation.
@@ -1354,6 +1358,7 @@ Known gaps:
 | New reviews and tickets | on | banners while the window is away (NOTE-*); the message center keeps them either way (MSG-2) |
 | Agents waiting on you | on | banners and the dock count; the message center keeps them either way (MSG-2) |
 | Put terminals back when the app reopens | on | PANE-7 |
+| Most terminals running at once | 32 | 32, 48 or 64 (PANE-2) |
 | Let agents read terminal output | **off** | MCP `pane_output`, `handoff_prompt` |
 | Keep awake (the cup in the top bar) | off | STATE-7, PHONE-8 |
 | Remote access: Tailscale | off | PHONE-1, PHONE-2 |

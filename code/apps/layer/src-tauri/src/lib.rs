@@ -159,6 +159,8 @@ pub fn run() {
                 runs,
                 slack_bot: Default::default(),
             };
+            // Before anything can start a pane: the restore, the Slack bot, MCP.
+            state.ptys.set_limit(state.config.read().ui.pane_limit);
             app.manage(state);
             // The workspace's Postgres and server, in the background (PROF-11).
             app.manage(workspace::ThisMac::new());

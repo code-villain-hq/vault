@@ -116,6 +116,7 @@ pub fn set_ui_prefs(app: AppHandle, state: State<AppState>, ui: UiPrefs) -> Resu
         terminal_font_size: ui.terminal_font_size.clamp(9, 24),
         conversation_font_size: ui.conversation_font_size.clamp(9, 24),
         restore_panes: ui.restore_panes,
+        pane_limit: ui.pane_limit.clamp(crate::pty::PANE_LIMIT, crate::pty::MAX_PANES),
         agents_read_panes: ui.agents_read_panes,
         trust_agent_dirs: ui.trust_agent_dirs,
         sync_jira_status: ui.sync_jira_status,
@@ -125,7 +126,9 @@ pub fn set_ui_prefs(app: AppHandle, state: State<AppState>, ui: UiPrefs) -> Resu
     };
     let before = state.config.read().ui.theme;
     let theme = ui.theme.clone();
+    let pane_limit = ui.pane_limit;
     state.config.update(|c| c.ui = ui)?;
+    state.ptys.set_limit(pane_limit);
     crate::theme::apply(&app, &theme);
     // A paired phone draws in the app's theme too, and would otherwise not
     // know until a pane changed.

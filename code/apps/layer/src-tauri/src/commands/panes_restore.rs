@@ -40,6 +40,7 @@ pub(crate) fn remember_pane(app: &AppHandle, state: &AppState, pane: &PaneInfo) 
         on_loop: None,
     };
     let live: HashSet<String> = state.ptys.list(None).into_iter().map(|p| p.id).collect();
+    let keep = saved_pane_limit(state.ptys.limit());
     let mut open = open_agents(state);
     if let Some(agent) = &pane.agent_id {
         open.insert((agent.clone(), pane.cwd.clone()));
@@ -62,7 +63,7 @@ pub(crate) fn remember_pane(app: &AppHandle, state: &AppState, pane: &PaneInfo) 
         // Panes that exited are never removed from here — only closing one on
         // purpose does that — so without a bound this grows for as long as the
         // app is used.
-        trim(&mut c.saved_panes, &live);
+        trim(&mut c.saved_panes, &live, keep);
         let before = c.saved_panes.len();
         c.saved_panes.retain(|p| !continued_by_an_open_agent(p, &open));
         c.saved_panes.len() < before
@@ -97,17 +98,17 @@ fn continued_by_an_open_agent(p: &SavedPane, open: &HashSet<(String, String)>) -
     }
 }
 
-/// Bring the list down to `SAVED_PANE_LIMIT`, losing the least: panes that
-/// exited first (neither open nor waiting), then waiting ones, oldest first.
-/// Simply dropping the oldest could take a waiting pane, the one thing PANE-7
-/// says is never lost, while dead entries newer than it stayed.
-fn trim(saved: &mut Vec<SavedPane>, live: &HashSet<String>) {
+/// Bring the list down to `keep`, losing the least: panes that exited first
+/// (neither open nor waiting), then waiting ones, oldest first. Simply
+/// dropping the oldest could take a waiting pane, the one thing PANE-7 says
+/// is never lost, while dead entries newer than it stayed.
+fn trim(saved: &mut Vec<SavedPane>, live: &HashSet<String>, keep: usize) {
     let exited = |p: &SavedPane| !p.waiting && !live.contains(&p.id);
     let waiting = |p: &SavedPane| p.waiting;
     let any = |_: &SavedPane| true;
     let order: [&dyn Fn(&SavedPane) -> bool; 3] = [&exited, &waiting, &any];
     for goes in order {
-        let mut over = saved.len().saturating_sub(SAVED_PANE_LIMIT);
+        let mut over = saved.len().saturating_sub(keep);
         saved.retain(|p| {
             let drop = over > 0 && goes(p);
             if drop {
@@ -118,12 +119,16 @@ fn trim(saved: &mut Vec<SavedPane>, live: &HashSet<String>) {
     }
 }
 
-/// How many panes are remembered between launches.
+/// How many panes are remembered between launches: as many as may run
+/// (`pane_limit`, PANE-2) and eight more, forty at the default.
 ///
 /// Larger than what a restore will actually open, so the record survives a
 /// session with a lot of churn, and still bounded: this file is written every
-/// time a pane starts.
-pub(crate) const SAVED_PANE_LIMIT: usize = 40;
+/// time a pane starts. Tied to the limit, since with the limit raised in
+/// Settings a fixed forty would forget the panes running past it at quit.
+pub(crate) fn saved_pane_limit(pane_limit: usize) -> usize {
+    pane_limit + 8
+}
 
 /// How many launches a saved pane may fail to come back on before it is
 /// forgotten.
@@ -139,8 +144,8 @@ pub(crate) const RESTORE_LIMIT: usize = 12;
 // Raising the restore limit past what the manager will open would make a
 // restore fail part-way through, which is the confusing version of the bug
 // rather than the dangerous one. Checked at compile time, so it cannot drift.
-const _: () = assert!(RESTORE_LIMIT < crate::pty::MAX_PANES);
-const _: () = assert!(RESTORE_LIMIT <= SAVED_PANE_LIMIT);
+// `PANE_LIMIT` is the lowest the limit in Settings goes.
+const _: () = assert!(RESTORE_LIMIT < crate::pty::PANE_LIMIT);
 
 /// What to put back: each remembered pane once, agents before shells, and
 /// never more than the machine should be asked to start at once. A pane
@@ -545,12 +550,13 @@ mod tests {
 
     #[test]
     fn a_full_list_drops_exited_panes_before_waiting_or_open_ones() {
-        let mut saved: Vec<SavedPane> = (0..SAVED_PANE_LIMIT + 3).map(|i| pane(&i.to_string(), "t", "agent")).collect();
+        let keep = saved_pane_limit(crate::pty::PANE_LIMIT);
+        let mut saved: Vec<SavedPane> = (0..keep + 3).map(|i| pane(&i.to_string(), "t", "agent")).collect();
         saved[0].waiting = true;
         saved[1].waiting = true;
         let live: HashSet<String> = ["2", "3", "4"].map(String::from).into();
-        trim(&mut saved, &live);
-        assert_eq!(saved.len(), SAVED_PANE_LIMIT);
+        trim(&mut saved, &live, keep);
+        assert_eq!(saved.len(), keep);
         let kept: Vec<&str> = saved.iter().take(5).map(|p| p.id.as_str()).collect();
         assert_eq!(kept, ["0", "1", "2", "3", "4"], "the oldest exited panes went, not the waiting or open ones");
     }
