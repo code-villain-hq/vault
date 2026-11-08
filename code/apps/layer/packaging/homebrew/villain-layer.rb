@@ -25,6 +25,15 @@ cask "villain-layer" do
 
   app "Layer.app"
 
+  # Layer is signed ad hoc, not notarised. On Nov 8 2026 macOS 27.2 called
+  # brew's quarantined 0.13.0 "damaged" and offered no Open Anyway, while
+  # Almanac, signed the same way, had been offered it. Clearing brew's
+  # quarantine flag on the installed app lets it open. Remove this once
+  # releases are notarised (docs/releasing.md).
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Layer.app"]
+  end
+
   # Replacing the bundle under a running app kills it, and every agent
   # running in it. `uninstall quit:` would not help: quitting ends them too.
   # This runs before an upgrade or uninstall touches anything, so refusing
@@ -50,10 +59,9 @@ cask "villain-layer" do
   ]
 
   caveats <<~EOS
-    Layer is not notarised by Apple yet, so macOS stops it the first
-    time with "Apple could not verify…". Choose Done, then System Settings →
-    Privacy & Security → Open Anyway. macOS also asks for keychain access
-    again after each upgrade.
+    Layer is not notarised by Apple yet. brew clears macOS's download
+    flag on it after each install, so macOS doesn't stop it as "damaged".
+    macOS still asks for keychain access again after each upgrade.
 
     Its tokens stay in the keychain (item eu.codevillain.villain-layer)
     after `brew uninstall --zap`. Delete them in Keychain Access.

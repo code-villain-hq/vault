@@ -91,14 +91,18 @@ name does not keep it trusted. Without `brew trust`, `brew upgrade` does not
 load the cask, and `brew uninstall` skips the check that the app is not
 running.
 
-Once releases are notarised, delete the first paragraph of the cask's
-`caveats`.
+Once releases are notarised, delete the cask's `postflight_steps` and the
+first paragraph of its `caveats`.
 
 ## Signing and notarisation
 
-Without them, macOS stops a downloaded app with "Apple could not verify
-…", and the only way past is System Settings → Privacy & Security → Open
-Anyway. Right-click → Open no longer works for that. An unsigned app also
+Without them, macOS stops a downloaded app. Usually it says "Apple could
+not verify…", and the only way past is System Settings → Privacy &
+Security → Open Anyway. Right-click → Open no longer works for that. On
+Nov 8 2026, macOS 27.2 called brew's 0.13.0 "damaged" instead and offered
+no Open Anyway. Clearing the quarantine flag (`xattr -dr
+com.apple.quarantine /Applications/Layer.app`) let it open, so the cask
+now does that after each install. An unsigned app also
 asks for keychain access again after every update, because *Always Allow*
 is tied to the exact binary. The script signs ad hoc until the variables
 below are set, and the release notes then tell people how to open it.

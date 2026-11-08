@@ -149,7 +149,8 @@ async function draft() {
     signing = "developer-id";
   } else if (set.length === 0) {
     // Ad hoc, not unsigned: macOS offers Open Anyway for an app it cannot
-    // check, but calls an unsigned download "damaged".
+    // check, but calls an unsigned download "damaged". It called an ad hoc
+    // one "damaged" too on Nov 8 2026, which the cask's postflight handles.
     env.APPLE_SIGNING_IDENTITY = "-";
     signing = "ad-hoc";
   } else {
@@ -194,9 +195,11 @@ async function draft() {
     ...(signing === "ad-hoc"
       ? [
           "",
-          'This build is not notarised by Apple, so macOS stops it the first time with "Apple',
-          'could not verify…". Choose Done, then System Settings → Privacy & Security → Open',
-          "Anyway. macOS also asks for keychain access again after each update.",
+          "This build is not notarised by Apple, so macOS stops it the first time. If it says",
+          '"Apple could not verify…", choose Done, then System Settings → Privacy & Security →',
+          'Open Anyway. If it calls Layer "damaged", run',
+          "`xattr -dr com.apple.quarantine /Applications/Layer.app` in a terminal (brew does",
+          "this itself). macOS also asks for keychain access again after each update.",
         ]
       : []),
     ...(changes ? ["", `## Since ${previous}`, "", changes] : []),

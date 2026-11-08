@@ -91,7 +91,7 @@ Updates: `brew upgrade --cask villain-layer`. Quit the app first, and run it fro
 
 Download the `.dmg` from the [latest release](https://git.codevillain.eu/code-villain/vault/releases). Runs on Macs with Apple silicon.
 
-macOS will block the first launch with "Apple could not verify…" because releases aren't notarized. Open System Settings → Privacy & Security → **Open Anyway**. Once is enough.
+Releases aren't notarized, so macOS blocks the first launch. It either says "Apple could not verify…" (then open System Settings → Privacy & Security → **Open Anyway**) or calls Layer "damaged" with no way past. In that case, clear the download flag in a terminal: `xattr -dr com.apple.quarantine /Applications/Layer.app`. The Homebrew cask does this for you.
 
 ### Requirements
 
