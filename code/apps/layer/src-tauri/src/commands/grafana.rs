@@ -144,7 +144,7 @@ fn only(loki: &[Datasource]) -> Result<String> {
         [] => Err(Error::Other("this Grafana has no Loki datasource the token can see".into())),
         many => Err(Error::Other(format!(
             "this Grafana has {} Loki datasources and the user has not chosen one in Settings → \
-             Observability; name one as datasource: {}",
+             Logs; name one as datasource: {}",
             many.len(),
             many.iter().map(|d| format!("{} ({})", d.uid, d.name)).collect::<Vec<_>>().join(", ")
         ))),
@@ -248,6 +248,6 @@ mod tests {
         let Err(e) = only(&[source("acme-logs"), source("acme-usage")]) else {
             panic!("two datasources and no choice should not pick one");
         };
-        assert!(e.to_string().contains("Settings → Observability"), "{e}");
+        assert!(e.to_string().contains("Settings → Logs"), "{e}");
     }
 }

@@ -194,7 +194,7 @@ fn within_limit(source: &LogSource, a: &AthenaTable) -> Result<(u64, u64)> {
     let done = scanned_today().get(&source.id).copied().unwrap_or(0);
     if done >= limit {
         return Err(Error::Other(format!(
-            "{}'s queries have scanned {} today, its daily limit of {gb} GB: no more until tomorrow, unless the user raises the limit in Settings → Observability",
+            "{}'s queries have scanned {} today, its daily limit of {gb} GB: no more until tomorrow, unless the user raises the limit in Settings → Logs",
             source.name,
             aws::bytes(done)
         )));
@@ -270,9 +270,7 @@ pub fn s3_logs_tools() -> Vec<Value> {
 fn source_named(sources: &[LogSource], named: Option<&str>) -> Result<LogSource> {
     let names = || sources.iter().map(|s| s.name.as_str()).collect::<Vec<_>>().join(", ");
     match (named, sources) {
-        (_, []) => {
-            Err(Error::Other("no S3 log source is set up: the user adds one in Settings → Observability".into()))
-        }
+        (_, []) => Err(Error::Other("no S3 log source is set up: the user adds one in Settings → Logs".into())),
         (None, [one]) => Ok(one.clone()),
         (None, _) => Err(Error::Other(format!("name a source: {}", names()))),
         (Some(n), _) => sources
@@ -443,7 +441,7 @@ mod tests {
         two.push(LogSource { id: "s2".into(), name: "CI request logs".into(), ..source("") });
         assert!(source_named(&two, None).unwrap_err().to_string().contains("CI request logs"));
         assert_eq!(source_named(&two, Some("s2")).unwrap().name, "CI request logs");
-        assert!(source_named(&[], None).unwrap_err().to_string().contains("Settings → Observability"));
+        assert!(source_named(&[], None).unwrap_err().to_string().contains("Settings → Logs"));
     }
 
     #[test]

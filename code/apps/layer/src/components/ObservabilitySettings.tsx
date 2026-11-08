@@ -7,7 +7,7 @@ import { heldText, Theirs, useHeld, Yours } from "./SharedSettings";
 import { BusyLabel, ErrorMessage, Field, useFailure } from "./ui";
 
 /**
- * Settings → Observability: where agents read your services' logs (§23):
+ * Settings → Logs: where agents read your services' logs (§23):
  * Grafana's Loki, and logs kept in S3, each a card of its own.
  */
 export function ObservabilitySettings() {

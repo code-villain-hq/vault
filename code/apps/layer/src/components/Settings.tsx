@@ -1,13 +1,13 @@
 import { getVersion } from "@tauri-apps/api/app";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { githubRejected } from "../lib/derive";
 import { useStore } from "../store";
-import { AcpSettings } from "./AcpSettings";
+import { AgentSettings } from "./AgentSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { BrowserSettings } from "./BrowserSettings";
+import { NotificationSettings } from "./NotificationSettings";
 import { ObservabilitySettings } from "./ObservabilitySettings";
 import { PhoneSettings } from "./PhoneSettings";
 import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
@@ -20,14 +20,32 @@ const ATLASSIAN_TOKENS = "https://id.atlassian.com/manage-profile/security/api-t
 
 type Section =
   | "appearance"
+  | "notifications"
+  | "agents"
+  | "browser"
+  | "phone"
   | "jira"
   | "github"
   | "slack"
-  | "observability"
-  | "phone"
-  | "browser"
-  | "acp"
-  | "general";
+  | "observability";
+
+/**
+ * The tabs (SET-6): this Mac's own first, then, after a gap, what it connects
+ * to. Named for what each does, not the product behind it.
+ */
+const TABS: [Section, string][] = [
+  ["appearance", "Appearance"],
+  ["notifications", "Notifications"],
+  ["agents", "Agents"],
+  ["browser", "Browser"],
+  ["phone", "Remote access"],
+  ["jira", "Tickets"],
+  ["github", "Code"],
+  ["slack", "Messaging"],
+  ["observability", "Logs"],
+];
+/** The first tab of the connections. */
+const CONNECTIONS: Section = "jira";
 
 export function Settings() {
   const settings = useStore((s) => s.settings);
@@ -37,7 +55,6 @@ export function Settings() {
       .then(setVersion)
       .catch(() => {});
   }, []);
-  const agents = useStore((s) => s.agents);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const refreshIssues = useStore((s) => s.refreshIssues);
@@ -48,7 +65,6 @@ export function Settings() {
   const jira = useFailure();
   const github = useFailure();
   const unlink = useFailure();
-  const general = useFailure();
 
   const [section, setSection] = useState<Section>(
     () => (useStore.getState().settingsSection as Section | null) ?? "appearance",
@@ -66,7 +82,6 @@ export function Settings() {
   const [ghTeam, setGhTeam] = useState("");
   const [ghToken, setGhToken] = useState("");
 
-  const [worktreeRoot, setWorktreeRoot] = useState("");
   const workspace = useWorkspace();
   const heldJira = useHeld("jira");
   const heldGithub = useHeld("github");
@@ -100,14 +115,6 @@ export function Settings() {
     setGhWeb(ghWebNow ?? "https://github.com");
     setGhTeam(ghTeamNow ?? "");
   }, [loaded, ghApiNow, ghWebNow, ghTeamNow]);
-  const rootSaved = settings
-    ? settings.worktree_root_is_default
-      ? ""
-      : settings.worktree_root
-    : null;
-  useEffect(() => {
-    if (rootSaved !== null) setWorktreeRoot(rootSaved);
-  }, [rootSaved]);
 
   async function connectJira() {
     setBusy(true);
@@ -157,24 +164,6 @@ export function Settings() {
     }
   }
 
-  async function saveWorktreeRoot(path: string) {
-    general.clear();
-    try {
-      await api.setWorktreeRoot(path.trim() || null);
-      await refreshSettings();
-    } catch (e) {
-      general.fail(e);
-    }
-  }
-
-  async function pickWorktreeRoot() {
-    const picked = await openDialog({ directory: true, title: "Task folder location" });
-    if (typeof picked === "string") {
-      setWorktreeRoot(picked);
-      await saveWorktreeRoot(picked);
-    }
-  }
-
   return (
     <Modal
       title="Settings"
@@ -184,23 +173,10 @@ export function Settings() {
       onClose={() => toggleSettings(false)}
       toolbar={
         <div className="ui-tabs section-tabs" role="tablist">
-          {/* Named for what each does, not the product behind it (SET-6). */}
-          {(
-            [
-              ["appearance", "Appearance"],
-              ["jira", "Tickets"],
-              ["github", "Code"],
-              ["slack", "Messaging"],
-              ["observability", "Observability"],
-              ["phone", "Remote access"],
-              ["browser", "Browser"],
-              ["acp", "ACP"],
-              ["general", "General"],
-            ] as [Section, string][]
-          ).map(([id, label]) => (
+          {TABS.map(([id, label]) => (
             <button
               key={id}
-              className="ui-tab"
+              className={`ui-tab${id === CONNECTIONS ? " settings-tab-gap" : ""}`}
               role="tab"
               aria-selected={section === id}
               onClick={() => {
@@ -215,10 +191,12 @@ export function Settings() {
       }
     >
       {section === "appearance" && <AppearanceSettings />}
+      {section === "notifications" && (
+        <NotificationSettings toMessaging={() => setSection("slack")} />
+      )}
+      {section === "agents" && <AgentSettings />}
 
       {section === "slack" && <SlackSettings />}
-
-      {section === "acp" && <AcpSettings />}
 
       {section === "jira" && (
         <>
@@ -462,54 +440,6 @@ export function Settings() {
       {section === "observability" && <ObservabilitySettings />}
       {section === "phone" && <PhoneSettings />}
       {section === "browser" && <BrowserSettings />}
-
-      {section === "general" && (
-        <>
-          <Field
-            label="Task folder location"
-            hint={
-              <>
-                Each task gets a folder here, holding one worktree per repository it touches.
-                Currently <code>{settings?.worktree_root}</code>
-                {settings?.worktree_root_is_default ? " (default)" : ""}.
-              </>
-            }
-          >
-            <div className="row">
-              <input
-                className="ui-field"
-                value={worktreeRoot}
-                placeholder="(default: ~/.villain-worktrees)"
-                onChange={(e) => setWorktreeRoot(e.target.value)}
-                onBlur={() => void saveWorktreeRoot(worktreeRoot)}
-              />
-              <button className="ui-button" onClick={() => void pickWorktreeRoot()}>
-                Browse…
-              </button>
-            </div>
-            <ErrorMessage>{general.error}</ErrorMessage>
-          </Field>
-          <Field label="Detected agents">
-            <div className="col">
-              {agents.map((a) => (
-                <div key={a.id} className="row" style={{ fontSize: "var(--type-ui-small-size)" }}>
-                  <span className={`dot ${a.installed ? "live" : ""}`} />
-                  <span style={{ width: 110 }}>{a.name}</span>
-                  <span
-                    className="muted"
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "var(--type-ui-small-size)",
-                    }}
-                  >
-                    {a.path ?? "not found on PATH"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Field>
-        </>
-      )}
 
       {/* Settings ends with the app's name and version, on every page
           (SET-11, studio/design/behaviour.md). */}

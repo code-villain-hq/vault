@@ -329,7 +329,7 @@ there is a `layer.toml` or `LAYER_OIDC_ISSUER`. The desktop app's own server
 `MAX_PANES` (64, `pty.rs`) and `RESTORE_LIMIT` (12, `commands/panes_restore.rs`)
 are ceilings that stop a runaway, not preferences. Do not make them
 settings. The pane limit itself is `PANE_LIMIT` (32), which Settings →
-Appearance raises to 48 or 64 and never past `MAX_PANES` (PANE-2). Only
+Agents raises to 48 or 64 and never past `MAX_PANES` (PANE-2). Only
 running panes count toward it.
 
 ## Done means

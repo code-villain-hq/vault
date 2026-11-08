@@ -528,7 +528,8 @@ const answer: Record<string, Answer> = {
   // A copy too: a pane pushed onto the same array read as no change.
   list_panes: () => structuredClone(world.panes),
   list_agents: () => world.agents,
-  // One of each standing, so Settings → ACP shows them all (ACP-17).
+  // One of most standings, so Settings → Agents shows them (ACP-17), and
+  // each where `list_agents` puts it: OpenCode is not installed.
   acp_versions: () => [
     {
       id: "claude",
@@ -543,25 +544,25 @@ const answer: Record<string, Answer> = {
       id: "gemini",
       name: "Gemini CLI",
       command: "gemini --acp",
-      path: null,
-      version: null,
+      path: "/usr/local/bin/gemini",
+      version: "1.2.0",
       checked: "0.63.0",
-      standing: "missing",
+      standing: "newer",
     },
     {
       id: "opencode",
       name: "OpenCode",
       command: "opencode acp",
-      path: "/opt/homebrew/bin/opencode",
-      version: "2.2.5",
-      checked: "1.18.35",
-      standing: "newer",
+      path: null,
+      version: null,
+      checked: "2.2.5",
+      standing: "missing",
     },
     {
       id: "copilot",
       name: "GitHub Copilot CLI",
       command: "copilot --acp",
-      path: "/opt/homebrew/bin/copilot",
+      path: "/usr/local/bin/copilot",
       version: "1.0.93",
       checked: "1.0.100",
       standing: "older",

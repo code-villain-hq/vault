@@ -744,11 +744,12 @@ body.dragging * {
 .site-row {
   padding: 2px 0;
 }
-.acp-version {
+/* Settings → Agents: an agent, where it is, and a line on it as a conversation (ACP-17). */
+.agent-row {
   padding: 4px 0;
   align-items: center;
 }
-.acp-version-name {
+.agent-row-name {
   gap: 2px;
   min-width: 0;
 }

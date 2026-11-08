@@ -1,7 +1,7 @@
 //! Which version of each ACP agent is installed, against the one §20 was
 //! checked with (ACP-17). An agent's ACP mode changes under it between
 //! releases: `claude-agent-acp` 0.22.2 had the model call tools without
-//! their schemas, and nothing in the protocol says so. Settings → ACP shows
+//! their schemas, and nothing in the protocol says so. Settings → Agents shows
 //! the user where they stand, and runs nothing but `--version`.
 
 use std::io::Read;

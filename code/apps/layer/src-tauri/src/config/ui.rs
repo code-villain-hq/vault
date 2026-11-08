@@ -1,4 +1,5 @@
-//! The app's look, and how its terminals behave: Settings → Appearance.
+//! The app's look, its banners, and how its terminals behave: Settings →
+//! Appearance, Notifications and Agents.
 
 use serde::{Deserialize, Serialize};
 

@@ -74,7 +74,7 @@ impl Grafana {
         if status == reqwest::StatusCode::UNAUTHORIZED {
             return Err(Error::Other(
                 "Grafana does not accept the saved token (it may have expired or been deleted). \
-                 Create a new service account token and enter it in Settings → Observability."
+                 Create a new service account token and enter it in Settings → Logs."
                     .into(),
             ));
         }

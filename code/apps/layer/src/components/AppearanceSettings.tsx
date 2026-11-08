@@ -1,85 +1,16 @@
-import { useRef, useState, type ReactNode } from "react";
-import { api } from "../lib/api";
+import type { ReactNode } from "react";
 import { THEMES, type Theme } from "../lib/theme";
-import type { ThemeChoice, UiPrefs } from "../lib/types";
-import { useStore } from "../store";
-import { ErrorMessage, Field, Switch, useFailure } from "./ui";
+import type { ThemeChoice } from "../lib/types";
+import { Field } from "./ui";
+import { useUiPrefs } from "./useUiPrefs";
 
-/** The pane limit's choices (PANE-2): the default, and up to `MAX_PANES` in `pty.rs`. */
-const PANE_LIMITS = [32, 48, 64];
-
-/** Which setting a failed save shows under. */
-type Place =
-  | "theme"
-  | "scale"
-  | "notifications"
-  | "terminals"
-  | "pane-limit"
-  | "terminal-text"
-  | "conversation-text";
-
-/** Settings → Appearance: how the app looks, and how its terminals and agents behave. */
+/** Settings → Appearance: how the app looks. */
 export function AppearanceSettings() {
-  const settings = useStore((s) => s.settings);
-  const refreshSettings = useStore((s) => s.refreshSettings);
-  // A save that fails says so under the setting that was changed (NOTE-6).
-  const failure = useFailure();
-  const [failedAt, setFailedAt] = useState<Place | null>(null);
-  const failedUnder = (at: Place) =>
-    failedAt === at && <ErrorMessage>{failure.error}</ErrorMessage>;
+  const { ui, saveUi, slideUi, failedUnder } = useUiPrefs<
+    "theme" | "scale" | "terminal-text" | "conversation-text"
+  >();
 
-  /**
-   * What the sliders say before it is saved.
-   *
-   * Bound straight to the stored value, a slider only moved once the save
-   * came back, so the thumb jumped back between steps of a drag — and every
-   * step was a save, rewriting the whole config file.
-   */
-  const [uiDraft, setUiDraft] = useState<Partial<UiPrefs>>({});
-  const uiDraftRef = useRef(uiDraft);
-  const uiSaveTimer = useRef<number | undefined>(undefined);
-  const uiSaves = useRef(0);
-  const ui = settings ? { ...settings.ui, ...uiDraft } : null;
-
-  /** Save a change to the prefs, on top of whatever a slider has not saved yet. */
-  async function saveUi(patch: Partial<UiPrefs>, at: Place) {
-    // Read now, not from the render that scheduled this: a slider's save
-    // runs after a pause, and anything switched meanwhile must survive it.
-    const stored = useStore.getState().settings?.ui;
-    if (!stored) return;
-    // This save carries the draft, so a slider's pending one is not needed
-    // — and firing after it would put the slider's older value back.
-    window.clearTimeout(uiSaveTimer.current);
-    uiDraftRef.current = { ...uiDraftRef.current, ...patch };
-    setUiDraft(uiDraftRef.current);
-    const n = ++uiSaves.current;
-    failure.clear();
-    try {
-      await api.setUiPrefs({ ...stored, ...uiDraftRef.current });
-      await refreshSettings();
-      if (n === uiSaves.current) {
-        uiDraftRef.current = {};
-        setUiDraft({});
-      }
-    } catch (e) {
-      setFailedAt(at);
-      failure.fail(e);
-    }
-  }
-
-  /** A slider: shown at once, saved once it stops moving. */
-  function slideUi(patch: Partial<UiPrefs>, at: Place) {
-    // Counts as a newer change, so a save already on its way does not clear
-    // the draft when it lands — that threw away a value still waiting on its
-    // timer, and the thumb jumped back.
-    uiSaves.current += 1;
-    uiDraftRef.current = { ...uiDraftRef.current, ...patch };
-    setUiDraft(uiDraftRef.current);
-    window.clearTimeout(uiSaveTimer.current);
-    uiSaveTimer.current = window.setTimeout(() => void saveUi({}, at), 250);
-  }
-
-  if (!settings || !ui) return null;
+  if (!ui) return null;
   return (
     <>
       <Field
@@ -115,73 +46,6 @@ export function AppearanceSettings() {
           ))}
         </div>
         {failedUnder("scale")}
-      </Field>
-
-      <Field
-        label="Notifications"
-        hint="Only while the window is in the background. Opening the app does not announce what was already waiting."
-      >
-        <div className="switch-list">
-          <Switch
-            label="New reviews and tickets"
-            detail="A banner when a pull request starts waiting on your review, or a ticket is assigned to you."
-            checked={settings.ui.system_notifications}
-            onChange={(v) => void saveUi({ system_notifications: v }, "notifications")}
-          />
-          <Switch
-            label="Agents waiting on you"
-            detail="A banner when an agent goes quiet, asks to trust its folder, runs out of budget or exits — and the number waiting on the dock icon."
-            checked={settings.ui.notify_waiting_agents}
-            onChange={(v) => void saveUi({ notify_waiting_agents: v }, "notifications")}
-          />
-        </div>
-        {failedUnder("notifications")}
-      </Field>
-
-      <Field
-        label="Terminals"
-        hint="Agents are resumed rather than restarted where their CLI supports it, so the conversation carries on."
-      >
-        <div className="switch-list">
-          <Switch
-            label="Put terminals back when the app reopens"
-            detail="Panes that were open last time are reopened in the same worktrees."
-            checked={settings.ui.restore_panes}
-            onChange={(v) => void saveUi({ restore_panes: v }, "terminals")}
-          />
-          <Switch
-            label="Let agents read terminal output"
-            detail="Agents can read what a terminal here has printed — a dev server's log, a test run — instead of starting a second copy. A shell's scrollback is a record of everything typed in it, so this stays off until you want it."
-            checked={settings.ui.agents_read_panes}
-            onChange={(v) => void saveUi({ agents_read_panes: v }, "terminals")}
-          />
-          <Switch
-            label="Trust the folders this app creates"
-            detail="Claude Code asks whether it trusts a folder the first time it starts there, and does nothing until answered — once per task, per repo. This answers it in advance, and only for worktrees and chat folders the app made itself."
-            checked={settings.ui.trust_agent_dirs}
-            onChange={(v) => void saveUi({ trust_agent_dirs: v }, "terminals")}
-          />
-        </div>
-        {failedUnder("terminals")}
-      </Field>
-
-      <Field
-        label="Most terminals running at once"
-        hint="Every agent is a process of its own, and not a small one. The limit stops a bug, or an agent, from starting more than this Mac can hold. Terminals that have ended don't count."
-      >
-        <div className="ui-segmented">
-          {PANE_LIMITS.map((n) => (
-            <button
-              key={n}
-              className="ui-segment"
-              aria-pressed={settings.ui.pane_limit === n}
-              onClick={() => void saveUi({ pane_limit: n }, "pane-limit")}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-        {failedUnder("pane-limit")}
       </Field>
 
       <TextSize

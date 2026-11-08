@@ -6,7 +6,7 @@ import { useWorkspace } from "./SharedSettings";
 import { Combo, Confirm, ErrorMessage, Field, useFailure } from "./ui";
 
 /**
- * Settings → Observability → S3 log sources (OBS-8, OBS-9): logs kept in S3,
+ * Settings → Logs → S3 log sources (OBS-8, OBS-9): logs kept in S3,
  * read with the user's own AWS profiles through the `aws` CLI. Each source
  * is a bucket and prefix, and optionally the Athena table over it.
  */

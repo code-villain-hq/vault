@@ -60,3 +60,8 @@
   padding: 0;
   min-width: 0;
 }
+
+/* Between this Mac's tabs and the connections' (SET-6). */
+.section-tabs .settings-tab-gap {
+  margin-left: 22px;
+}

@@ -348,7 +348,7 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   Output alone cannot tell working from idle: Claude Code repaints every
   few seconds while idle. CLIs dropped for this are in git history.
 - **PANE-2** At most 32 panes run at once (`PANE_LIMIT`), however many
-  spawns race. Settings → Appearance MAY raise it to 48 or 64, never past
+  spawns race. Settings → Agents MAY raise it to 48 or 64, never past
   64 (`MAX_PANES`), whatever the config file says. A pane that has ended,
   its agent exited or stopped, MUST NOT count: it holds no process.
   Counted, a day of finished agents left open filled the limit while
@@ -1353,32 +1353,33 @@ Known gaps:
 
 | Setting | Default | What it does |
 |---|---|---|
-| Theme | Nightshade Night | Nightshade Night or Day, another theme, or Match the Mac (SET-5) |
-| Interface scale | 100% | 80–160% |
-| New reviews and tickets | on | banners while the window is away (NOTE-*); the message center keeps them either way (MSG-2) |
-| Agents waiting on you | on | banners and the dock count; the message center keeps them either way (MSG-2) |
-| Put terminals back when the app reopens | on | PANE-7 |
-| Most terminals running at once | 32 | 32, 48 or 64 (PANE-2) |
-| Let agents read terminal output | **off** | MCP `pane_output`, `handoff_prompt` |
+| Appearance: Theme | Nightshade Night | Nightshade Night or Day, another theme, or Match the Mac (SET-5) |
+| Appearance: Interface scale | 100% | 80–160% |
+| Appearance: Terminal text | 13px | 9–24px |
+| Appearance: Conversation text | 14px | 9–24px, an agent over ACP (ACP-15) |
+| Notifications: New reviews and tickets | on | banners while the window is away (NOTE-*); the message center keeps them either way (MSG-2) |
+| Notifications: Agents waiting on you | on | banners and the dock count; the message center keeps them either way (MSG-2) |
+| Notifications: Slack | — | once the bot is connected: the channel, four switches (BOT-15, NOTE-5) |
+| Agents: Put terminals back when the app reopens | on | PANE-7 |
+| Agents: Trust the folders this app creates | on | PANE-10 |
+| Agents: Let agents read terminal output | **off** | MCP `pane_output`, `handoff_prompt` |
+| Agents: Most terminals running at once | 32 | 32, 48 or 64 (PANE-2) |
+| Agents: Task folder location | `~/.villain-worktrees` | where task folders go |
 | Keep awake (the cup in the top bar) | off | STATE-7, PHONE-8 |
+| Browser: sites agents may use | none: this machine's pages only | BRW-3, BRW-11 |
+| Browser: saved sign-ins | none | BRW-18 |
 | Remote access: Tailscale | off | PHONE-1, PHONE-2 |
 | Remote access: Home network and router VPN | off | PHONE-1, PHONE-2 |
 | Remote access: Let phones type into agents | off | PHONE-7 |
-| Browser: sites agents may use | none: this machine's pages only | BRW-3, BRW-11 |
-| Browser: saved sign-ins | none | BRW-18 |
-| Tickets follow the work (Jira) | work starts: first in-progress status; review, merged: not chosen | TKT-1, TKT-8, per Jira project |
-| Trust the folders this app creates | on | PANE-10 |
-| Terminal text | 13px | 9–24px |
-| Conversation text | 14px | 9–24px, an agent over ACP (ACP-15) |
-| Task folder location | `~/.villain-worktrees` | where task folders go |
 | Tickets: issue tracker | none | Jira, GitHub Issues or Forge, one per workspace (TKT-15) |
 | Tickets: Jira | — | site URL, email, API token, optional project key and JQL |
+| Tickets follow the work (Jira) | work starts: first in-progress status; review, merged: not chosen | TKT-1, TKT-8, per Jira project |
 | Tickets: Forge | — | site URL, then a sign-in in the browser; optional team key |
-| Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug; a fine-grained token also needs Issues, read and write, when GitHub Issues is the tracker), review team |
 | Tickets: GitHub Issues | — | the issue type epics are, when the organisation has issue types (TKT-17) |
-| Observability: Grafana | — | site URL, service account token (reads and queries datasources), OBS-1; the Loki datasource for your services' logs, none chosen, OBS-5 |
-| Observability: S3 log sources | none | each a name, AWS profile, region, bucket, prefix and optional Athena table; no AWS keys, OBS-8, OBS-9 |
-| Messaging: Slack | — | the bot: bot token (`xoxb-`), app-level token (`xapp-`, `connections:write`), the owner's member ID, the agent and its model (BOT-17), on/off, work without asking, personality (BOT-*); its notifications: the channel, four switches (BOT-15, NOTE-5) |
+| Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug; a fine-grained token also needs Issues, read and write, when GitHub Issues is the tracker), review team |
+| Messaging: Slack | — | the bot: bot token (`xoxb-`), app-level token (`xapp-`, `connections:write`), the owner's member ID, the agent and its model (BOT-17), on/off, work without asking, personality (BOT-*) |
+| Logs: Grafana | — | site URL, service account token (reads and queries datasources), OBS-1; the Loki datasource for your services' logs, none chosen, OBS-5 |
+| Logs: S3 log sources | none | each a name, AWS profile, region, bucket, prefix and optional Athena table; no AWS keys, OBS-8, OBS-9 |
 
 - **SET-1** A token field left blank MUST reuse the saved token only for
   the same site (scheme, host, port). A different site needs the token
@@ -1396,12 +1397,16 @@ Known gaps:
   an empty search, or a 404 for a ticket that exists, looks like an answer.
 
 - **SET-6** Settings' tabs MUST be named for what each does, not the
-  product behind it: Appearance, Tickets (Jira), Code (GitHub), Messaging
-  (Slack), Observability, Remote access (the phone), Browser, ACP (agents
-  as conversations, §20: a protocol, not a product), General. A page
+  product behind it, this Mac's first: Appearance (how it looks),
+  Notifications (banners here, posts to Slack), Agents (the agents found,
+  their terminals, the task folder), Browser, Remote access (the phone).
+  Then, a gap apart, what it connects to: Tickets (Jira or GitHub Issues),
+  Code (GitHub), Messaging (the Slack bot), Logs (Grafana and S3). A page
   connecting a service says which one at its top. A product's name said
   nothing to someone who had not set it up, and would be wrong the day a
-  second one is supported.
+  second one is supported. A setting MUST sit on the tab of what it
+  changes: banners were on Appearance and posts to Slack on Messaging, and
+  the agents had two tabs, General and ACP, naming the same four.
 - **SET-5** The theme MUST reach everything the app draws: every view,
   the terminals, the window behind the page before it has drawn, and a
   paired phone's page. The themes are Nightshade Night, Nightshade Day,
@@ -1463,7 +1468,8 @@ Known gaps:
   this Mac (PROF-11) reads none of them.
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
-`AppearanceSettings.tsx`, `integrations/mod.rs` (`require_https`); the
+`AppearanceSettings.tsx`, `NotificationSettings.tsx`, `AgentSettings.tsx`
+(`useUiPrefs.tsx` saves the prefs for all three), `integrations/mod.rs` (`require_https`); the
 server's settings (SET-13) in `crates/server/src/config.rs`; the
 workspace's and yours (SET-7 to SET-10) in `SharedSettings.tsx` and
 `config/shared.rs` (`held`, `WorkspaceAt.admin`); the
@@ -2334,19 +2340,22 @@ count and banner treats it like any other.
   (`promptCapabilities.image`) is said to, and the prompt is refused
   rather than sent without them. The conversation names each image
   `[image]`, as a replay does.
-- **ACP-17** Settings → ACP MUST show, for each agent in the table above,
-  its ACP command, the version installed (its `--version`, given 5
-  seconds), the version it was checked against, and where it stands:
-  Supported (the checked version, or a later one in the same major
-  release), Too old (before it), Not checked yet (a later major release),
-  Version unknown, or Not installed. Each is read as the tab opens and on
-  "Check again". It is advice: no version is refused (ACP-1 still offers
-  any one on the PATH).
+- **ACP-17** Settings → Agents MUST show, for each agent in the table
+  above, where it is on the PATH and, under it, how it stands as a
+  conversation: its ACP program's version (its `--version`, given 5
+  seconds) against the one it was checked with. Supported is the checked
+  version, or a later one in the same major release, and says only that
+  it runs as a conversation too. Too old (before it), Not checked yet (a
+  later major release) and Version unknown are pills, the one thing on
+  the row that stands out; an agent not installed says to install it, and
+  one whose ACP program is missing names it. Each is read as the tab
+  opens and on "Check again". It is advice: no version is refused (ACP-1
+  still offers any one on the PATH).
 
 Code: `acp/` (`conn.rs` the protocol, `user.rs`, `conversation.rs`,
 `entry.rs`, `read.rs`, `process.rs`, `version.rs` for ACP-17), `pty/acp.rs`,
 `commands/acp_panes.rs`, `agents.rs` (`AcpCommand`), `AcpPane.tsx`,
-`lib/acpUpdates.ts`, `lib/types-acp.ts`, `AcpSettings.tsx`. A real agent is checked with
+`lib/acpUpdates.ts`, `lib/types-acp.ts`, `AgentSettings.tsx`. A real agent is checked with
 `VILLAIN_ACP_AGENT="opencode acp" cargo test --lib real_agent -- --ignored`.
 
 Known gaps:
@@ -2657,8 +2666,8 @@ Known gaps:
 
 ## 23. Observability
 
-Agents read the logs of the services they work on. Settings has an
-Observability tab for where those logs are: Grafana's Loki, and S3. You
+Agents read the logs of the services they work on. Settings has a
+Logs tab for where those logs are: Grafana's Loki, and S3. You
 connect a Grafana site (its address and a service account's token), and
 agents then query its Loki datasources through the app's MCP server
 (§12), with LogQL or with a Grafana Explore link pasted from a ticket, a
@@ -2893,7 +2902,7 @@ mention sent while the app is closed is never seen.
   view to be reopened (PANE-7) and does not come back at launch; the
   thread's next message picks it up on its conversation (BOT-5).
 - **BOT-15** Notifications (§11) MUST be posted by the bot, with its token,
-  to the one channel chosen for them in Settings → Messaging; there is no
+  to the one channel chosen for them in Settings → Notifications; there is no
   second Slack app, token or webhook for them. The bot posts only where it
   was invited: it does not ask for `chat:write.public`, and choosing a
   channel posts a test message there first, so a channel it is not in is

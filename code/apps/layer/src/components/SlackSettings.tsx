@@ -2,9 +2,8 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { BOT_NAME_MAX, botManifest, newAppUrl, useSlackBot } from "../lib/slackBot";
-import type { AgentStatus, SlackBotConfig, SlackBotStatus, SlackConfig } from "../lib/types";
+import type { AgentStatus, SlackBotConfig, SlackBotStatus } from "../lib/types";
 import { useStore } from "../store";
-import { heldText, Theirs, useHeld, useWorkspace, Yours } from "./SharedSettings";
 import { BusyLabel, ErrorMessage, Field, Switch, useFailure } from "./ui";
 
 const STATE: Record<SlackBotStatus["state"], [string, string]> = {
@@ -17,8 +16,8 @@ const STATE: Record<SlackBotStatus["state"], [string, string]> = {
 /**
  * Settings → Messaging: the Slack bot (§24), a Slack app of your own, named by you,
  * that hands a thread to a chat when you mention it and posts the chat's
- * replies back to the thread; and the notifications it posts to a channel
- * (§11).
+ * replies back to the thread. What it posts to a channel is under
+ * Notifications (§11).
  */
 export function SlackSettings() {
   const settings = useStore((s) => s.settings);
@@ -134,7 +133,7 @@ export function SlackSettings() {
         Mention your bot in a Slack thread, or send it a direct message, and a chat opens here with
         the thread and what you asked. Its replies go back to the thread, and you can answer it
         there or here. It listens to you alone, and only while this app is open. It also posts the
-        app's notifications to a channel you choose.
+        app's notifications to a channel, chosen under Notifications.
       </p>
 
       {bot && (
@@ -185,8 +184,6 @@ export function SlackSettings() {
           <ErrorMessage>{card.error}</ErrorMessage>
         </div>
       )}
-
-      {bot && <Notifications botName={bot.bot_name} />}
 
       {bot && (
         <div className="card" style={{ marginBottom: 14 }}>
@@ -404,129 +401,6 @@ function AgentAndModel({
           ))}
         </select>
       </Field>
-    </div>
-  );
-}
-
-/**
- * Where the bot posts the app's notifications (§11), and which. It posts
- * only where it has been invited, so choosing a channel posts a test
- * message there first.
- */
-function Notifications({ botName }: { botName: string }) {
-  const slack = useStore((s) => s.settings?.slack ?? null);
-  const refreshSettings = useStore((s) => s.refreshSettings);
-  const failure = useFailure();
-  const workspace = useWorkspace();
-  // The channel is the workspace's (SET-7): a member posts their test there.
-  const heldChannel = heldText(useHeld("slack"), "channel");
-  const [channel, setChannel] = useState(slack?.channel || heldChannel || "");
-  const [busy, setBusy] = useState(false);
-  const chosen = slack !== null && slack.channel !== "";
-  const memberToTest =
-    workspace?.admin === false && heldChannel !== null && slack?.channel !== heldChannel;
-
-  async function saveChannel() {
-    setBusy(true);
-    failure.clear();
-    try {
-      // No toast (NOTE-7): the test is there to see in the channel.
-      await api.setSlackChannel(channel.trim());
-      await refreshSettings();
-    } catch (e) {
-      failure.fail(e);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function save(prefs: SlackConfig) {
-    failure.clear();
-    try {
-      await api.setSlackPrefs(prefs);
-      await refreshSettings();
-    } catch (e) {
-      failure.fail(e);
-    }
-  }
-
-  return (
-    <div className="card" style={{ marginBottom: 14 }}>
-      <h3>Notifications</h3>
-      <Theirs kind="slack" what="Slack" rows={[["Channel", channel]]}>
-        <Field
-          label="Channel"
-          hint={
-            <>
-              A channel name or ID. The bot posts only where it is invited:{" "}
-              <code>/invite @{botName}</code> there first.
-            </>
-          }
-        >
-          <div className="row">
-            <input
-              className="ui-field"
-              value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              placeholder="#eng-agents"
-            />
-            <button
-              className="ui-button"
-              disabled={busy || !channel.trim() || channel.trim() === slack?.channel}
-              onClick={() => void saveChannel()}
-            >
-              {busy ? "Posting…" : "Save & test"}
-            </button>
-          </div>
-        </Field>
-      </Theirs>
-      {memberToTest && (
-        <button
-          className="ui-button"
-          disabled={busy}
-          onClick={() => void saveChannel()}
-          style={{ marginBottom: 14 }}
-        >
-          {busy ? "Posting…" : "Post a test there"}
-        </button>
-      )}
-      {chosen && (
-        <Yours>
-          <Field
-            label="What gets posted"
-            hint="Muting is enforced in the backend, so an agent cannot route around it."
-          >
-            <div className="switch-list">
-              <Switch
-                label="Send anything to Slack"
-                detail="Master switch. Off means silence, without disconnecting."
-                checked={slack.enabled}
-                onChange={(v) => void save({ ...slack, enabled: v })}
-              />
-              <Switch
-                label="When an agent finishes"
-                checked={slack.notify_on_done}
-                disabled={!slack.enabled}
-                onChange={(v) => void save({ ...slack, notify_on_done: v })}
-              />
-              <Switch
-                label="When pull requests open"
-                checked={slack.notify_on_prs}
-                disabled={!slack.enabled}
-                onChange={(v) => void save({ ...slack, notify_on_prs: v })}
-              />
-              <Switch
-                label="Messages agents send themselves"
-                detail="The slack_post tool. Agents post unattended, so this is separate."
-                checked={slack.allow_agent_posts}
-                disabled={!slack.enabled}
-                onChange={(v) => void save({ ...slack, allow_agent_posts: v })}
-              />
-            </div>
-          </Field>
-        </Yours>
-      )}
-      <ErrorMessage>{failure.error}</ErrorMessage>
     </div>
   );
 }

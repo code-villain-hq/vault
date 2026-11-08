@@ -515,7 +515,7 @@ impl PtyManager {
                 return Err(Error::Pty(format!(
                     "{live} terminals are already running, which is the limit. Stop or \
                      close some before starting another, or raise the limit in Settings → \
-                     Appearance — and if you did not start this many, something is \
+                     Agents — and if you did not start this many, something is \
                      starting them on its own."
                 )));
             }
