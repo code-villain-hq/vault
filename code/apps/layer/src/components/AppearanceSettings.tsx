@@ -15,7 +15,7 @@ export function AppearanceSettings() {
     <>
       <Field
         label="Theme"
-        hint="Match the Mac switches between Nightshade's night and day as the Mac does. A paired phone draws in the same theme, or under Match the Mac in its own appearance. In a terminal an agent picks its own colours: if one stays dark, change its theme (Claude Code: /theme)."
+        hint="Match the Mac follows the Mac between Nightshade's night and day. In a terminal an agent keeps its own colours: change them there (Claude Code: /theme)."
       >
         <ThemePicker value={ui.theme} onPick={(theme) => void saveUi({ theme }, "theme")} />
         {failedUnder("theme")}
@@ -23,7 +23,7 @@ export function AppearanceSettings() {
 
       <Field
         label={`Interface scale — ${Math.round(ui.scale * 100)}%`}
-        hint="Scales everything except terminal text, which has its own size below."
+        hint="Everything but terminal text, which has its own size below."
       >
         <input
           type="range"
@@ -50,14 +50,14 @@ export function AppearanceSettings() {
 
       <TextSize
         label="Terminal text"
-        hint="Applies to running panes immediately; they re-fit to the new cell size."
+        hint="Running panes re-fit at once."
         value={ui.terminal_font_size}
         onChange={(v) => slideUi({ terminal_font_size: v }, "terminal-text")}
         error={failedUnder("terminal-text")}
       />
       <TextSize
         label="Conversation text"
-        hint="Agents started as a conversation (ACP): what they say, their tool calls and the message box. Applies to open ones immediately."
+        hint="Agents running as a conversation. Open ones change at once."
         value={ui.conversation_font_size}
         onChange={(v) => slideUi({ conversation_font_size: v }, "conversation-text")}
         error={failedUnder("conversation-text")}

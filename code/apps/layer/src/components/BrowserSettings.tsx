@@ -45,12 +45,9 @@ export function BrowserSettings() {
         label="Sites agents may use"
         hint={
           <>
-            Each task's agents have a browser tab, and open this machine's pages (localhost) in it
-            whenever they like. Anywhere else only as listed here: a page's text is written by
-            whoever runs the site, and an agent reads it as something that may tell it what to do. A
-            site covers its subdomains. An agent can ask for one; the request shows in its task's
-            browser. The browser is Google Chrome with a profile of its own, apart from yours: what
-            you sign in to there stays signed in for every task.
+            Agents open this Mac's pages whenever they like, and other sites only as listed here or
+            asked for in a task's browser: a page's text can tell an agent what to do. A site covers
+            its subdomains.
           </>
         }
       >
@@ -133,11 +130,9 @@ function SignIns() {
       label="Saved sign-ins"
       hint={
         <>
-          Agents sign in with these through the app, which types the password into the page's
-          password field itself: an agent never sees it. Passwords are kept in the keychain.{" "}
-          <code>localhost</code> alone is every port of this machine; a site elsewhere is that host
-          only. Use test accounts: an agent signed in can do what the account can. You can also save
-          one from the browser, after typing it into a page (the key in its toolbar).
+          The app types the password in, so an agent never sees it, and keeps it in the keychain.{" "}
+          <code>localhost</code> is every port of this Mac; elsewhere, that host only. Use test
+          accounts.
         </>
       }
     >

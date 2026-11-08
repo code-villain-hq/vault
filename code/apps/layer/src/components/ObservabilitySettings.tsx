@@ -122,7 +122,7 @@ function GrafanaSource() {
   const choice = sources && sources.length > 1 && (
     <Field
       label="Your services' logs"
-      hint="The Loki datasource agents read when they don't name one. Grafana Cloud adds datasources of its own beside yours. One missing here is one the token may not query: give its service account access to it in Grafana."
+      hint="The Loki datasource agents read when they don't name one. One missing here is one the token may not query."
     >
       <select
         className="ui-field"

@@ -91,19 +91,19 @@ export function PhoneSettings() {
       </p>
       <Field
         label="Ways in"
-        hint="Everything keeps running on this Mac; a phone sees the tasks and their agents, and follows a terminal. The app answers on the network only while one of these is on, and only to callers on that way."
+        hint="The app answers on the network only while one of these is on, and only that way."
       >
         <div className="switch-list">
           <Switch
             label="Tailscale"
-            detail="From anywhere, over your tailnet. Install Tailscale on this Mac and on the phone, signed in to the same account."
+            detail="From anywhere, with Tailscale on this Mac and the phone, signed in to one account."
             checked={status.tailscale}
             disabled={busy}
             onChange={(v) => void save({ tailscale: v }, ways)}
           />
           <Switch
             label="Home network and router VPN"
-            detail="On the same Wi-Fi as this Mac, or from anywhere through your router's own VPN (WireGuard on a GL.iNet router, say), which puts the phone on the home network."
+            detail="On this Mac's Wi-Fi, or from anywhere through your router's own VPN."
             checked={status.home}
             disabled={busy}
             onChange={(v) => void save({ home: v }, ways)}
@@ -145,7 +145,7 @@ export function PhoneSettings() {
         <div className="switch-list">
           <Switch
             label="Let phones type into agents"
-            detail="A line of text, and the keys an agent's questions take: Enter, Esc, the arrows, 1 to 3, Ctrl-C. Into agents only, never shells. Off, a phone only watches."
+            detail="Text and the keys an agent's questions take, into agents only, never shells. Off, a phone only watches."
             checked={status.typing}
             disabled={busy}
             onChange={(v) => void save({ typing: v }, typing)}
@@ -156,7 +156,7 @@ export function PhoneSettings() {
 
       <Field
         label="Phones"
-        hint="A phone gets in only with a code shown here, and each paired phone has a token of its own. Forget one and it is out at once."
+        hint="A phone gets in only with a code shown here. Forget one and it is out at once."
       >
         {status.pairing ? (
           <Pairing

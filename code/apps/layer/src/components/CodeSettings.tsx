@@ -125,12 +125,12 @@ export function CodeSettings() {
         >
           <input className="ui-field" value={ghApi} onChange={(e) => setGhApi(e.target.value)} />
         </Field>
-        <Field label="Web URL" hint="Used for building links back to the browser.">
+        <Field label="Web URL" hint="For links that open in the browser.">
           <input className="ui-field" value={ghWeb} onChange={(e) => setGhWeb(e.target.value)} />
         </Field>
         <Field
           label="Review team"
-          hint="Optional. A second list of pull requests requested of this team, as @fe or org/fe. A bare name is looked up from the teams you belong to, which needs the read:org scope; org/fe does not."
+          hint="Optional. A second list of pull requests asked of this team: org/fe, or @fe with the read:org scope."
         >
           <input
             className="ui-field"

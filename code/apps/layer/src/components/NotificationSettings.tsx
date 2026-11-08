@@ -19,20 +19,17 @@ export function NotificationSettings({ toMessaging }: { toMessaging: () => void 
     <>
       <div className="card" style={{ marginBottom: 14 }}>
         <h3>On this Mac</h3>
-        <Field
-          label="Banners"
-          hint="Only while the window is in the background. Opening the app does not announce what was already waiting."
-        >
+        <Field label="Banners" hint="Only while the window is in the background.">
           <div className="switch-list">
             <Switch
               label="New reviews and tickets"
-              detail="A banner when a pull request starts waiting on your review, or a ticket is assigned to you."
+              detail="A pull request waiting on your review, or a ticket assigned to you."
               checked={ui.system_notifications}
               onChange={(v) => void saveUi({ system_notifications: v }, "banners")}
             />
             <Switch
               label="Agents waiting on you"
-              detail="A banner when an agent goes quiet, asks to trust its folder, runs out of budget or exits — and the number waiting on the dock icon."
+              detail="An agent that stopped for you, and how many wait, on the dock icon."
               checked={ui.notify_waiting_agents}
               onChange={(v) => void saveUi({ notify_waiting_agents: v }, "banners")}
             />
@@ -144,7 +141,7 @@ function InSlack({ botName }: { botName: string }) {
         <Yours>
           <Field
             label="What gets posted"
-            hint="Muting is enforced in the backend, so an agent cannot route around it."
+            hint="Kept by the app, so an agent cannot get around them."
           >
             <div className="switch-list">
               <Switch

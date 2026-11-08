@@ -83,24 +83,24 @@ export function AgentSettings() {
 
       <Field
         label="Terminals"
-        hint="Agents are resumed rather than restarted where their CLI supports it, so the conversation carries on."
+        hint="Agents are resumed rather than restarted where their CLI supports it."
       >
         <div className="switch-list">
           <Switch
             label="Put terminals back when the app reopens"
-            detail="Panes that were open last time are reopened in the same worktrees."
+            detail="Panes open last time reopen in the same worktrees."
             checked={ui.restore_panes}
             onChange={(v) => void saveUi({ restore_panes: v }, "terminals")}
           />
           <Switch
             label="Trust the folders this app creates"
-            detail="Claude Code asks whether it trusts a folder the first time it starts there, and does nothing until answered — once per task, per repo. This answers it in advance, and only for worktrees and chat folders the app made itself."
+            detail="Answers Claude Code's trust question before it asks, for worktrees and chat folders this app made."
             checked={ui.trust_agent_dirs}
             onChange={(v) => void saveUi({ trust_agent_dirs: v }, "terminals")}
           />
           <Switch
             label="Let agents read terminal output"
-            detail="Agents can read what a terminal here has printed — a dev server's log, a test run — instead of starting a second copy. A shell's scrollback is a record of everything typed in it, so this stays off until you want it."
+            detail="A dev server's log or a test run, instead of starting a second copy. Off until you want it: a shell's scrollback holds everything typed in it."
             checked={ui.agents_read_panes}
             onChange={(v) => void saveUi({ agents_read_panes: v }, "terminals")}
           />
@@ -110,7 +110,7 @@ export function AgentSettings() {
 
       <Field
         label="Most terminals running at once"
-        hint="Every agent is a process of its own, and not a small one. The limit stops a bug, or an agent, from starting more than this Mac can hold. Terminals that have ended don't count."
+        hint="It stops a bug, or an agent, from starting more than this Mac can hold. Terminals that have ended don't count."
       >
         <div className="ui-segmented">
           {PANE_LIMITS.map((n) => (
@@ -131,7 +131,7 @@ export function AgentSettings() {
         label="Task folder location"
         hint={
           <>
-            Each task gets a folder here, holding one worktree per repository it touches. Currently{" "}
+            Each task gets a folder here, with a worktree for every repository it touches. Now{" "}
             <code>{settings.worktree_root}</code>
             {settings.worktree_root_is_default ? " (default)" : ""}.
           </>

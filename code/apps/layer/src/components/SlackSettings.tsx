@@ -142,10 +142,9 @@ export function SlackSettings() {
   return (
     <>
       <p className="muted" style={{ marginTop: 0 }}>
-        Mention your bot in a Slack thread, or send it a direct message, and a chat opens here with
-        the thread and what you asked. Its replies go back to the thread, and you can answer it
-        there or here. It listens to you alone, and only while this app is open. It also posts the
-        app's notifications to a channel, chosen under Notifications.
+        Mention your bot in a Slack thread, or message it, and a chat opens here. Its replies go
+        back to the thread. It listens to you alone, while this app is open. What it posts to a
+        channel is under Notifications.
       </p>
 
       {bot && (
@@ -202,7 +201,7 @@ export function SlackSettings() {
           <h3>Personality</h3>
           <Field
             label="Who it is"
-            hint="Its replies in Slack are written in this voice. It changes how it sounds, not how carefully it works. A chat already open keeps the voice it started with."
+            hint="Its replies in Slack take this voice: how it sounds, not how carefully it works. An open chat keeps its own."
           >
             <textarea
               className="ui-field"
