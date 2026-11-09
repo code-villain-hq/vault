@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, errMessage, failureText } from "../lib/api";
 import type { Cleaned, CleanupItem } from "../lib/types";
-import { BusyLabel, ErrorMessage, Modal, useFailure } from "./ui";
+import { BusyLabel, ErrorMessage, Modal, Spinner, useFailure } from "./ui";
 
 const SECTIONS: { kind: CleanupItem["kind"]; title: string }[] = [
   { kind: "folder", title: "Task folders no task uses" },
@@ -112,7 +112,14 @@ export function CleanUp({ onClose, onDone }: { onClose: () => void; onDone: () =
     >
       {broken ? (
         <ErrorMessage>{broken}</ErrorMessage>
-      ) : items === null ? null : items.length === 0 ? (
+      ) : items === null ? (
+        // Walking every task folder and copy takes seconds: an empty dialog
+        // in the meantime read as broken.
+        <div className="row muted" aria-busy>
+          <Spinner />
+          Looking through the task folders and copies…
+        </div>
+      ) : items.length === 0 ? (
         <div className="muted">Nothing to clean up: every folder, branch and copy is in use.</div>
       ) : (
         <>
