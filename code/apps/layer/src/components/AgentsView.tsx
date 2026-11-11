@@ -1,7 +1,9 @@
 import { Fragment, memo, useCallback, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { AGENT_SORT_LABEL, AGENT_SORTS, sortAgents, type AgentSort } from "../lib/agentSort";
 import { api } from "../lib/api";
 import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
+import { readOneOf, write } from "../lib/persist";
 import { markStopping, useStore } from "../store";
 import { Ago } from "./Ago";
 import { BusyLabel, ErrorMessage, SidebarToggle, useFailure } from "./ui";
@@ -21,15 +23,9 @@ export function AgentsView() {
   const failure = useFailure();
   const { clear, fail } = failure;
   const [failedOn, setFailedOn] = useState<string | null>(null);
-  // What needs you first, so the dock's count is the top of this list.
-  const ids = useStore(
-    useShallow((s) =>
-      s.panes
-        .filter((p) => p.kind === "agent")
-        .sort((a, b) => Number(needsYou(b)) - Number(needsYou(a)))
-        .map((p) => p.id),
-    ),
-  );
+  // The order last chosen, remembered on this Mac (PANE-17).
+  const [sort, setSort] = useState<AgentSort>(() => readOneOf("agentsSort", AGENT_SORTS, "needs"));
+  const ids = useStore(useShallow((s) => sortAgents(s.panes, s.tasks, sort)));
   const { live, waiting } = useStore(
     useShallow((s) => ({
       live: s.panes.filter((p) => p.kind === "agent" && p.running).length,
@@ -84,6 +80,24 @@ export function AgentsView() {
           {live} running · {ids.length - live} exited — pick a task on the left to work on one
         </span>
         <div className="spacer" />
+        {ids.length > 1 && (
+          <select
+            className="ui-field agents-sort"
+            value={sort}
+            aria-label="Sort agents"
+            onChange={(e) => {
+              const next = e.target.value as AgentSort;
+              setSort(next);
+              write("agentsSort", next);
+            }}
+          >
+            {AGENT_SORTS.map((o) => (
+              <option key={o} value={o}>
+                {AGENT_SORT_LABEL[o]}
+              </option>
+            ))}
+          </select>
+        )}
         <button className="ui-button" onClick={() => void refreshPanes()}>
           Refresh
         </button>
