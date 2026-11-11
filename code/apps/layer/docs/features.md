@@ -3444,7 +3444,8 @@ limit was found by an agent stopping on it.
   Keychain, and Orca's own notes say polling it is refused with 429s. The
   app's settings are laid over the user's, so a user with a status line of
   their own (`statusLine` in `~/.claude/settings.json`) keeps it and gets
-  no Claude row.
+  no Claude row. Orca's is not counted as theirs: Orca leaves it there
+  after it is put away, and outside Orca's own panes it prints nothing.
 - **LIMIT-3** OpenAI's MUST be asked of `chatgpt.com/backend-api/wham/usage`
   with the ChatGPT sign-in OpenCode keeps (`opencode.db`'s `credential`
   row for `openai`, or its older `auth.json`), only when it is an OAuth
