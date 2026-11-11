@@ -114,7 +114,18 @@ pub fn user_has_status_line() -> bool {
         .or_else(|| std::env::home_dir().map(|h| h.join(".claude")));
     dir.and_then(|d| std::fs::read_to_string(d.join("settings.json")).ok())
         .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-        .is_some_and(|v| v.get("statusLine").is_some_and(|s| !s.is_null()))
+        .is_some_and(|v| owns_status_line(&v))
+}
+
+/// Whether these settings hold a status line that is the user's. Orca's is
+/// not: it installs one in the user's settings that stays after Orca is put
+/// away, and outside a pane Orca started (no `ORCA_*` variables) it reads
+/// its input and prints nothing, so in the app's panes it shows nothing to
+/// take away.
+fn owns_status_line(settings: &Value) -> bool {
+    let Some(line) = settings.get("statusLine").filter(|s| !s.is_null()) else { return false };
+    let command = line.get("command").and_then(Value::as_str).unwrap_or_default();
+    !command.contains(".orca/agent-hooks/claude-statusline")
 }
 
 /// What a status line post says of the plan, or None when it says nothing.
@@ -385,6 +396,15 @@ mod tests {
         run(r#"{"rate_limits":{"five_hour":{"used_percentage":3}}}"#);
         assert_eq!(lines(), 2, "a stamp it cannot read does not stop it");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_status_line_of_the_users_own_is_kept_but_orcas_leftover_is_not() {
+        assert!(!owns_status_line(&json!({"model": "opus"})));
+        assert!(!owns_status_line(&json!({"statusLine": null})));
+        assert!(owns_status_line(&json!({"statusLine": {"type": "command", "command": "~/bin/line.sh"}})));
+        let orca = r#"if [ -f "${HOME-}/.orca/agent-hooks/claude-statusline.sh" ]; then /bin/sh "${HOME-}/.orca/agent-hooks/claude-statusline.sh"; fi"#;
+        assert!(!owns_status_line(&json!({"statusLine": {"type": "command", "command": orca}})));
     }
 
     #[test]
