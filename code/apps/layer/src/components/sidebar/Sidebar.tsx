@@ -17,6 +17,7 @@ import { BusyOverlay, Confirm, ErrorMessage, Field, Modal, useFailure } from "..
 import { DeleteTask } from "./DeleteTask";
 import { EpicsSection, useEpicSections } from "./EpicsSection";
 import { NoTasks } from "./NoTasks";
+import { PlanLimitsStrip } from "./PlanLimits";
 import { ProfileMenu } from "./ProfileMenu";
 import { SyncStatus } from "./SyncStatus";
 import { TaskRow } from "./TaskRow";
@@ -469,6 +470,7 @@ export function Sidebar() {
             </Fragment>
           ))}
       </div>
+      <PlanLimitsStrip />
       <ProfileMenu />
       {/* Where every app has it (PROF-19): Forge keeps a help button beside it. */}
       <div className="sidebar-foot">
