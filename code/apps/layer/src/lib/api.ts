@@ -1,5 +1,6 @@
 import type { Operation, TrackerKind } from "@layer/types";
 import { Channel, invoke } from "@tauri-apps/api/core";
+import type { PlanLimits } from "./limits";
 import type {
   AcpVersion,
   AcpView,
@@ -445,6 +446,10 @@ export const api = {
   // the run log (§22)
   listRuns: () => invoke<RunLog>("list_runs"),
   clearRuns: () => invoke<void>("clear_runs"),
+
+  // each agent plan's limits (§27)
+  planLimits: () => invoke<PlanLimits[]>("plan_limits"),
+  refreshPlanLimits: () => invoke<PlanLimits[]>("refresh_plan_limits"),
 
   // profiles (§25)
   listProfiles: () => invoke<ProfileView[]>("list_profiles"),

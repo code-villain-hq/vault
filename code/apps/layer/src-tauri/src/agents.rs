@@ -236,19 +236,26 @@ const HOOK_EVENTS: &[&str] =
 ///
 /// Its output cannot: it repaints its prompt every few seconds while it waits,
 /// so an agent two days idle read as working.
-pub fn claude_hook_settings() -> serde_json::Value {
+pub fn claude_hook_settings(status_line: bool) -> serde_json::Value {
     let report = |e: &str| {
         serde_json::json!([{
             "matcher": "*",
             "hooks": [{ "type": "command", "command": post_hook(e), "timeout": 5 }]
         }])
     };
-    serde_json::json!({
+    let mut settings = serde_json::json!({
         "hooks": HOOK_EVENTS
             .iter()
             .map(|e| (e.to_string(), report(e)))
             .collect::<serde_json::Map<_, _>>()
-    })
+    });
+    // The plan's limits (LIMIT-2), unless the user has a status line: this
+    // file is laid over theirs, and would take it away.
+    if status_line {
+        settings["statusLine"] =
+            serde_json::json!({ "type": "command", "command": crate::limits::status_line_command(), "padding": 0 });
+    }
+    settings
 }
 
 /// The same hooks for GitHub Copilot CLI, in its own file format.
@@ -366,7 +373,7 @@ pub fn prepare_launch(
     match integration {
         Integration::Claude => {
             let path = dir.join("claude-hooks.json");
-            replace_file(&path, &json(claude_hook_settings()), None)?;
+            replace_file(&path, &json(claude_hook_settings(!crate::limits::user_has_status_line())), None)?;
             launch.args = vec!["--settings".into(), path.to_string_lossy().into()];
             if let Some(mcp) = mcp {
                 // Always the flag, even where a `.mcp.json` sits in the
@@ -939,7 +946,7 @@ mod tests {
 
     #[test]
     fn every_hook_posts_for_its_pane_and_never_fails_the_turn() {
-        let claude = claude_hook_settings();
+        let claude = claude_hook_settings(true);
         let copilot = copilot_hooks();
         for e in HOOK_EVENTS {
             let c = claude["hooks"][e][0]["hooks"][0]["command"].as_str().unwrap();
@@ -956,13 +963,16 @@ mod tests {
         assert!(!after_tool.contains("@-") && after_tool.contains(r#"{"hook_event_name":"PostToolUse"}"#));
         let notice = claude["hooks"]["Notification"][0]["hooks"][0]["command"].as_str().unwrap();
         assert!(notice.contains("--data-binary @-"));
+        // The plan's limits come by the status line, unless the user has one.
+        assert_eq!(claude["statusLine"]["command"], crate::limits::status_line_command());
+        assert!(claude_hook_settings(false).get("statusLine").is_none());
     }
 
     #[test]
     fn a_session_start_says_which_conversation_it_is_and_only_an_id_is_taken() {
         // Sent whole: it names the conversation a restart resumes (PANE-14).
         let start =
-            claude_hook_settings()["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap().to_string();
+            claude_hook_settings(true)["hooks"]["SessionStart"][0]["hooks"][0]["command"].as_str().unwrap().to_string();
         assert!(start.contains("--data-binary @-"));
 
         let id = "024e8fc6-e2f5-44cd-a238-12dc258b29c8";

@@ -234,6 +234,7 @@ for, and the reverse, and that each is in this table.
 | `panes:waiting` | none | the panes a launch did not put back changed: marked at launch, reopened, forgotten (PANE-7), a Slack thread's chat stopped or picked up again (BOT-14) | `Watchers.tsx` → `refreshWaiting` |
 | `messages:changed` | none | the message center's log changed: recorded, read or cleared (`messages.rs`) | `Watchers.tsx` → `refreshMessages` |
 | `runs:changed` | none | an agent's run was recorded, a task finished or deleted, or the log cleared (`runs.rs`, RUN-1, RUN-9) | `UsageView.tsx`, while open → `listRuns` |
+| `limits:changed` | every provider's latest `PlanLimits` | a Claude status line posted, or OpenAI was asked (`limits.rs`, LIMIT-2, LIMIT-3) | `sidebar/PlanLimits.tsx` → its rows |
 | `notes:changed` | none | an agent remembered, checked or forgot a repo note (`notes.rs`, MEM-5), or the workspace's snapshot changed the notes (`commands/workspace.rs`, PROF-14) | `ReposView.tsx`, while open → `listRepoNotes` |
 | `browser:changed` | task id, or `""` for every task | a task's tab changed: made, navigated, retitled, loading, an agent acted, closed; or the browser went away (`browser/`) | `BrowserPanel.tsx` (`useBrowserView`) → `browser_view` |
 | `loop:changed` | pane id | a pane's loop changed: started, waiting, checking, a check run, ended (`loops.rs`, LOOP-9) | `LoopBar.tsx` (`useLoop`) → `loop_view` |

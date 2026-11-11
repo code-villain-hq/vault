@@ -8,6 +8,7 @@ mod config;
 mod error;
 mod git;
 mod integrations;
+mod limits;
 mod loops;
 mod mcp;
 mod messages;
@@ -162,6 +163,8 @@ pub fn run() {
             // Before anything can start a pane: the restore, the Slack bot, MCP.
             state.ptys.set_limit(state.config.read().ui.pane_limit);
             app.manage(state);
+            // Each plan's limits as last read (§27).
+            app.manage(limits::Limits::load(handle.state::<AppState>().config.folder()));
             // The workspace's Postgres and server, in the background (PROF-11).
             app.manage(workspace::ThisMac::new());
             workspace::attach(handle);
@@ -196,6 +199,7 @@ pub fn run() {
             theme::apply(handle, &handle.state::<AppState>().config.read().ui.theme);
             messages::spawn_writer(handle.clone(), dirty)?;
             runs::spawn_writer(handle.clone(), runs_dirty)?;
+            limits::spawn_openai_watch(handle.clone());
 
             // Agents reach the app's Jira, GitHub and Slack connections through
             // this rather than holding their own credentials. Bound before any
@@ -439,6 +443,8 @@ pub fn run() {
             commands::set_browser_sites,
             commands::list_runs,
             commands::clear_runs,
+            commands::plan_limits,
+            commands::refresh_plan_limits,
             commands::list_profiles,
             commands::open_profile,
             commands::create_profile,
