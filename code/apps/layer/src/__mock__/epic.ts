@@ -153,6 +153,7 @@ function prs(
         verdict: verdict as TaskPrs["rows"][number]["verdict"],
         base: "main",
         changed: 0,
+        to_reply: 0,
         error: null,
       },
     ],

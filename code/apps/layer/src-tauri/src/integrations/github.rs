@@ -334,6 +334,28 @@ impl GitHub {
         parse_feedback(&first.unwrap_or(Value::Null))
     }
 
+    /// How much on a pull request waits on its author's reply: the count on
+    /// its card's Feedback button (PR-6).
+    ///
+    /// Lighter than [`Self::pr_feedback`], since the sweep asks this of every
+    /// open PR: one page, and each thread's last comment only.
+    pub async fn pr_to_reply(&self, owner: &str, repo: &str, number: u64) -> Result<u32> {
+        const QUERY: &str = "query($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) {
+              author { login }
+              reviewThreads(first: 100) {
+                nodes { isResolved comments(last: 1) { nodes { author { login __typename } body url createdAt } } }
+              }
+              reviews(last: 100) { nodes { author { login __typename } state body url submittedAt } }
+              comments(last: 100) { nodes { author { login __typename } body url createdAt } }
+            }
+          }
+        }";
+        let v = self.graphql(QUERY, json!({ "owner": owner, "name": repo, "number": number })).await?;
+        Ok(to_reply(&parse_feedback(&v)?))
+    }
+
     /// Check runs on a ref that failed, with what they said about it.
     ///
     /// Cancelled is left out: it is nearly always a newer push superseding the
@@ -785,10 +807,74 @@ pub(crate) fn parse_feedback(v: &Value) -> Result<PrFeedback> {
     })
 }
 
+/// What waits on the PR's author: open threads someone else spoke last on,
+/// and what people said in the conversation since the author last did.
+/// A bot is not waiting on anyone.
+pub fn to_reply(f: &PrFeedback) -> u32 {
+    let person = |n: &Note| !n.bot && n.author != f.author;
+    let threads = f.threads.iter().filter(|t| !t.resolved && t.comments.last().is_some_and(person)).count();
+    let talk = || f.reviews.iter().chain(&f.comments);
+    // ISO times in UTC, so they order as text.
+    let last_own = talk().filter(|n| n.author == f.author).filter_map(|n| n.at.as_deref()).max();
+    let since = talk().filter(|n| person(n) && n.at.as_deref() > last_own).count();
+    (threads + since) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn note(author: &str, bot: bool, at: &str) -> Note {
+        Note { author: author.into(), bot, state: None, body: "x".into(), url: String::new(), at: Some(at.into()) }
+    }
+
+    fn thread(resolved: bool, last: Note) -> ReviewThread {
+        ReviewThread {
+            path: String::new(),
+            line: None,
+            start_line: None,
+            code: Vec::new(),
+            resolved,
+            outdated: false,
+            url: String::new(),
+            comments: vec![last],
+        }
+    }
+
+    #[test]
+    fn to_reply_counts_what_waits_on_the_author() {
+        let f = PrFeedback {
+            author: "me".into(),
+            threads: vec![
+                thread(false, note("ada", false, "2026-11-01T10:00:00Z")),
+                // Answered, accepted, or only a bot's.
+                thread(false, note("me", false, "2026-11-01T11:00:00Z")),
+                thread(true, note("ada", false, "2026-11-01T10:00:00Z")),
+                thread(false, note("lint", true, "2026-11-01T10:00:00Z")),
+            ],
+            reviews: vec![note("ada", false, "2026-11-01T09:00:00Z")],
+            comments: vec![
+                note("bob", false, "2026-11-01T08:00:00Z"),
+                note("me", false, "2026-11-01T09:30:00Z"),
+                note("bob", false, "2026-11-01T12:00:00Z"),
+                note("ci", true, "2026-11-01T13:00:00Z"),
+            ],
+        };
+        // One open thread, and bob's comment after the author's.
+        assert_eq!(to_reply(&f), 2);
+    }
+
+    #[test]
+    fn to_reply_counts_the_whole_conversation_before_the_author_speaks() {
+        let f = PrFeedback {
+            author: "me".into(),
+            threads: Vec::new(),
+            reviews: vec![note("ada", false, "2026-11-01T09:00:00Z")],
+            comments: vec![note("bob", false, "2026-11-01T08:00:00Z")],
+        };
+        assert_eq!(to_reply(&f), 2);
+    }
 
     #[test]
     fn a_ref_stays_one_path_segment() {

@@ -556,7 +556,11 @@ export function PrPanel({
               */}
               <button
                 className="ui-button"
-                title="Pick this PR's review threads, comments and failing checks to hand an agent"
+                title={
+                  row.to_reply > 0
+                    ? `Pick this PR's review threads, comments and failing checks to hand an agent. ${row.to_reply} wait on your reply.`
+                    : "Pick this PR's review threads, comments and failing checks to hand an agent"
+                }
                 onClick={(e) => {
                   e.stopPropagation();
                   setFeedback(row.checkout_id);
@@ -564,6 +568,9 @@ export function PrPanel({
               >
                 Feedback → agent
                 {toAnswer(row) > 0 && <span className="badge">{toAnswer(row)}</span>}
+                {row.to_reply > 0 && (
+                  <span className="badge badge-reply">· {row.to_reply} to reply</span>
+                )}
               </button>
               {/* Stopped, or opening the PR would fold the card underneath it. */}
               <button

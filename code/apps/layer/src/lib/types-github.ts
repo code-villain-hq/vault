@@ -54,6 +54,8 @@ export interface CheckoutPr {
   base: string;
   /** Files changed since the branch point, which a merged PR moves up to what it landed (UPD-6). */
   changed: number;
+  /** Threads and comments on the open PR waiting on its author's reply (PR-6). */
+  to_reply: number;
   error: string | null;
 }
 

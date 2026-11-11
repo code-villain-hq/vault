@@ -640,6 +640,7 @@ const prs: TaskPrs[] = [
         verdict: "changes_requested",
         base: "main",
         changed: 4,
+        to_reply: 2,
         error: null,
       },
       {
@@ -652,6 +653,7 @@ const prs: TaskPrs[] = [
         verdict: "none",
         base: "main",
         changed: 1,
+        to_reply: 0,
         error: null,
       },
     ],
@@ -670,6 +672,7 @@ const prs: TaskPrs[] = [
         verdict: "approved",
         base: "main",
         changed: 0,
+        to_reply: 0,
         error: null,
       },
     ],

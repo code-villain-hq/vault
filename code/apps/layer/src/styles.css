@@ -1186,6 +1186,11 @@ body.dragging * {
   font-family: var(--font-mono);
   opacity: 0.85;
 }
+/* What waits on you stands out from the total beside it (PR-6). */
+.ui-button .badge-reply {
+  color: var(--warn);
+  opacity: 1;
+}
 
 /* -------------------------------------------------------------------- pr */
 .panel-scroll {

@@ -778,7 +778,9 @@ send feedback to an agent, and finish a merged task.
   clears it.
 - **PR-6** Feedback to an agent is asked for from a PR's own card, with a
   count of that PR's comments and failing checks; one button for every PR
-  gave no way to tell whose they were. The picker shows that PR, and a task
+  gave no way to tell whose they were. Beside it, how many wait on your
+  reply: open threads someone else spoke last on, and what people said in
+  the conversation since you last did. Bots wait on no one. The picker shows that PR, and a task
   with several switches between them, each saying how many of its items
   are picked. Everything picked, on any of them, is sent in one go, and the
   send button says from how many PRs.

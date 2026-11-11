@@ -268,6 +268,7 @@ mod tests {
             verdict: "none".into(),
             base: "main".into(),
             changed,
+            to_reply: 0,
             error: None,
         }
     }
