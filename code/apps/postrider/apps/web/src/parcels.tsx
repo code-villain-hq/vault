@@ -2,20 +2,21 @@
 // order a shop says is on its way before it gives one, the ones still
 // coming first, each with where it is as its newest mail says and a link
 // to follow it on the carrier's page or the shop's. Nothing asks a
-// carrier: the state is the mail's, so it says when that mail came. The
-// shop's name opens the mail.
+// carrier: the state is the mail's, so it says when that mail came, unless
+// you said it came (Mark delivered, on hover), which Not delivered takes
+// back. The shop's name opens the mail.
 
 import { messageOf } from "@code-villain/web";
-import type { Parcel, ParcelState, Parcels } from "@postrider/types";
+import type { Parcel, ParcelDelivered, ParcelState, Parcels } from "@postrider/types";
 import { Link } from "@tanstack/react-router";
 import { ExternalLink } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { initial, useNow } from "./inbox";
 import { PageBody, PageHeader } from "./layout";
 import { hue, mailTime, useAccounts } from "./mail";
 import { isDesktop, openInBrowser } from "./platform";
-import { Empty, ErrorMessage } from "./ui";
+import { Button, Empty, ErrorMessage } from "./ui";
 import { useWorkspace } from "./workspace";
 
 const STATES: Record<ParcelState, string> = {
@@ -35,16 +36,30 @@ export function ParcelsPage() {
   const now = useNow();
   const [data, setData] = useState(() => lastRead.get(workspace.id));
   const [error, setError] = useState("");
+  const [saying, setSaying] = useState<string>();
+  const load = useCallback(
+    () =>
+      api<Parcels>("GET", `/api/w/${workspace.id}/parcels`, undefined, place).then(
+        (read) => {
+          lastRead.set(workspace.id, read);
+          setData(read);
+          setError("");
+        },
+        (problem) => setError(messageOf(problem)),
+      ),
+    [workspace.id, place],
+  );
   useEffect(() => {
-    api<Parcels>("GET", `/api/w/${workspace.id}/parcels`, undefined, place).then(
-      (read) => {
-        lastRead.set(workspace.id, read);
-        setData(read);
-        setError("");
-      },
-      (problem) => setError(messageOf(problem)),
-    );
-  }, [workspace.id, place]);
+    void load();
+  }, [load]);
+
+  const say = (parcel: Parcel, delivered: boolean) => {
+    setSaying(parcel.key);
+    const body: ParcelDelivered = { key: parcel.key, delivered };
+    api("POST", `/api/w/${workspace.id}/parcels/delivered`, body, place)
+      .then(load, (problem) => setError(messageOf(problem)))
+      .finally(() => setSaying(undefined));
+  };
 
   return (
     <>
@@ -63,11 +78,13 @@ export function ParcelsPage() {
             <ol className="pc-table" aria-label="Parcels">
               {data.parcels.map((parcel) => (
                 <ParcelRow
-                  key={parcel.number ?? `${parcel.mail.from_address} ${parcel.order}`}
+                  key={parcel.number ?? parcel.key}
                   parcel={parcel}
                   accountHue={byId.get(parcel.mail.account_id)?.hue ?? 1}
                   workspace={workspace.url_key}
                   now={now}
+                  saying={saying === parcel.key}
+                  onSay={(delivered) => say(parcel, delivered)}
                 />
               ))}
             </ol>
@@ -83,15 +100,22 @@ function ParcelRow({
   accountHue,
   workspace,
   now,
+  saying,
+  onSay,
 }: {
   parcel: Parcel;
   accountHue: number;
   workspace: string;
   now: Date;
+  saying: boolean;
+  onSay: (delivered: boolean) => void;
 }) {
   const { mail } = parcel;
   const shop = mail.from_name || mail.from_address;
   const waiting = parcel.state === "out_for_delivery" || parcel.state === "pick_up";
+  // A mail that says it came is the last word; what you said can be taken back.
+  const said = parcel.marked_at !== null;
+  const sayable = said || parcel.state !== "delivered";
   return (
     <li className={`pc ${parcel.state === "delivered" ? "done" : ""}`} style={hue(accountHue)}>
       <span className="av" aria-hidden="true">
@@ -113,10 +137,20 @@ function ParcelRow({
         </span>
       </span>
       <span className={`st ${waiting ? "waiting" : ""}`}>{STATES[parcel.state]}</span>
-      <span className="lw" title="When the mail that says so came">
-        {mailTime(mail.date, now)}
+      <span
+        className="lw"
+        title={said ? "When you said it came" : "When the mail that says so came"}
+      >
+        {mailTime(parcel.marked_at ?? mail.date, now)}
       </span>
-      {parcel.track_url && <TrackLink url={parcel.track_url} />}
+      <span className="say">
+        {sayable && (
+          <Button variant="secondary" disabled={saying} onClick={() => onSay(!said)}>
+            {saying ? "Saving…" : said ? "Not delivered" : "Mark delivered"}
+          </Button>
+        )}
+      </span>
+      <span className="go">{parcel.track_url && <TrackLink url={parcel.track_url} />}</span>
     </li>
   );
 }
@@ -124,7 +158,7 @@ function ParcelRow({
 function TrackLink({ url }: { url: string }) {
   return (
     <a
-      className="ui-button track"
+      className="ui-button"
       href={url}
       target="_blank"
       rel="noopener noreferrer"

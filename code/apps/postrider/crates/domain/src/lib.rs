@@ -21,8 +21,8 @@ pub use mail::{
     CalendarCreate, CalendarPatch, Conversation, Day, Draft, DraftRef, Event, Folder, FolderLink,
     FolderRole, HUES, Inbox, KeptInInbox, Listing, MailAccount, MailAccountConnect,
     MailAccountCreate, MailAccountPatch, MailRef, MailSummary, MarkMail, MarkedRead, Message,
-    MoveMail, NewUpload, Newsletter, NewsletterRef, Newsletters, Outgoing, Parcel, ParcelState,
-    Parcels, Party, PictureSender, PictureSenders, RenameFolder, Rewrite, Rewritten,
+    MoveMail, NewUpload, Newsletter, NewsletterRef, Newsletters, Outgoing, Parcel, ParcelDelivered,
+    ParcelState, Parcels, Party, PictureSender, PictureSenders, RenameFolder, Rewrite, Rewritten,
     SIGNATURE_CHARS, SenderProblem, Senders, ServerCalendar, SettingAside, UnsubscribeSent,
     Unsubscribed, Unsubscribing, Upload, signed,
 };

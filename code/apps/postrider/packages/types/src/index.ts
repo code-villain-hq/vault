@@ -38,6 +38,7 @@ export type * from "./generated/NewsletterRef";
 export type * from "./generated/Newsletters";
 export type * from "./generated/Outgoing";
 export type * from "./generated/Parcel";
+export type * from "./generated/ParcelDelivered";
 export type * from "./generated/ParcelState";
 export type * from "./generated/Parcels";
 export type * from "./generated/Party";

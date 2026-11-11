@@ -675,9 +675,15 @@ which the row names and opens. Track opens the mail's own link with the
 number, else the carrier's page, else the shop's link for the order (one
 with "track" in it first), else Parcels' page (parcelsapp.com), which
 finds the carrier itself; an order whose mail links nowhere for it has
-no Track. Delivered parcels go after 7 days, others after 60 without
-mail. What each mail gave is kept in memory, so a mail is read once
-while the server runs.
+no Track. Mark delivered, on a row's hover (always shown without a
+pointer), says a parcel came that no mail said came
+(`POST /parcels/delivered`, `delivered_parcels`): by its number, else its
+shop and order (`Parcel.key`), so a mark made on an order holds once its
+number comes. The row then reads Delivered, at when you said so, and Not
+delivered takes it back; a mail that says delivered is the last word and
+has no button. Delivered parcels go 7 days after their last mail or your
+mark, others after 60 without mail. What each mail gave is kept in
+memory, so a mail is read once while the server runs.
 
 ## Layout
 

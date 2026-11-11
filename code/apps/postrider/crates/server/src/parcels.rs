@@ -22,9 +22,10 @@ use std::sync::{Mutex, OnceLock};
 
 use axum::Json;
 use axum::extract::State;
-use chrono::{Duration, Utc};
+use axum::http::StatusCode;
+use chrono::{DateTime, Duration, Utc};
 use mail_parser::MessageParser;
-use postrider_domain::{FolderRole, MailSummary, Parcel, ParcelState, Parcels};
+use postrider_domain::{FolderRole, MailSummary, Parcel, ParcelDelivered, ParcelState, Parcels};
 use uuid::Uuid;
 
 use crate::auth::Member;
@@ -311,6 +312,14 @@ impl Mail {
         })
         .await
         .map_err(|error| AppError::internal(format!("reading parcels: {error}")))?;
+        let marks: Marks = sqlx::query_as::<_, (String, DateTime<Utc>)>(
+            "SELECT key, created_at FROM delivered_parcels WHERE workspace_id = $1",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .collect();
 
         let mut known = read().lock().expect("parcels read");
         known.extend(found);
@@ -323,15 +332,23 @@ impl Mail {
             .flat_map(|(mail, seen)| seen.iter().map(move |sighting| (mail, sighting)))
             .collect();
         ordered.sort_by_key(|(mail, _)| mail.date);
-        let parcels = gather(ordered, Utc::now());
+        let parcels = gather(ordered, &marks, Utc::now());
         Ok(Parcels { parcels })
     }
 }
 
+/// The parcels you said came, by key, and when you said so.
+type Marks = HashMap<String, DateTime<Utc>>;
+
 /// One parcel per number, oldest mail first in: its newest mail, the
 /// furthest state any mail gave it, and the link to follow it. An order
 /// without a number is one parcel with the number its shop gives it later.
-fn gather(ordered: Vec<(&MailSummary, &Sighting)>, now: chrono::DateTime<Utc>) -> Vec<Parcel> {
+/// One you said came is delivered from then on, until a mail says so too.
+fn gather(
+    ordered: Vec<(&MailSummary, &Sighting)>,
+    marks: &Marks,
+    now: DateTime<Utc>,
+) -> Vec<Parcel> {
     struct Gathered {
         parcel: Parcel,
         shop: String,
@@ -357,6 +374,8 @@ fn gather(ordered: Vec<(&MailSummary, &Sighting)>, now: chrono::DateTime<Utc>) -
                     carrier: sighting.carrier.clone(),
                     track_url: sighting.url.clone(),
                     state: sighting.state,
+                    marked_at: None,
+                    key: String::new(),
                     mail: mail.clone(),
                 },
                 shop,
@@ -394,11 +413,30 @@ fn gather(ordered: Vec<(&MailSummary, &Sighting)>, now: chrono::DateTime<Utc>) -
                     None => known.order_url,
                 };
             }
+            // Its number, else its shop and order, the same while it has
+            // none and once it has: a mark made either way holds.
+            let order = parcel
+                .order
+                .as_ref()
+                .map(|order| format!("{} {order}", known.shop));
+            let keys: Vec<String> = parcel.number.iter().cloned().chain(order).collect();
+            let marked = keys.iter().find_map(|key| marks.get_key_value(key));
+            parcel.key = match marked {
+                Some((key, _)) => key.clone(),
+                None => keys.into_iter().next().unwrap_or_default(),
+            };
+            if let Some((_, at)) = marked
+                && parcel.state != ParcelState::Delivered
+            {
+                parcel.state = ParcelState::Delivered;
+                parcel.marked_at = Some(*at);
+            }
             parcel
         })
         .collect();
     parcels.retain(|parcel| {
-        let age = now - parcel.mail.date;
+        let last = parcel.mail.date;
+        let age = now - parcel.marked_at.map_or(last, |at| at.max(last));
         match parcel.state {
             ParcelState::Delivered => age < Duration::days(DELIVERED_DAYS),
             _ => age < Duration::days(STALE_DAYS),
@@ -1164,6 +1202,30 @@ pub async fn list(
     Ok(Json(state.mail.parcels(member.actor.workspace_id).await?))
 }
 
+/// `POST /api/w/{workspace}/parcels/delivered`: you say a parcel came, or
+/// take that back.
+pub async fn delivered(
+    State(state): State<AppState>,
+    member: Member,
+    Json(mark): Json<ParcelDelivered>,
+) -> Result<StatusCode, AppError> {
+    let key = mark.key.trim();
+    if key.is_empty() || key.len() > 200 {
+        return Err(AppError::invalid("That isn't a parcel."));
+    }
+    let query = if mark.delivered {
+        "INSERT INTO delivered_parcels (workspace_id, key) VALUES ($1, $2) ON CONFLICT DO NOTHING"
+    } else {
+        "DELETE FROM delivered_parcels WHERE workspace_id = $1 AND key = $2"
+    };
+    sqlx::query(query)
+        .bind(member.actor.workspace_id)
+        .bind(key)
+        .execute(&state.pool)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1334,7 +1396,11 @@ mod tests {
         assert_eq!(numbered[0].order.as_deref(), Some("1234567890123456"));
 
         let (old, new) = (received(3, shop), received(1, shop));
-        let parcels = gather(vec![(&old, &ordered[0]), (&new, &numbered[0])], Utc::now());
+        let parcels = gather(
+            vec![(&old, &ordered[0]), (&new, &numbered[0])],
+            &Marks::new(),
+            Utc::now(),
+        );
         assert_eq!(parcels.len(), 1);
         assert_eq!(parcels[0].number.as_deref(), Some("00123456789012345678"));
         assert_eq!(parcels[0].state, ParcelState::OutForDelivery);
@@ -1344,7 +1410,7 @@ mod tests {
         );
 
         // Alone, the order is followed on the shop's page for it.
-        let parcels = gather(vec![(&old, &ordered[0])], Utc::now());
+        let parcels = gather(vec![(&old, &ordered[0])], &Marks::new(), Utc::now());
         assert_eq!(
             parcels[0].track_url.as_deref(),
             Some("https://www.shop.example/p/order/detail.html?orderId=1234567890123456&x=1")
@@ -1354,6 +1420,7 @@ mod tests {
         let elsewhere = received(2, "orders@other.example");
         let parcels = gather(
             vec![(&old, &ordered[0]), (&elsewhere, &ordered[0])],
+            &Marks::new(),
             Utc::now(),
         );
         assert_eq!(parcels.len(), 2);
@@ -1404,7 +1471,11 @@ mod tests {
         };
         let (old, new) = (received(3, "a@shop.example"), received(1, "a@shop.example"));
         let (shipped, delivered) = (seen(ParcelState::Shipped), seen(ParcelState::Delivered));
-        let parcels = gather(vec![(&old, &shipped), (&new, &delivered)], now);
+        let parcels = gather(
+            vec![(&old, &shipped), (&new, &delivered)],
+            &Marks::new(),
+            now,
+        );
         assert_eq!(parcels.len(), 1);
         assert_eq!(parcels[0].state, ParcelState::Delivered);
         assert_eq!(parcels[0].mail.uid, 1);
@@ -1416,6 +1487,55 @@ mod tests {
         );
 
         let long_ago = received(10, "a@shop.example");
-        assert!(gather(vec![(&long_ago, &delivered)], now).is_empty());
+        assert!(gather(vec![(&long_ago, &delivered)], &Marks::new(), now).is_empty());
+    }
+
+    #[test]
+    fn a_parcel_you_said_came_is_delivered_until_you_take_it_back() {
+        let now = Utc::now();
+        let seen = |number: Option<&str>| Sighting {
+            number: number.map(Into::into),
+            order: Some("123456".into()),
+            carrier: None,
+            url: None,
+            order_url: None,
+            state: ParcelState::Shipped,
+        };
+        let (mail, later) = (
+            received(20, "orders@shop.example"),
+            received(19, "orders@shop.example"),
+        );
+        let (order, numbered) = (seen(None), seen(Some("00340434123456789012")));
+        let marked = |at| Marks::from([("shop.example 123456".to_string(), at)]);
+
+        // Said while only its order was known, long after its mail.
+        let parcels = gather(vec![(&mail, &order)], &marked(now), now);
+        assert_eq!(parcels[0].state, ParcelState::Delivered);
+        assert_eq!(parcels[0].marked_at, Some(now));
+        assert_eq!(parcels[0].key, "shop.example 123456");
+
+        // The number its shop gives later keeps what you said, and its key.
+        let parcels = gather(
+            vec![(&mail, &order), (&later, &numbered)],
+            &marked(now),
+            now,
+        );
+        assert_eq!(parcels.len(), 1);
+        assert_eq!(parcels[0].state, ParcelState::Delivered);
+        assert_eq!(parcels[0].key, "shop.example 123456");
+
+        // It goes a week after you said so.
+        let week_ago = now - Duration::days(8);
+        assert!(gather(vec![(&mail, &order)], &marked(week_ago), now).is_empty());
+
+        // Taken back, it's on its way again, by its number.
+        let parcels = gather(
+            vec![(&mail, &order), (&later, &numbered)],
+            &Marks::new(),
+            now,
+        );
+        assert_eq!(parcels[0].state, ParcelState::Shipped);
+        assert_eq!(parcels[0].marked_at, None);
+        assert_eq!(parcels[0].key, "00340434123456789012");
     }
 }

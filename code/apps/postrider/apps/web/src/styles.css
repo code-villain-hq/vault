@@ -1005,8 +1005,9 @@ body {
 }
 
 /* Parcels, the ones still coming first: the shop and its number take what's
-   free; where it is, when its mail came and Track stand at the right. Out
-   for delivery and ready to pick up wear the accent, as they're what needs
+   free; where it is, when its mail came and Track stand at the right, with
+   Mark delivered before Track where a pointer is over the row. Out for
+   delivery and ready to pick up wear the accent, as they're what needs
    you; a delivered one goes faint. */
 .parcels {
   padding: 22px 16px 24px;
@@ -1015,7 +1016,7 @@ body {
   display: grid;
   /* The rows are subgrids: their 12px padding comes out of the first and last
      columns, so the avatar's column holds it too. */
-  grid-template-columns: 38px minmax(0, 1fr) 140px 84px auto;
+  grid-template-columns: 38px minmax(0, 1fr) 140px 84px auto auto;
   column-gap: 12px;
 }
 .pc {
@@ -1064,8 +1065,18 @@ body {
   color: var(--accent);
   font-weight: 600;
 }
-.pc .track {
+.pc .say,
+.pc .go {
+  display: flex;
+  justify-content: flex-end;
+}
+.pc .go .ui-button {
   gap: 6px;
+}
+@media (hover: hover) {
+  .pc:not(:hover):not(:focus-within) .say {
+    visibility: hidden;
+  }
 }
 .pc.done .name {
   color: var(--faint);
@@ -1086,8 +1097,12 @@ body {
   .pc .lw {
     grid-column: 2;
   }
-  .pc .track {
+  .pc .go {
     grid-column: 3;
     grid-row: 1;
+  }
+  .pc .say {
+    grid-column: 3;
+    grid-row: 2 / span 2;
   }
 }

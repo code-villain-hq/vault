@@ -67,6 +67,7 @@ pub fn router(state: AppState) -> Router {
         .route("/search", get(folders::search))
         .route("/flagged", get(marks::flagged))
         .route("/parcels", get(parcels::list))
+        .route("/parcels/delivered", post(parcels::delivered))
         .route("/pictures", get(pictures::list).post(pictures::set))
         .route("/newsletters", get(newsletters::list))
         .route("/newsletters/sender", get(newsletters::sender))

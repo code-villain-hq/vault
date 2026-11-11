@@ -27,6 +27,14 @@ carrier: string | null,
  */
 track_url: string | null, state: ParcelState, 
 /**
+ * When you said it came, while no mail has: its state is then yours.
+ */
+marked_at: string | null, 
+/**
+ * What says it came: its number, else its shop and order.
+ */
+key: string, 
+/**
  * The newest mail that names it: who sent it, and when.
  */
 mail: MailSummary, };

@@ -1047,8 +1047,22 @@ pub struct Parcel {
     /// carrier itself. None for an order whose mail links nowhere for it.
     pub track_url: Option<String>,
     pub state: ParcelState,
+    /// When you said it came, while no mail has: its state is then yours.
+    pub marked_at: Option<DateTime<Utc>>,
+    /// What says it came: its number, else its shop and order.
+    pub key: String,
     /// The newest mail that names it: who sent it, and when.
     pub mail: MailSummary,
+}
+
+/// `POST /api/w/{workspace}/parcels/delivered`: that a parcel came, or
+/// didn't after all, by its key.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct ParcelDelivered {
+    pub key: String,
+    pub delivered: bool,
 }
 
 /// `GET /api/w/{workspace}/parcels`: the parcels the mail on this Mac
