@@ -3,22 +3,29 @@ import type { MailSummary } from "./MailSummary";
 import type { ParcelState } from "./ParcelState";
 
 /**
- * A parcel a mail gave a tracking number for.
+ * A parcel a mail gave a tracking number for, or an order its shop said
+ * is on its way before any mail gave one.
  */
 export type Parcel = { 
 /**
- * The tracking number, without spaces.
+ * The tracking number, without spaces; none while only the shop's
+ * order is known.
  */
-number: string, 
+number: string | null, 
 /**
- * "DHL", "DPD", "Hermes"…, when the mail or the number tells.
+ * The shop's order number, when its mail names it.
+ */
+order: string | null, 
+/**
+ * "DHL", "PostNord", "Chronopost"…, when the mail or the number tells.
  */
 carrier: string | null, 
 /**
  * Where to follow it: the mail's own link, else the carrier's page,
- * else a page that finds the carrier itself.
+ * else the shop's page for the order, else a page that finds the
+ * carrier itself. None for an order whose mail links nowhere for it.
  */
-track_url: string, state: ParcelState, 
+track_url: string | null, state: ParcelState, 
 /**
  * The newest mail that names it: who sent it, and when.
  */

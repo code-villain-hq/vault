@@ -1,8 +1,9 @@
-// Parcels: every tracking number the mail on this Mac gives, the ones
-// still coming first, each with where it is as its newest mail says and a
-// link to follow it on the carrier's page. Nothing asks a carrier: the
-// state is the mail's, so it says when that mail came. The shop's name
-// opens the mail.
+// Parcels: every tracking number the mail on this Mac gives, and every
+// order a shop says is on its way before it gives one, the ones still
+// coming first, each with where it is as its newest mail says and a link
+// to follow it on the carrier's page or the shop's. Nothing asks a
+// carrier: the state is the mail's, so it says when that mail came. The
+// shop's name opens the mail.
 
 import { messageOf } from "@code-villain/web";
 import type { Parcel, ParcelState, Parcels } from "@postrider/types";
@@ -54,15 +55,15 @@ export function ParcelsPage() {
           <ErrorMessage>{error}</ErrorMessage>
           {data && data.parcels.length === 0 && (
             <Empty title="No parcels on their way">
-              When a shop or a carrier mails you a tracking number, the parcel shows here, with
-              where it is and a link to follow it.
+              When a shop or a carrier mails you a tracking number, or a shop says your order is on
+              its way, the parcel shows here, with where it is and a link to follow it.
             </Empty>
           )}
           {data && data.parcels.length > 0 && (
             <ol className="pc-table" aria-label="Parcels">
               {data.parcels.map((parcel) => (
                 <ParcelRow
-                  key={parcel.number}
+                  key={parcel.number ?? `${parcel.mail.from_address} ${parcel.order}`}
                   parcel={parcel}
                   accountHue={byId.get(parcel.mail.account_id)?.hue ?? 1}
                   workspace={workspace.url_key}
@@ -108,27 +109,33 @@ function ParcelRow({
         </Link>
         <span className="num">
           {parcel.carrier ? `${parcel.carrier} · ` : ""}
-          {parcel.number}
+          {parcel.number ?? `Order ${parcel.order}`}
         </span>
       </span>
       <span className={`st ${waiting ? "waiting" : ""}`}>{STATES[parcel.state]}</span>
       <span className="lw" title="When the mail that says so came">
         {mailTime(mail.date, now)}
       </span>
-      <a
-        className="ui-button track"
-        href={parcel.track_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(event) => {
-          if (!isDesktop) return;
-          event.preventDefault();
-          void openInBrowser(parcel.track_url);
-        }}
-      >
-        Track
-        <ExternalLink size={13} strokeWidth={1.75} aria-hidden="true" />
-      </a>
+      {parcel.track_url && <TrackLink url={parcel.track_url} />}
     </li>
+  );
+}
+
+function TrackLink({ url }: { url: string }) {
+  return (
+    <a
+      className="ui-button track"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) => {
+        if (!isDesktop) return;
+        event.preventDefault();
+        void openInBrowser(url);
+      }}
+    >
+      Track
+      <ExternalLink size={13} strokeWidth={1.75} aria-hidden="true" />
+    </a>
   );
 }

@@ -26,7 +26,8 @@ drafts kept in the account's Drafts. Step 4 is built:
 newsletters skip the Inbox for a page of their own (G then N), the ones
 you never open first, and Unsubscribe asks nothing. The week (5) is still
 to come. Parcels (G then P), asked for beyond the storyboard, lists the
-tracking numbers your mail gives (below).
+tracking numbers your mail gives and the orders a shop says are on their
+way (below).
 
 It is built the way Raven and Almanac are: a Rust server on Postgres with
 the studio's sync engine (`code/kit/sync`), a React app (`apps/web`) on
@@ -643,18 +644,40 @@ tracking numbers in the mail this Mac keeps: the Inbox's kept sources and
 the folders' (those a search asks, but Sent). Nothing asks a carrier, and
 no key or account is needed. A number comes from a `ParcelDelivery` the
 mail declares (schema.org JSON-LD), a link to a carrier's page with the
-number in it, a label ("Sendungsnummer:", "Tracking number", grouped
-digits joined), or a format only one carrier writes (`1Z…` UPS, `JJD…`
-DHL, `TBA…` Amazon, a UPU number ending in DE) in a mail about a parcel.
-The carrier is the number's, else the sender's domain, else the one the
-mail alone names. Where it is comes from the mail's words, the subject
-first: on its way, out for delivery, ready to pick up, delivered; a
+number in it, a link of any shop's that names it (`track_sn=…`) in a mail
+about a parcel, a label in German, English, Swedish, Danish, Norwegian or
+French ("Sendungsnummer:", "Tracking number", "Spårningsnummer",
+"Paket-ID", "Numéro de suivi"; grouped digits joined), the word right
+before it ("Package 0012…", "Paket", "Colis"), or a format only one
+carrier writes (`1Z…` UPS, `JJD…` DHL, `TBA…` Amazon, a UPU number like
+`RR123456785DE` whose check digit is right, its country naming the post:
+DE DHL, SE and DK PostNord, NO Bring, FR Colissimo, GB Royal Mail, US
+USPS) in a mail about a parcel. The carrier is the sender's when a
+carrier (`CARRIERS`: the German ones, PostNord, Instabox, Budbee, Airmee,
+Early Bird, Bring, InPost, Chronopost, Colissimo, Royal Mail, USPS…)
+wrote the mail, else the linked page's, else the number's, else the one
+the mail alone names.
+
+A shop's order is a parcel too: the number after "Order", "Bestellung",
+"Beställning", "Commande"… (anywhere in the subject, a few words after it
+in the text, else a link's `orderId=…`), once the subject says it left
+(shipped, on its way, på väg, versendet, expédié, delivered…); a
+confirmation is not. The row says "Order 1234…" until a mail from the
+same shop (its registrable domain) gives a number with that order, which
+then takes its place. Two numbers for one shipment (a shop's and the
+carrier's) stay two rows.
+
+Where it is comes from the mail's words, the subject first and decisive
+(a "på väg" subject is on its way, whatever the text says will happen
+next): on its way, out for delivery, ready to pick up, delivered; a
 parcel keeps the furthest any of its mails said, and its newest mail,
 which the row names and opens. Track opens the mail's own link with the
-number, else the carrier's page (`CARRIERS`), else Parcels' page
-(parcelsapp.com), which finds the carrier itself. Delivered parcels go
-after 7 days, others after 60 without mail. What each mail gave is kept
-in memory, so a mail is read once while the server runs.
+number, else the carrier's page, else the shop's link for the order (one
+with "track" in it first), else Parcels' page (parcelsapp.com), which
+finds the carrier itself; an order whose mail links nowhere for it has
+no Track. Delivered parcels go after 7 days, others after 60 without
+mail. What each mail gave is kept in memory, so a mail is read once
+while the server runs.
 
 ## Layout
 

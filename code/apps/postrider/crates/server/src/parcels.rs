@@ -1,15 +1,21 @@
 //! Parcels, at `GET /api/w/{workspace}/parcels`: the tracking numbers in
 //! the mail this Mac keeps (the Inbox's and the folders a search asks, but
-//! Sent), each with where it is as its newest mail says and a link to
+//! Sent), and the orders a shop said are on their way before any mail gave
+//! a number, each with where it is as its newest mail says and a link to
 //! follow it. Nothing is asked of a carrier: the link is the mail's own,
-//! else the carrier's page the number or the mail names, else Parcels'
-//! page, which finds the carrier itself.
+//! else the carrier's page the number or the mail names, else the shop's
+//! page for the order, else Parcels' page, which finds the carrier itself.
 //!
-//! A number is found three ways: a `ParcelDelivery` a shop or carrier
+//! A number is found four ways: a `ParcelDelivery` a shop or carrier
 //! wrote into the mail (schema.org, as JSON-LD), a link to a carrier's
-//! tracking page, or the words around it ("Sendungsnummer: …", and numbers
-//! only one carrier writes, `1Z…`, `JJD…`, in a mail about a parcel).
-//! What each mail says is read once and kept in memory.
+//! tracking page or one that names its number (`track_sn=…`), the words
+//! around it ("Sendungsnummer: …", "Spårningsnummer: …", "Package …"), and
+//! numbers only a carrier writes (`1Z…`, `JJD…`, a post's `RR123456785DE`
+//! with its check digit), in a mail about a parcel. An order is the shop's
+//! number after "Order", "Bestellung", "Beställning"…, in a mail whose
+//! subject says it left (shipped, on its way, delivered); a number given
+//! with that order later takes its place. What each mail says is read
+//! once and kept in memory.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
@@ -51,13 +57,13 @@ const CARRIERS: &[Carrier] = &[
         page: Some(
             "https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={}",
         ),
-        domains: &["dhl.de", "dhl.com", "deutschepost.de"],
+        domains: &["dhl.de", "dhl.com", "dhl.se", "deutschepost.de"],
         words: &["DHL", "Deutsche Post"],
     },
     Carrier {
         name: "DPD",
         page: Some("https://tracking.dpd.de/status/de_DE/parcel/{}"),
-        domains: &["dpd.de", "dpd.com"],
+        domains: &["dpd.de", "dpd.com", "dpd.fr", "dpd.co.uk", "dpdgroup.com"],
         words: &["DPD"],
     },
     Carrier {
@@ -85,6 +91,79 @@ const CARRIERS: &[Carrier] = &[
         words: &["FedEx"],
     },
     Carrier {
+        name: "PostNord",
+        page: Some("https://tracking.postnord.com/se/tracking?id={}"),
+        domains: &[
+            "postnord.se",
+            "postnord.com",
+            "postnord.dk",
+            "postnord.no",
+            "postnord.fi",
+        ],
+        words: &["PostNord"],
+    },
+    Carrier {
+        name: "Instabox",
+        page: Some("https://track.instabox.io/{}"),
+        domains: &["instabox.se", "instabox.io", "instabee.com"],
+        words: &["Instabox"],
+    },
+    Carrier {
+        name: "Budbee",
+        page: None,
+        domains: &["budbee.com"],
+        words: &["Budbee"],
+    },
+    Carrier {
+        name: "Airmee",
+        page: None,
+        domains: &["airmee.com"],
+        words: &["Airmee"],
+    },
+    Carrier {
+        name: "Early Bird",
+        page: None,
+        domains: &["earlybird.se"],
+        words: &["Early Bird"],
+    },
+    Carrier {
+        name: "Bring",
+        page: Some("https://tracking.bring.com/tracking/{}"),
+        domains: &["bring.com", "bring.se", "bring.no", "posten.no"],
+        // "Bring" starts many a sentence.
+        words: &[],
+    },
+    Carrier {
+        name: "InPost",
+        page: None,
+        domains: &["inpost.pl", "inpost.eu", "inpost.co.uk"],
+        words: &["InPost"],
+    },
+    Carrier {
+        name: "Chronopost",
+        page: Some("https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT={}"),
+        domains: &["chronopost.fr"],
+        words: &["Chronopost"],
+    },
+    Carrier {
+        name: "Colissimo",
+        page: Some("https://www.laposte.fr/outils/suivre-vos-envois?code={}"),
+        domains: &["laposte.fr", "colissimo.fr"],
+        words: &["Colissimo"],
+    },
+    Carrier {
+        name: "Royal Mail",
+        page: Some("https://www.royalmail.com/track-your-item#/tracking-results/{}"),
+        domains: &["royalmail.com"],
+        words: &["Royal Mail"],
+    },
+    Carrier {
+        name: "USPS",
+        page: Some("https://tools.usps.com/go/TrackConfirmAction?tLabels={}"),
+        domains: &["usps.com"],
+        words: &["USPS"],
+    },
+    Carrier {
         name: "Amazon",
         page: None,
         domains: &[],
@@ -92,13 +171,16 @@ const CARRIERS: &[Carrier] = &[
     },
 ];
 
-/// What one mail says of one parcel.
+/// What one mail says of one parcel: its number, its order, or both.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Sighting {
-    pub number: String,
+    pub number: Option<String>,
+    pub order: Option<String>,
     pub carrier: Option<String>,
-    /// The mail's own link to follow it.
+    /// The mail's own link to follow it, with its number.
     pub url: Option<String>,
+    /// The shop's link for its order, which follows it too.
+    pub order_url: Option<String>,
     pub state: ParcelState,
 }
 
@@ -247,38 +329,74 @@ impl Mail {
 }
 
 /// One parcel per number, oldest mail first in: its newest mail, the
-/// furthest state any mail gave it, and the link to follow it.
+/// furthest state any mail gave it, and the link to follow it. An order
+/// without a number is one parcel with the number its shop gives it later.
 fn gather(ordered: Vec<(&MailSummary, &Sighting)>, now: chrono::DateTime<Utc>) -> Vec<Parcel> {
-    let mut parcels: Vec<Parcel> = Vec::new();
+    struct Gathered {
+        parcel: Parcel,
+        shop: String,
+        order_url: Option<String>,
+    }
+    let mut gathered: Vec<Gathered> = Vec::new();
     for (mail, sighting) in ordered {
-        match parcels
-            .iter_mut()
-            .find(|parcel| parcel.number == sighting.number)
-        {
-            Some(parcel) => {
-                parcel.mail = mail.clone();
-                parcel.state = parcel.state.max(sighting.state);
-                if sighting.carrier.is_some() {
-                    parcel.carrier.clone_from(&sighting.carrier);
-                }
-                if let Some(url) = &sighting.url {
-                    parcel.track_url.clone_from(url);
-                }
+        let shop = shop_of(&mail.from_address);
+        let same = |known: &Gathered| match (&known.parcel.number, &sighting.number) {
+            (Some(a), Some(b)) => a == b,
+            // An order and the number its shop gave it, or the order again.
+            _ => {
+                sighting.order.is_some()
+                    && known.parcel.order == sighting.order
+                    && known.shop == shop
             }
-            None => parcels.push(Parcel {
-                number: sighting.number.clone(),
-                carrier: sighting.carrier.clone(),
-                track_url: sighting.url.clone().unwrap_or_default(),
-                state: sighting.state,
-                mail: mail.clone(),
-            }),
+        };
+        let Some(at) = gathered.iter().position(same) else {
+            gathered.push(Gathered {
+                parcel: Parcel {
+                    number: sighting.number.clone(),
+                    order: sighting.order.clone(),
+                    carrier: sighting.carrier.clone(),
+                    track_url: sighting.url.clone(),
+                    state: sighting.state,
+                    mail: mail.clone(),
+                },
+                shop,
+                order_url: sighting.order_url.clone(),
+            });
+            continue;
+        };
+        let known = &mut gathered[at];
+        let parcel = &mut known.parcel;
+        parcel.mail = mail.clone();
+        parcel.state = parcel.state.max(sighting.state);
+        if parcel.number.is_none() {
+            parcel.number.clone_from(&sighting.number);
+        }
+        if parcel.order.is_none() {
+            parcel.order.clone_from(&sighting.order);
+        }
+        if sighting.carrier.is_some() {
+            parcel.carrier.clone_from(&sighting.carrier);
+        }
+        if sighting.url.is_some() {
+            parcel.track_url.clone_from(&sighting.url);
+        }
+        if sighting.order_url.is_some() {
+            known.order_url.clone_from(&sighting.order_url);
         }
     }
-    for parcel in &mut parcels {
-        if parcel.track_url.is_empty() {
-            parcel.track_url = page(parcel.carrier.as_deref(), &parcel.number);
-        }
-    }
+    let mut parcels: Vec<Parcel> = gathered
+        .into_iter()
+        .map(|known| {
+            let mut parcel = known.parcel;
+            if parcel.track_url.is_none() {
+                parcel.track_url = match &parcel.number {
+                    Some(number) => Some(page(parcel.carrier.as_deref(), number, known.order_url)),
+                    None => known.order_url,
+                };
+            }
+            parcel
+        })
+        .collect();
     parcels.retain(|parcel| {
         let age = now - parcel.mail.date;
         match parcel.state {
@@ -294,16 +412,26 @@ fn gather(ordered: Vec<(&MailSummary, &Sighting)>, now: chrono::DateTime<Utc>) -
     parcels
 }
 
-/// The carrier's tracking page for a number, else Parcels'.
-fn page(carrier: Option<&str>, number: &str) -> String {
+/// Where to follow a number no mail linked with: the carrier's page, else
+/// the shop's page for its order, else Parcels'.
+fn page(carrier: Option<&str>, number: &str, order_url: Option<String>) -> String {
     CARRIERS
         .iter()
         .find(|known| Some(known.name) == carrier)
         .and_then(|known| known.page)
-        .map_or_else(
-            || format!("{ANY_CARRIER}{number}"),
-            |page| page.replace("{}", number),
-        )
+        .map(|page| page.replace("{}", number))
+        .or(order_url)
+        .unwrap_or_else(|| format!("{ANY_CARRIER}{number}"))
+}
+
+/// Whose shop a mail is from: the domain its sender registered, so
+/// `notice.shop.example` and `orders.shop.example` are one.
+fn shop_of(address: &str) -> String {
+    let domain = address
+        .rsplit_once('@')
+        .map_or(address, |(_, domain)| domain)
+        .to_ascii_lowercase();
+    psl::domain_str(&domain).map_or_else(|| domain.clone(), String::from)
 }
 
 /// What one mail says of the parcels in it.
@@ -315,37 +443,58 @@ pub(crate) fn sightings(raw: &[u8], from_address: &str, subject: &str) -> Vec<Si
     let html = message.html_bodies().collect::<Vec<_>>().join("\n");
     let links = links(&html, &text);
     let state = state_of(subject, &text);
+    // The carrier that wrote the mail knows best, even when it links to
+    // the one that delivers.
+    let sender = sender(from_address);
     let named = carrier_named(from_address, &text);
+    let about = {
+        let lower = format!("{subject}\n{text}").to_lowercase();
+        ABOUT_PARCELS.iter().any(|word| lower.contains(word))
+    };
     let mut found: Vec<Sighting> = declared(&html);
 
-    // Links to a carrier's own page, with the number in them.
+    // Links to a carrier's own page with the number in them, and, in a
+    // mail about a parcel, any link that names its tracking number.
     for link in &links {
-        let Some(carrier) = host(link).and_then(carrier_at) else {
+        let carrier = host(link).and_then(carrier_at);
+        let number = match carrier {
+            Some(_) => number_in_link(link),
+            None if about => tracked_in_link(link),
+            None => None,
+        };
+        let Some(number) = number else {
             continue;
         };
-        if let Some(number) = number_in_link(link) {
-            found.push(Sighting {
-                number,
-                carrier: Some(carrier.name.into()),
-                url: Some(link.clone()),
-                state,
-            });
-        }
+        let carrier = sender
+            .or(carrier.map(|carrier| carrier.name))
+            .or_else(|| carrier_of(&number))
+            .or(named);
+        found.push(Sighting {
+            number: Some(number),
+            order: None,
+            carrier: carrier.map(String::from),
+            url: Some(link.clone()),
+            order_url: None,
+            state,
+        });
     }
 
     // Numbers in the words.
-    for number in written(subject, &text) {
-        let carrier = carrier_of(&number)
-            .map(String::from)
-            .or_else(|| named.map(String::from));
+    for number in written(subject, &text, about) {
+        let carrier = sender
+            .or_else(|| carrier_of(&number))
+            .or(named)
+            .map(String::from);
         let url = links
             .iter()
             .find(|link| link.to_ascii_uppercase().contains(&number))
             .cloned();
         found.push(Sighting {
-            number,
+            number: Some(number),
+            order: None,
             carrier,
             url,
+            order_url: None,
             state,
         });
     }
@@ -361,8 +510,43 @@ pub(crate) fn sightings(raw: &[u8], from_address: &str, subject: &str) -> Vec<Si
                 if k.url.is_none() {
                     k.url = sighting.url;
                 }
+                if k.order.is_none() {
+                    k.order = sighting.order;
+                }
             }
             None => kept.push(sighting),
+        }
+    }
+
+    // The shop's order, which a number joins and which, once its subject
+    // says it left, is a parcel before any number comes.
+    let order = kept
+        .iter()
+        .find_map(|sighting| sighting.order.clone())
+        .or_else(|| order_of(subject, &text))
+        .or_else(|| links.iter().find_map(|link| order_in_link(link)));
+    let Some(order) = order else {
+        return kept;
+    };
+    let order_url = links
+        .iter()
+        .filter(|link| has_word(link, &order))
+        .min_by_key(|link| !link.to_ascii_lowercase().contains("track"))
+        .cloned();
+    if kept.is_empty() && subject_said(subject).is_some() {
+        kept.push(Sighting {
+            number: None,
+            order: None,
+            carrier: named.map(String::from),
+            url: None,
+            order_url: None,
+            state,
+        });
+    }
+    for sighting in &mut kept {
+        sighting.order.get_or_insert_with(|| order.clone());
+        if sighting.order_url.is_none() {
+            sighting.order_url.clone_from(&order_url);
         }
     }
     kept
@@ -437,14 +621,23 @@ fn deliveries(value: &serde_json::Value, found: &mut Vec<Sighting>) {
                     } else {
                         ParcelState::Shipped
                     };
+                    let order = fields
+                        .get("partOfOrder")
+                        .and_then(|order| order.get("orderNumber"))
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::trim)
+                        .filter(|order| order_token(order))
+                        .map(String::from);
                     found.push(Sighting {
-                        number,
+                        number: Some(number),
+                        order,
                         carrier,
                         url: fields
                             .get("trackingUrl")
                             .and_then(serde_json::Value::as_str)
                             .filter(|url| url.starts_with("https://"))
                             .map(String::from),
+                        order_url: None,
                         state,
                     });
                 }
@@ -505,15 +698,46 @@ fn number_in_link(link: &str) -> Option<String> {
         .find(|part| plausible(part))
 }
 
-/// The one carrier the mail is from or names, if only one.
-fn carrier_named(from_address: &str, text: &str) -> Option<&'static str> {
+/// A link's query, name and value, as written.
+fn query(link: &str) -> impl Iterator<Item = (&str, &str)> {
+    let query = link.split_once('?').map_or("", |(_, query)| query);
+    query
+        .split('#')
+        .next()
+        .unwrap_or_default()
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+}
+
+/// A tracking number any link names, as a shop's tracking page takes it:
+/// `track_sn=…`, `trackingNumber=…`.
+fn tracked_in_link(link: &str) -> Option<String> {
+    query(link)
+        .find(|(name, value)| name.to_ascii_lowercase().contains("track") && plausible(value))
+        .map(|(_, value)| value.to_string())
+}
+
+/// An order number a link names: `orderId=…`, `tradeOrderId=…`.
+fn order_in_link(link: &str) -> Option<String> {
+    query(link)
+        .find(|(name, value)| name.to_ascii_lowercase().contains("order") && order_token(value))
+        .map(|(_, value)| value.to_string())
+}
+
+/// The carrier a mail is from.
+fn sender(from_address: &str) -> Option<&'static str> {
     let domain = from_address
         .rsplit('@')
         .next()
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if let Some(carrier) = carrier_at(domain) {
-        return Some(carrier.name);
+    carrier_at(domain).map(|carrier| carrier.name)
+}
+
+/// The one carrier the mail is from or names, if only one.
+fn carrier_named(from_address: &str, text: &str) -> Option<&'static str> {
+    if let Some(carrier) = sender(from_address) {
+        return Some(carrier);
     }
     let mut named = CARRIERS
         .iter()
@@ -524,37 +748,72 @@ fn carrier_named(from_address: &str, text: &str) -> Option<&'static str> {
     }
 }
 
+/// Where `word` is in `text`, as written, not inside another word.
+fn words_at<'a>(text: &'a str, word: &'a str) -> impl Iterator<Item = usize> + 'a {
+    text.match_indices(word)
+        .filter(move |(at, _)| {
+            let before = text[..*at].chars().next_back();
+            let after = text[at + word.len()..].chars().next();
+            !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
+        })
+        .map(|(at, _)| at)
+}
+
 /// `word` in `text`, as written, not inside another word.
 fn has_word(text: &str, word: &str) -> bool {
-    text.match_indices(word).any(|(at, _)| {
-        let before = text[..at].chars().next_back();
-        let after = text[at + word.len()..].chars().next();
-        !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
-    })
+    words_at(text, word).next().is_some()
 }
 
 /// The carrier only it writes a number like this.
 fn carrier_of(number: &str) -> Option<&'static str> {
-    let bytes = number.as_bytes();
     if number.starts_with("1Z") && number.len() == 18 {
         Some("UPS")
     } else if number.starts_with("JJD") || number.starts_with("JVGL") {
         Some("DHL")
     } else if number.starts_with("TBA") {
         Some("Amazon")
-    } else if is_s10(bytes) && number.ends_with("DE") {
-        Some("DHL")
+    } else if is_s10(number) {
+        post_of(&number[11..])
     } else {
         None
     }
 }
 
-/// A post's number, as the UPU writes it: `RR123456789DE`.
-fn is_s10(bytes: &[u8]) -> bool {
-    bytes.len() == 13
+/// Who delivers a post's number, by the country it ends in.
+fn post_of(country: &str) -> Option<&'static str> {
+    match country {
+        "DE" => Some("DHL"),
+        "SE" | "DK" => Some("PostNord"),
+        "NO" => Some("Bring"),
+        "FR" => Some("Colissimo"),
+        "GB" => Some("Royal Mail"),
+        "US" => Some("USPS"),
+        _ => None,
+    }
+}
+
+/// A post's number, as the UPU writes it: `RR123456785DE`, the ninth
+/// digit checking the eight before it.
+fn is_s10(number: &str) -> bool {
+    let bytes = number.as_bytes();
+    if !(bytes.len() == 13
         && bytes[..2].iter().all(u8::is_ascii_uppercase)
         && bytes[2..11].iter().all(u8::is_ascii_digit)
-        && bytes[11..].iter().all(u8::is_ascii_uppercase)
+        && bytes[11..].iter().all(u8::is_ascii_uppercase))
+    {
+        return false;
+    }
+    let sum: u32 = bytes[2..10]
+        .iter()
+        .zip([8, 6, 4, 2, 3, 5, 9, 7])
+        .map(|(digit, weight)| u32::from(digit - b'0') * weight)
+        .sum();
+    let check = match 11 - sum % 11 {
+        10 => 0,
+        11 => 5,
+        check => check,
+    };
+    u32::from(bytes[10] - b'0') == check
 }
 
 /// What could be a tracking number: 10 to 35 capitals and digits, at
@@ -567,6 +826,20 @@ fn plausible(number: &str) -> bool {
             .all(|b| b.is_ascii_digit() || b.is_ascii_uppercase())
         && digits >= 6
         && number.bytes().collect::<HashSet<_>>().len() > 2
+}
+
+/// What could be a shop's order number: 5 to 30 capitals, digits and
+/// dashes, at least 4 of them digits, and not a date.
+fn order_token(word: &str) -> bool {
+    let bytes = word.as_bytes();
+    let digits = bytes.iter().filter(|b| b.is_ascii_digit()).count();
+    let date = bytes.len() == 10 && bytes[4] == b'-' && bytes[7] == b'-' && digits == 8;
+    (5..=30).contains(&bytes.len())
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_digit() || b.is_ascii_uppercase() || *b == b'-')
+        && digits >= 4
+        && !date
 }
 
 /// What a mail calls its tracking number, in the languages it comes in.
@@ -593,9 +866,44 @@ const LABELS: &[&str] = &[
     "paketscheinnummer",
     "identcode",
     "parcel number",
+    "parcel id",
+    "package id",
     "shipment number",
     "waybill",
+    "spårningsnummer",
+    "spårningsnr",
+    "spårnings-id",
+    "spårningsid",
+    "spårningskod",
+    "sändningsnummer",
+    "sändnings-id",
+    "sändningsid",
+    "kollinummer",
+    "kolli-id",
+    "paket-id",
+    "paketid",
+    "försändelse-id",
+    "sporingsnummer",
+    "pakkenummer",
     "numéro de suivi",
+    "numéro de colis",
+    "numéro d'envoi",
+    "n° de suivi",
+    "n° de colis",
+];
+
+/// What a mail calls its parcel, its number right after: "Package 0012…".
+const PARCEL_WORDS: &[&str] = &[
+    "package",
+    "parcel",
+    "shipment",
+    "paket",
+    "sendung",
+    "kolli",
+    "försändelse",
+    "forsendelse",
+    "sändning",
+    "colis",
 ];
 
 /// Whether a mail is about a parcel at all.
@@ -605,6 +913,7 @@ const ABOUT_PARCELS: &[&str] = &[
     "tracking",
     "shipment",
     "shipped",
+    "dispatch",
     "versand",
     "versendet",
     "verschickt",
@@ -613,11 +922,23 @@ const ABOUT_PARCELS: &[&str] = &[
     "parcel",
     "package",
     "delivery",
+    "pickup",
+    "pick up",
+    "leverans",
+    "levere",
+    "försändelse",
+    "spårning",
+    "skickat",
+    "skickad",
+    "colis",
+    "livraison",
+    "expédi",
+    "suivi",
 ];
 
-/// The numbers a mail's words give: after a label, and those only one
-/// carrier writes, in a mail about a parcel.
-fn written(subject: &str, text: &str) -> Vec<String> {
+/// The numbers a mail's words give: after a label or a parcel's own word,
+/// and those only a carrier writes, in a mail about a parcel.
+fn written(subject: &str, text: &str, about: bool) -> Vec<String> {
     let all = format!("{subject}\n{text}");
     let lower = all.to_ascii_lowercase();
     let mut found: Vec<String> = Vec::new();
@@ -632,9 +953,24 @@ fn written(subject: &str, text: &str) -> Vec<String> {
             }
         }
     }
-    if ABOUT_PARCELS.iter().any(|word| lower.contains(word)) {
+    for word in PARCEL_WORDS {
+        for at in words_at(&lower, word) {
+            let next = all[at + word.len()..]
+                .split_whitespace()
+                .map(trimmed)
+                .find(|next| !next.is_empty());
+            if let Some(next) = next
+                && plausible(next)
+                && !found.iter().any(|f| f == next)
+            {
+                found.push(next.to_string());
+            }
+        }
+    }
+    if about {
         for word in all.split(|c: char| !c.is_ascii_alphanumeric()) {
-            if carrier_of(word).is_some() && plausible(word) && !found.iter().any(|f| f == word) {
+            let known = carrier_of(word).is_some() || is_s10(word);
+            if known && plausible(word) && !found.iter().any(|f| f == word) {
                 found.push(word.to_string());
             }
         }
@@ -642,14 +978,15 @@ fn written(subject: &str, text: &str) -> Vec<String> {
     found
 }
 
+/// A word without the marks around it: `#1234567:` is `1234567`.
+fn trimmed(word: &str) -> &str {
+    word.trim_matches(|c: char| !c.is_ascii_alphanumeric())
+}
+
 /// The first number in the few words after a label, its groups joined
 /// when it's written in them: `0034 0434 1234 5678 9012`.
 fn first_number(window: &str) -> Option<String> {
-    let words: Vec<&str> = window
-        .split_whitespace()
-        .map(|word| word.trim_matches(|c: char| !c.is_ascii_alphanumeric()))
-        .take(6)
-        .collect();
+    let words: Vec<&str> = window.split_whitespace().map(trimmed).take(6).collect();
     for (i, word) in words.iter().enumerate() {
         if plausible(word) {
             return Some((*word).to_string());
@@ -670,6 +1007,42 @@ fn first_number(window: &str) -> Option<String> {
     None
 }
 
+/// What a mail calls the shop's order.
+const ORDER_WORDS: &[&str] = &[
+    "order",
+    "ordernummer",
+    "ordernr",
+    "beställning",
+    "beställningsnummer",
+    "bestellung",
+    "bestellnummer",
+    "commande",
+];
+
+/// The shop's order number: after "Order", "Bestellung", "Beställning"…
+/// anywhere in the subject, else within a few words of it in the text.
+fn order_of(subject: &str, text: &str) -> Option<String> {
+    [(subject, usize::MAX), (text, 5)]
+        .into_iter()
+        .find_map(|(part, reach)| {
+            let lower = part.to_ascii_lowercase();
+            let mut at: Vec<(usize, usize)> = ORDER_WORDS
+                .iter()
+                .flat_map(|word| words_at(&lower, word).map(|at| (at, word.len())))
+                .collect();
+            at.sort_unstable();
+            at.into_iter().find_map(|(at, len)| {
+                part[at + len..]
+                    .split_whitespace()
+                    .map(trimmed)
+                    .filter(|word| !word.is_empty())
+                    .take(reach)
+                    .find(|word| order_token(word))
+                    .map(String::from)
+            })
+        })
+}
+
 const DELIVERED: &[&str] = &[
     "wurde zugestellt",
     "ist zugestellt",
@@ -680,6 +1053,9 @@ const DELIVERED: &[&str] = &[
     "has been delivered",
     "was delivered",
     "been delivered",
+    "har levererats",
+    "har lämnats ut",
+    "a été livré",
 ];
 const PICK_UP: &[&str] = &[
     "abholbereit",
@@ -687,8 +1063,17 @@ const PICK_UP: &[&str] = &[
     "abgeholt werden",
     "ready for pickup",
     "ready for pick-up",
+    "ready for pick up",
+    "ready to pick up",
     "ready for collection",
     "ready to be picked up",
+    "available for pickup",
+    "redo att hämtas",
+    "redo för upphämtning",
+    "finns att hämta",
+    "kan hämtas",
+    "disponible en point",
+    "prêt à être retiré",
 ];
 const OUT_FOR_DELIVERY: &[&str] = &[
     "out for delivery",
@@ -700,28 +1085,74 @@ const OUT_FOR_DELIVERY: &[&str] = &[
     "arriving today",
     "arrives today",
     "zustellfahrzeug",
+    "ute för leverans",
+    "ute för utkörning",
+    "levereras idag",
+    "levereras i dag",
+    "kommer idag",
+    "kommer i dag",
+    "en cours de livraison",
 ];
+/// What a subject says when the parcel left, and nothing more.
+const ON_ITS_WAY: &[&str] = &[
+    "shipped",
+    "dispatched",
+    "on its way",
+    "on the way",
+    "in transit",
+    "collected by the carrier",
+    "delivery attempted",
+    "arriving",
+    "versendet",
+    "versandt",
+    "verschickt",
+    "unterwegs",
+    "auf dem weg",
+    "zustellversuch",
+    "på väg",
+    "skickat",
+    "skickad",
+    "har skickats",
+    "leveransförsök",
+    "expédié",
+    "en route",
+    "en cours d'acheminement",
+];
+
+/// Where the words say a parcel is, the furthest first.
+fn said(text: &str) -> Option<ParcelState> {
+    let lower = text.to_lowercase();
+    [
+        (DELIVERED, ParcelState::Delivered),
+        (PICK_UP, ParcelState::PickUp),
+        (OUT_FOR_DELIVERY, ParcelState::OutForDelivery),
+    ]
+    .into_iter()
+    .find(|(words, _)| words.iter().any(|word| lower.contains(word)))
+    .map(|(_, state)| state)
+}
+
+/// Where a subject says its parcel is, if it says it left at all.
+fn subject_said(subject: &str) -> Option<ParcelState> {
+    said(subject).or_else(|| {
+        let lower = subject.to_lowercase();
+        if ["zugestellt", "delivered", "levererad", "levererat", "livré"]
+            .iter()
+            .any(|word| lower.contains(word))
+        {
+            Some(ParcelState::Delivered)
+        } else if ON_ITS_WAY.iter().any(|word| lower.contains(word)) {
+            Some(ParcelState::Shipped)
+        } else {
+            None
+        }
+    })
+}
 
 /// Where the mail says its parcel is: its subject first, then its text.
 fn state_of(subject: &str, text: &str) -> ParcelState {
-    let says = |text: &str| {
-        let lower = text.to_lowercase();
-        [
-            (DELIVERED, ParcelState::Delivered),
-            (PICK_UP, ParcelState::PickUp),
-            (OUT_FOR_DELIVERY, ParcelState::OutForDelivery),
-        ]
-        .into_iter()
-        .find(|(words, _)| words.iter().any(|word| lower.contains(word)))
-        .map(|(_, state)| state)
-    };
-    let subject_says = says(subject).or_else(|| {
-        let lower = subject.to_lowercase();
-        (lower.contains("zugestellt") || lower.contains("delivered"))
-            .then_some(ParcelState::Delivered)
-    });
-    subject_says
-        .or_else(|| says(text))
+    subject_said(subject)
+        .or_else(|| said(text))
         .unwrap_or(ParcelState::Shipped)
 }
 
@@ -741,6 +1172,23 @@ mod tests {
         format!("From: x@shop.example\r\n{headers}\r\n\r\n{body}").into_bytes()
     }
 
+    fn received(days: i64, from: &str) -> MailSummary {
+        MailSummary {
+            account_id: Uuid::nil(),
+            folder: None,
+            uid: days,
+            from_name: "Shop".into(),
+            from_address: from.into(),
+            subject: String::new(),
+            snippet: String::new(),
+            date: Utc::now() - Duration::days(days),
+            seen: true,
+            flagged: false,
+            to_name: None,
+            unsent: false,
+        }
+    }
+
     #[test]
     fn reads_a_labelled_number_and_the_carrier_the_mail_names() {
         let raw = mail(
@@ -749,11 +1197,11 @@ mod tests {
         );
         let found = sightings(&raw, "shop@shop.example", "Ihre Bestellung ist unterwegs");
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].number, "00340434123456789012");
+        assert_eq!(found[0].number.as_deref(), Some("00340434123456789012"));
         assert_eq!(found[0].carrier.as_deref(), Some("DHL"));
         assert_eq!(found[0].state, ParcelState::Shipped);
         assert_eq!(
-            page(found[0].carrier.as_deref(), &found[0].number),
+            page(found[0].carrier.as_deref(), "00340434123456789012", None),
             "https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=00340434123456789012"
         );
     }
@@ -781,11 +1229,12 @@ mod tests {
             "Subject: Versandbestätigung\r\nContent-Type: text/html",
             r#"<script type="application/ld+json">{"@context":"http://schema.org","@type":"ParcelDelivery",
                "trackingNumber":"09876543210123","carrier":{"@type":"Organization","name":"DPD"},
-               "partOfOrder":{"@type":"Order","orderStatus":"http://schema.org/OrderDelivered"}}</script><p>Hallo</p>"#,
+               "partOfOrder":{"@type":"Order","orderNumber":"A-10042","orderStatus":"http://schema.org/OrderDelivered"}}</script><p>Hallo</p>"#,
         );
         let found = sightings(&raw, "a@shop.example", "Versandbestätigung");
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].number, "09876543210123");
+        assert_eq!(found[0].number.as_deref(), Some("09876543210123"));
+        assert_eq!(found[0].order.as_deref(), Some("A-10042"));
         assert_eq!(found[0].carrier.as_deref(), Some("DPD"));
         assert_eq!(found[0].state, ParcelState::Delivered);
     }
@@ -797,6 +1246,130 @@ mod tests {
             "Bestellnummer 302-1234567-1234567, IBAN DE89370400440532013000\n",
         );
         assert!(sightings(&raw, "a@shop.example", "Rechnung 2026-1234").is_empty());
+    }
+
+    #[test]
+    fn a_carriers_link_and_a_posts_number_from_beyond_germany() {
+        let subject = "Your parcel is on its way XT123456785TS";
+        let raw = mail(
+            &format!("Subject: {subject}\r\nContent-Type: text/html"),
+            "<p>Your parcel SHOP XT123456785TS / 01234567890123K is being handled in our network.</p>\
+             <a href=\"https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=XT123456785TS&amp;langue=en_GB\">here</a>",
+        );
+        let found = sightings(&raw, "avisage@chronopost.fr", subject);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].number.as_deref(), Some("XT123456785TS"));
+        assert_eq!(found[0].carrier.as_deref(), Some("Chronopost"));
+        assert_eq!(found[0].state, ParcelState::Shipped);
+
+        // A wrong check digit is no post's number.
+        assert!(is_s10("RR123456785DE"));
+        assert!(!is_s10("RR123456784DE"));
+        assert_eq!(carrier_of("UO123456785SE"), Some("PostNord"));
+        let subject = "Your parcel is on its way XT123456784TS";
+        let raw = mail(&format!("Subject: {subject}"), "Your parcel is coming.\n");
+        assert!(sightings(&raw, "a@shop.example", subject).is_empty());
+    }
+
+    #[test]
+    fn reads_swedish_labels_and_trusts_the_subject_over_the_text() {
+        let subject = "Leverans på väg!";
+        let raw = mail(
+            &format!("Subject: {subject}\r\nContent-Type: text/plain; charset=utf-8"),
+            "Så snart ditt paket är redo att hämtas ut får du en pin-kod.\nPaket-ID\nKA012345678901\n",
+        );
+        let found = sightings(&raw, "info@instabox.se", subject);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].number.as_deref(), Some("KA012345678901"));
+        assert_eq!(found[0].carrier.as_deref(), Some("Instabox"));
+        assert_eq!(found[0].state, ParcelState::Shipped);
+
+        let subject = "Ditt paket är på väg!";
+        let raw = mail(
+            &format!("Subject: {subject}\r\nContent-Type: text/plain; charset=utf-8"),
+            "Din beställning nr. 10042 hanteras av PostNord.\n\
+             Spåra mitt paket ( https://tracking.postnord.com/se/tracking?id=01234567890123 )\n\
+             *Spårningsnummer:* 01234567890123\n",
+        );
+        let found = sightings(&raw, "hello@shop.example", subject);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].number.as_deref(), Some("01234567890123"));
+        assert_eq!(found[0].carrier.as_deref(), Some("PostNord"));
+        assert_eq!(found[0].order.as_deref(), Some("10042"));
+    }
+
+    #[test]
+    fn an_order_on_its_way_is_a_parcel_until_its_number_comes() {
+        let shop = "transaction@notice.shop.example";
+        let shipped = "Order 1234567890123456: order shipped";
+        let raw = mail(
+            &format!("Subject: {shipped}\r\nContent-Type: text/html"),
+            "<p>Your order 1234567890123456 has shipped.</p>\
+             <a href=\"https://www.shop.example/p/order/detail.html?orderId=1234567890123456&amp;x=1\">Track order</a>",
+        );
+        let ordered = sightings(&raw, shop, shipped);
+        assert_eq!(ordered.len(), 1);
+        assert_eq!(ordered[0].number, None);
+        assert_eq!(ordered[0].order.as_deref(), Some("1234567890123456"));
+        assert_eq!(ordered[0].state, ParcelState::Shipped);
+
+        // Only once it left: a confirmed order is no parcel yet.
+        let confirmed = "Order 1234567890123456: order confirmed";
+        let raw = mail(
+            &format!("Subject: {confirmed}\r\nContent-Type: text/plain"),
+            "Your order 1234567890123456 is confirmed.\n",
+        );
+        assert!(sightings(&raw, shop, confirmed).is_empty());
+
+        // Its number comes with the order in the shop's tracking link.
+        let coming = "Package 00123456789012345678 is out for delivery";
+        let raw = mail(
+            &format!("Subject: {coming}\r\nContent-Type: text/html"),
+            "<p>Your package 00123456789012345678 is out for delivery.</p>\
+             <a href=\"https://www.shop.example/p/tracking/index.html?tradeOrderId=1234567890123456\">Track</a>",
+        );
+        let numbered = sightings(&raw, shop, coming);
+        assert_eq!(numbered.len(), 1);
+        assert_eq!(numbered[0].number.as_deref(), Some("00123456789012345678"));
+        assert_eq!(numbered[0].order.as_deref(), Some("1234567890123456"));
+
+        let (old, new) = (received(3, shop), received(1, shop));
+        let parcels = gather(vec![(&old, &ordered[0]), (&new, &numbered[0])], Utc::now());
+        assert_eq!(parcels.len(), 1);
+        assert_eq!(parcels[0].number.as_deref(), Some("00123456789012345678"));
+        assert_eq!(parcels[0].state, ParcelState::OutForDelivery);
+        assert_eq!(
+            parcels[0].track_url.as_deref(),
+            Some("https://www.shop.example/p/tracking/index.html?tradeOrderId=1234567890123456")
+        );
+
+        // Alone, the order is followed on the shop's page for it.
+        let parcels = gather(vec![(&old, &ordered[0])], Utc::now());
+        assert_eq!(
+            parcels[0].track_url.as_deref(),
+            Some("https://www.shop.example/p/order/detail.html?orderId=1234567890123456&x=1")
+        );
+
+        // Another shop's order of the same number is another parcel.
+        let elsewhere = received(2, "orders@other.example");
+        let parcels = gather(
+            vec![(&old, &ordered[0]), (&elsewhere, &ordered[0])],
+            Utc::now(),
+        );
+        assert_eq!(parcels.len(), 2);
+    }
+
+    #[test]
+    fn a_shops_tracking_link_names_the_number() {
+        let subject = "Your order shipped and its tracking number is ready (#PO-191-0123456789)";
+        let raw = mail(
+            &format!("Subject: {subject}\r\nContent-Type: text/html"),
+            "<a href=\"https://www.shop.example/logistic.html?provider_id=7&amp;track_sn=1234567890123\">Track</a>",
+        );
+        let found = sightings(&raw, "orders@shop.example", subject);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].number.as_deref(), Some("1234567890123"));
+        assert_eq!(found[0].order.as_deref(), Some("PO-191-0123456789"));
     }
 
     #[test]
@@ -813,7 +1386,7 @@ mod tests {
             ParcelState::PickUp
         );
         assert_eq!(
-            page(None, "ABC1234567890"),
+            page(None, "ABC1234567890", None),
             "https://parcelsapp.com/en/tracking/ABC1234567890"
         );
     }
@@ -821,35 +1394,28 @@ mod tests {
     #[test]
     fn a_parcel_takes_its_newest_mail_and_furthest_state() {
         let now = Utc::now();
-        let summary = |days: i64| MailSummary {
-            account_id: Uuid::nil(),
-            folder: None,
-            uid: days,
-            from_name: "Shop".into(),
-            from_address: "a@shop.example".into(),
-            subject: String::new(),
-            snippet: String::new(),
-            date: now - Duration::days(days),
-            seen: true,
-            flagged: false,
-            to_name: None,
-            unsent: false,
-        };
         let seen = |state| Sighting {
-            number: "00340434123456789012".into(),
+            number: Some("00340434123456789012".into()),
+            order: None,
             carrier: Some("DHL".into()),
             url: None,
+            order_url: None,
             state,
         };
-        let (old, new) = (summary(3), summary(1));
+        let (old, new) = (received(3, "a@shop.example"), received(1, "a@shop.example"));
         let (shipped, delivered) = (seen(ParcelState::Shipped), seen(ParcelState::Delivered));
         let parcels = gather(vec![(&old, &shipped), (&new, &delivered)], now);
         assert_eq!(parcels.len(), 1);
         assert_eq!(parcels[0].state, ParcelState::Delivered);
         assert_eq!(parcels[0].mail.uid, 1);
-        assert!(parcels[0].track_url.starts_with("https://www.dhl.de/"));
+        assert!(
+            parcels[0]
+                .track_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("https://www.dhl.de/"))
+        );
 
-        let long_ago = summary(10);
+        let long_ago = received(10, "a@shop.example");
         assert!(gather(vec![(&long_ago, &delivered)], now).is_empty());
     }
 }
