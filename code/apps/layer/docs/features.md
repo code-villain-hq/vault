@@ -3282,7 +3282,9 @@ paper.
 
 - **EPIC-9** The task list MUST show epics in a section of their own,
   above Tasks: each epic on one row, heading its group so that it does not
-  read as a task: its title heavier than a task's, "N of M merged" with a
+  read as a task: the epic and its sub-tasks on a card of their own, a
+  diamond where a task has a dot (still showing its agents' state), "Epic"
+  before its key, its title heavier than a task's, "N of M merged" with a
   meter beside it where the sidebar has room (a segment per sub-task,
   filled once merged; one bar past six) (or "M to file" before filing),
   and space before the next epic. Its

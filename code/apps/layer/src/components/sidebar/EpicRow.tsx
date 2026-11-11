@@ -96,13 +96,13 @@ export const EpicRow = memo(function EpicRow({
           >
             <ChevronIcon />
           </span>
-          <span className={`dot ${waiting ? "idle" : busy ? "live" : ""}`} />
+          <span className={`dot mark ${waiting ? "idle" : busy ? "live" : ""}`} />
           <span className="label">
             {epic.issue_key ? epic.name.replace(`${epic.issue_key} `, "") : epic.name}
           </span>
         </div>
         <div className="ws-meta">
-          {epic.issue_key && <span className="branch">{epic.issue_key}</span>}
+          <span className="branch">Epic{epic.issue_key && <> · {epic.issue_key}</>}</span>
           <div className="spacer" />
           {toFile > 0 ? (
             <span>{toFile} to file</span>
@@ -196,11 +196,11 @@ export const JiraEpicRow = memo(function JiraEpicRow({
           >
             <ChevronIcon />
           </span>
-          <span className="dot" />
+          <span className="dot mark" />
           <span className="label">{epic.summary}</span>
         </div>
         <div className="ws-meta">
-          <span className="branch">{epic.key}</span>
+          <span className="branch">Epic · {epic.key}</span>
           <div className="spacer" />
           {opening ? (
             <span>Opening…</span>

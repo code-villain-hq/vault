@@ -1,14 +1,32 @@
 /* An epic (§26): its sub-tasks in the sidebar, one line each under it, and
    its page, the sub-tasks or the spec beside the epic's chat. */
 
-/* An epic heads its group (EPIC-9): its title heavier than a task's, a
-   meter no task row has, and space between one epic's group and the next.
-   Weight and space, not a colour or a line: the sidebar stays a step back. */
+/* An epic heads its group (EPIC-9): a card holding it and its sub-tasks,
+   a diamond where a task has a dot, "Epic" before its key, its title
+   heavier, and a meter no task row has. Weight and space alone left an
+   epic and a task with the same chevron, dot and key line looking alike.
+   The card is the surface, not a colour: the sidebar stays a step back. */
 .side-epic {
   container-type: inline-size;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
 }
-.side-epic + .side-epic {
-  margin-top: 8px;
+/* The agent's state still shows, in the outline. */
+.dot.mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 1.5px;
+  transform: rotate(45deg);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--faint);
+}
+.dot.mark.live {
+  box-shadow: inset 0 0 0 1.5px var(--signal);
+}
+.dot.mark.idle {
+  box-shadow: inset 0 0 0 1.5px var(--status-warn-ink);
 }
 .side-epic > .ws .ws-title .label {
   font-weight: 600;
