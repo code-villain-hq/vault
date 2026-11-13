@@ -1,0 +1,21 @@
+[package]
+name = "code-villain-webview"
+description = "Keeps a studio desktop app's window drawing when macOS's WebKit loses its GPU helper"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+tracing = "0.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+libc = "0.2"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString"] }
+
+# It talks to Objective-C and the kernel, so it has `unsafe`: each block says
+# why it's sound.
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "warn"
