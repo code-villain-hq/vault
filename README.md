@@ -32,6 +32,6 @@ identity and sync runtime.
 
 ## Contributing
 
-The vault lives on Forgejo at [git.codevillain.eu/code-villain/vault](https://git.codevillain.eu/code-villain/vault). [github.com/code-villain-hq/vault](https://github.com/code-villain-hq/vault) mirrors it, and pull requests are welcome there. Each one is reviewed and merged on Forgejo with its commits and authors unchanged. The GitHub pull request then shows as merged. Read the app's `AGENTS.md` before working in it. `git config core.hooksPath .githooks`, once per clone, runs each app's pre-commit check when a commit touches it.
+The vault lives on Forgejo at [git.codevillain.eu/code-villain/vault](https://git.codevillain.eu/code-villain/vault). [github.com/code-villain-hq/vault](https://github.com/code-villain-hq/vault) mirrors it, and pull requests are welcome there. Each one is opened on Forgejo, then reviewed and merged there, and its authors stay. The GitHub pull request then shows as merged, or is closed with a link when its commits went across as copies, with a work address swapped for the author's own. Read the app's `AGENTS.md` before working in it. `git config core.hooksPath .githooks`, once per clone, runs each app's pre-commit check when a commit touches it.
 
-Maintainers bring a GitHub pull request across with [`scripts/take-pr`](scripts/take-pr).
+[`scripts/take-pr`](scripts/take-pr) brings them across. On a maintainer's Mac, `scripts/take-pr install` runs it every 10 minutes. It holds back a pull request that names what the vault keeps out, for a maintainer to look at with `scripts/take-pr <n>`.

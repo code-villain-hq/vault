@@ -1,22 +1,48 @@
 #!/usr/bin/env bash
-# Bring a pull request from the GitHub mirror to Forgejo.
+# Bring pull requests from the GitHub mirror to Forgejo.
 #
-#   scripts/take-pr            list open pull requests on GitHub
-#   scripts/take-pr <n>        review GitHub PR <n>, then open it on Forgejo
-#   scripts/take-pr done <n>   after the Forgejo merge, close GitHub PR <n>
-#                              if GitHub has not marked it merged by itself
+#   scripts/take-pr              list open pull requests on GitHub
+#   scripts/take-pr <n>          review GitHub PR <n>, then open it on Forgejo
+#   scripts/take-pr done <n>     after the Forgejo merge, close GitHub PR <n>
+#                                if GitHub has not marked it merged by itself
+#   scripts/take-pr sync         open new or updated GitHub PRs on Forgejo and
+#                                close those merged there; prints what it did
+#   scripts/take-pr install      run sync every 10 minutes (a launch agent)
+#   scripts/take-pr uninstall    stop that
 #
-# The contributor's commits go to Forgejo unchanged, so authorship stays and a
-# merge commit on Forgejo makes GitHub mark the PR merged once the mirror syncs.
-# Running <n> again after the contributor pushes more updates the same Forgejo PR.
+# The contributor's commits go to Forgejo as they are, so authorship stays and
+# a merge commit on Forgejo makes GitHub mark the PR merged once the mirror
+# syncs. Two files outside the repo change that, so they can name what the
+# repo must not:
 #
-# Needs gh logged in to github.com, jq, and push access to origin.
+#   ~/.config/take-pr/mailmap  git mailmap lines: an author or committer
+#                              address they map is swapped on the way
+#   ~/.config/take-pr/hold     extended regexes, one a line, any case: a PR
+#                              whose addresses, messages, description or added
+#                              lines still match one is held. sync skips it
+#                              and says so once; take-pr <n> shows the lines
+#                              and can edit the messages.
+#
+# Swapped or edited commits are copies, so GitHub never marks those PRs
+# merged; sync (or done) closes them with a link once Forgejo has merged.
+# Nothing a PR adds is run: CI on Forgejo runs on pushes to main only.
+#
+# Needs gh logged in to github.com and jq. Pushes with the Forgejo token in
+# the keychain (service git.codevillain.eu, account release), else to origin.
 
 set -euo pipefail
 
 github_repo=code-villain-hq/vault
-forgejo_api=https://git.codevillain.eu/api/v1/repos/code-villain/vault
+forgejo=https://git.codevillain.eu
+forgejo_git=$forgejo/code-villain/vault.git
+forgejo_api=$forgejo/api/v1/repos/code-villain/vault
+config=${XDG_CONFIG_HOME:-$HOME/.config}/take-pr
+label=eu.codevillain.take-pr
+log_file=$HOME/Library/Logs/take-pr.log
+main=refs/take-pr/main
 export GH_HOST=github.com
+
+self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 
 die() { printf 'take-pr: %s\n' "$*" >&2; exit 1; }
 gh_pr() { gh pr "$@" --repo "github.com/$github_repo"; }
@@ -29,72 +55,166 @@ forgejo_pr() {
       'map(select(.flow == 1 and (.head.label | split("/") | last) == $topic)) | first // empty'
 }
 
+# Pushes to Forgejo over HTTPS with the keychain token: unlike SSH, that
+# works with nobody at the Mac. Without the token, over origin.
+push() {
+  local token
+  if token=$(security find-generic-password -s git.codevillain.eu -a release -w 2>/dev/null); then
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader \
+      GIT_CONFIG_VALUE_0="Authorization: token $token" git push "$forgejo_git" "$@"
+  else
+    git push origin "$@"
+  fi
+}
+
+ref() { git rev-parse -q --verify "$1" || true; }
+
+notify() {
+  osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title "take-pr"' \
+    -e 'end run' "$1" >/dev/null 2>&1 || true
+}
+
+# Fetches GitHub PR $1 and Forgejo's main, and sets pr_* and description.
+load() {
+  local n=$1 pr
+  pr=$(gh_pr view "$n" --json state,baseRefName,title,author,url,body,headRefOid)
+  [[ $(jq -r .state <<<"$pr") == OPEN ]] || die "GitHub PR #$n is $(jq -r .state <<<"$pr")"
+  [[ $(jq -r .baseRefName <<<"$pr") == main ]] || die "GitHub PR #$n targets $(jq -r .baseRefName <<<"$pr"), not main"
+  pr_title=$(jq -r '.title | gsub("[\r\n]+"; " ")' <<<"$pr")
+  pr_author=$(jq -r .author.login <<<"$pr")
+  pr_url=$(jq -r .url <<<"$pr")
+  pr_sha=$(jq -r .headRefOid <<<"$pr")
+  description=$(printf 'From %s by @%s.\n\n%s\n' "$pr_url" "$pr_author" "$(jq -r '.body // ""' <<<"$pr")")
+
+  git fetch -q --no-tags --no-write-fetch-head "$forgejo_git" "+refs/heads/main:$main"
+  git fetch -q --no-tags --no-write-fetch-head "https://github.com/$github_repo.git" \
+    "+refs/pull/$n/head:refs/take-pr/$n"
+  [[ $(git rev-parse "refs/take-pr/$n") == "$pr_sha" ]] || die "fetched head differs from GitHub's $pr_sha; run again"
+  [[ $(git rev-list --count --merges "$main..$pr_sha") == 0 ]] ||
+    die "GitHub PR #$n has a merge commit in it; bring it across by hand"
+}
+
+# The PR's commits with the mailmap's addresses and, where $2/<i> exists, the
+# i-th message from there. Prints the new head, or the PR's own when nothing
+# changed.
+rewrite() {
+  local edits=${1:-} c i=0 parent='' changed='' raw a m a2 m2 msg
+  msg=$(mktemp)
+  for c in $(git rev-list --reverse "$main..$pr_sha"); do
+    i=$((i + 1))
+    raw=$(git cat-file commit "$c")
+    a=$(sed -n 's/^author //p' <<<"$raw" | head -1)
+    m=$(sed -n 's/^committer //p' <<<"$raw" | head -1)
+    a2=$(git -c "mailmap.file=$config/mailmap" check-mailmap "${a%>*}>")
+    m2=$(git -c "mailmap.file=$config/mailmap" check-mailmap "${m%>*}>")
+    if [[ -n $edits && -f $edits/$i ]]; then cp "$edits/$i" "$msg"; else git cat-file commit "$c" | sed '1,/^$/d' >"$msg"; fi
+    if [[ -z $changed && $a2 == "${a%>*}>" && $m2 == "${m%>*}>" ]] && git cat-file commit "$c" | sed '1,/^$/d' | cmp -s - "$msg"; then
+      parent=$c
+      continue
+    fi
+    changed=1
+    [[ -n $parent ]] || parent=$(git rev-parse "$c^")
+    parent=$(GIT_AUTHOR_NAME=${a2% <*} GIT_AUTHOR_EMAIL=$(sed 's/.*<\(.*\)>/\1/' <<<"$a2") GIT_AUTHOR_DATE="@${a##*> }" \
+      GIT_COMMITTER_NAME=${m2% <*} GIT_COMMITTER_EMAIL=$(sed 's/.*<\(.*\)>/\1/' <<<"$m2") GIT_COMMITTER_DATE="@${m##*> }" \
+      git commit-tree --no-gpg-sign "$c^{tree}" -p "$parent" -F "$msg")
+  done
+  rm -f "$msg"
+  if [[ -n $changed ]]; then echo "$parent"; else echo "$pr_sha"; fi
+}
+
+# The lines of the PR at $1 that the hold list catches.
+hits() {
+  [[ -s $config/hold ]] || return 0
+  {
+    git log --format='%an <%ae>%n%cn <%ce>%n%B' "$main..$1"
+    printf '%s\n' "$description"
+    git diff "$main...$1" | grep '^+' || true
+  } | grep -iE -f <(grep -vE '^[[:space:]]*(#|$)' "$config/hold") | sed 's/^[[:space:]]*//' | sort -u || true
+}
+
+# The PR's messages and description in a new folder, to edit.
+messages() {
+  local dir c i=0
+  dir=$(mktemp -d)
+  for c in $(git rev-list --reverse "$main..$pr_sha"); do
+    i=$((i + 1))
+    git cat-file commit "$c" | sed '1,/^$/d' >"$dir/$i"
+  done
+  printf '%s\n' "$description" >"$dir/description"
+  echo "$dir"
+}
+
+# Opens GitHub PR $1 on Forgejo at $2, or updates the Forgejo PR already open.
+open_on_forgejo() {
+  local n=$1 head=$2 existing url note
+  local opts=(-o "topic=github-pr-$n" -o "title=$pr_title")
+  existing=$(forgejo_pr "$n" | jq -c 'select(.state == "open")')
+  if [[ -n $existing && $(jq -r .head.sha <<<"$existing") == "$head" ]]; then
+    git update-ref "refs/take-pr/taken/$n" "$pr_sha"
+    printf '%s already has these commits.\n' "$(jq -r .html_url <<<"$existing")"
+    return
+  fi
+  opts+=(-o "description={base64}$(printf '%s' "$description" | base64 | tr -d '\n')")
+  [[ -n $existing ]] && opts+=(-o force-push=true)
+  push -q "$head:refs/for/main" "${opts[@]}"
+
+  url=$(forgejo_pr "$n" | jq -r '.html_url // empty')
+  [[ -n $url ]] || die "pushed, but no Forgejo PR with topic github-pr-$n turned up"
+  git update-ref "refs/take-pr/taken/$n" "$pr_sha"
+  if [[ -n $existing ]]; then
+    printf 'GitHub PR #%s: updated %s\n' "$n" "$url"
+    return
+  fi
+  if [[ $head == "$pr_sha" ]]; then
+    note="When it merges there, the mirror brings your commits back and this pull request shows as merged."
+  else
+    note="Your commits went across as copies, keeping work addresses and hosts out of the vault's history, so when it merges there this pull request is closed with a link to it."
+  fi
+  gh_pr comment "$n" --body "Under review on Forgejo: $url. $note" >/dev/null
+  printf 'GitHub PR #%s: opened %s and linked it on GitHub\n' "$n" "$url"
+}
+
 list() {
   gh_pr list --state open --json number,title,author,updatedAt \
     --template '{{range .}}#{{.number}}  {{.title}}  (@{{.author.login}}, {{timeago .updatedAt}}){{"\n"}}{{end}}'
 }
 
 take() {
-  local n=$1 pr state base title author url body sha ref existing
-  pr=$(gh_pr view "$n" --json state,baseRefName,title,author,url,body,headRefOid)
-  state=$(jq -r .state <<<"$pr")
-  base=$(jq -r .baseRefName <<<"$pr")
-  title=$(jq -r '.title | gsub("[\r\n]+"; " ")' <<<"$pr")
-  author=$(jq -r .author.login <<<"$pr")
-  url=$(jq -r .url <<<"$pr")
-  body=$(jq -r '.body // ""' <<<"$pr")
-  sha=$(jq -r .headRefOid <<<"$pr")
-  [[ $state == OPEN ]] || die "GitHub PR #$n is $state"
-  [[ $base == main ]] || die "GitHub PR #$n targets $base, not main"
-
-  ref=refs/take-pr/$n
-  git fetch -q origin main
-  git fetch -q --no-tags "https://github.com/$github_repo.git" "+refs/pull/$n/head:$ref"
-  [[ $(git rev-parse "$ref") == "$sha" ]] || die "fetched head differs from GitHub's $sha; run again"
-
-  printf '\n#%s  %s\nby @%s  %s\n\n' "$n" "$title" "$author" "$url"
-  git log --reverse --format='  %h %an <%ae>  %s' "origin/main..$ref"
-  echo
-  git diff --stat "origin/main...$ref"
-  if git diff --name-only "origin/main...$ref" | grep -q '^\.forgejo/'; then
-    printf '\n!! This PR changes .forgejo/. CI runs on the Mac after the merge. Read those files closely.\n'
-  fi
-
+  local n=$1 head edits='' found answer
+  load "$n"
+  head=$(rewrite)
   while :; do
-    printf '\n[d]iff, [y] open on Forgejo, [n] stop: '
+    printf '\n#%s  %s\nby @%s  %s\n\n' "$n" "$pr_title" "$pr_author" "$pr_url"
+    git log --reverse --format='  %h %an <%ae>  %s' "$main..$head"
+    [[ $head == "$pr_sha" ]] || printf '  (copies: GitHub has %s)\n' "${pr_sha:0:7}"
+    echo
+    git diff --stat "$main...$head"
+    if git diff --name-only "$main...$head" | grep -q '^\.forgejo/'; then
+      printf '\n!! This PR changes .forgejo/. CI runs on the Mac after the merge. Read those files closely.\n'
+    fi
+    found=$(hits "$head")
+    [[ -z $found ]] || printf '\n!! The hold list catches:\n%s\n' "$(sed 's/^/   /' <<<"$found")"
+
+    printf '\n[d]iff, [e]dit messages and description, [y] open on Forgejo, [n] stop: '
     read -r answer
     case $answer in
-      d) git diff "origin/main...$ref" ;;
+      d) git diff "$main...$head" ;;
+      e)
+        edits=${edits:-$(messages)}
+        ${VISUAL:-${EDITOR:-vi}} "$edits"/*
+        description=$(<"$edits/description")
+        head=$(rewrite "$edits")
+        ;;
       y) break ;;
       *) echo "Nothing pushed."; exit 0 ;;
     esac
   done
-
-  existing=$(forgejo_pr "$n" | jq -c 'select(.state == "open")')
-  if [[ -n $existing && $(jq -r .head.sha <<<"$existing") == "$sha" ]]; then
-    printf '\n%s already has these commits.\n' "$(jq -r .html_url <<<"$existing")"
-    return
-  fi
-  local description push_opts=()
-  description=$(printf 'From %s by @%s.\n\n%s\n' "$url" "$author" "$body")
-  push_opts+=(-o "topic=github-pr-$n" -o "title=$title")
-  push_opts+=(-o "description={base64}$(printf '%s' "$description" | base64 | tr -d '\n')")
-  [[ -n $existing ]] && push_opts+=(-o force-push=true)
-  git push origin "$sha:refs/for/main" "${push_opts[@]}"
-
-  local forgejo
-  forgejo=$(forgejo_pr "$n" | jq -r '.html_url // empty')
-  [[ -n $forgejo ]] || die "pushed, but no Forgejo PR with topic github-pr-$n turned up"
-  if [[ -z $existing ]]; then
-    gh_pr comment "$n" --body "Under review on Forgejo: $forgejo. When it merges there, the mirror brings your commits back and this pull request shows as merged."
-    printf '\nOpened %s and linked it on GitHub.\n' "$forgejo"
-  else
-    printf '\nUpdated %s.\n' "$forgejo"
-  fi
+  echo
+  open_on_forgejo "$n" "$head"
 }
 
 done_() {
-  local n=$1 fpr state merge
+  local n=$1 fpr state merge r
   fpr=$(forgejo_pr "$n")
   [[ -n $fpr ]] || die "no Forgejo PR for GitHub PR #$n"
   [[ $(jq -r .merged <<<"$fpr") == true ]] || die "$(jq -r .html_url <<<"$fpr") is not merged"
@@ -110,15 +230,90 @@ done_() {
   # GitHub flips a PR to merged a moment after its commits reach main.
   sleep 5
   state=$(gh_pr view "$n" --json state --jq .state)
-  [[ $state == OPEN ]] || { echo "GitHub PR #$n is $state."; return; }
-
-  gh_pr close "$n" --comment "Landed on Forgejo as https://git.codevillain.eu/code-villain/vault/commit/$merge ($(jq -r .html_url <<<"$fpr")). Thank you."
-  git update-ref -d "refs/take-pr/$n" 2>/dev/null || true
+  if [[ $state == OPEN ]]; then
+    gh_pr close "$n" --comment "Landed on Forgejo as $forgejo/code-villain/vault/commit/$merge ($(jq -r .html_url <<<"$fpr")). Thank you." >/dev/null
+    state=CLOSED
+  fi
+  printf 'GitHub PR #%s: %s, landed as %s\n' "$n" "$state" "${merge:0:7}"
+  for r in "refs/take-pr/$n" "refs/take-pr/taken/$n" "refs/take-pr/held/$n"; do
+    git update-ref -d "$r" 2>/dev/null || true
+  done
 }
 
-cd "$(git rev-parse --show-toplevel)"
+# One GitHub PR, for sync: close it if Forgejo merged it, else open what's new.
+sync_one() {
+  local n=$1 fpr sha head found
+  fpr=$(forgejo_pr "$n")
+  if [[ -n $fpr && $(jq -r .merged <<<"$fpr") == true ]]; then
+    done_ "$n"
+    return
+  fi
+  sha=$(gh_pr view "$n" --json headRefOid --jq .headRefOid)
+  [[ $sha != "$(ref "refs/take-pr/taken/$n")" && $sha != "$(ref "refs/take-pr/held/$n")" ]] || return 0
+
+  load "$n"
+  head=$(rewrite)
+  found=$(hits "$head")
+  if [[ -n $found ]]; then
+    git update-ref "refs/take-pr/held/$n" "$pr_sha"
+    printf 'GitHub PR #%s held back; the hold list catches:\n%s\n' "$n" "$(sed 's/^/  /' <<<"$found")"
+    notify "GitHub PR #$n is held back. Run scripts/take-pr $n to look."
+    return
+  fi
+  open_on_forgejo "$n" "$head"
+}
+
+stamp() { while IFS= read -r line; do printf '%s  %s\n' "$(date '+%F %T')" "$line"; done; }
+
+sync() {
+  local n
+  for n in $(gh_pr list --state open --base main --json number,isDraft --jq '.[] | select(.isDraft | not) | .number'); do
+    "$self" _sync "$n" 2>&1 | stamp || echo "GitHub PR #$n: failed" | stamp
+  done
+}
+
+install() {
+  local plist=$HOME/Library/LaunchAgents/$label.plist
+  mkdir -p "$(dirname "$plist")" "$(dirname "$log_file")"
+  cat >"$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key>
+  <array><string>$self</string><string>sync</string></array>
+  <key>WorkingDirectory</key><string>$(pwd)</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>GIT_TERMINAL_PROMPT</key><string>0</string>
+  </dict>
+  <key>StartInterval</key><integer>600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>$log_file</string>
+  <key>StandardErrorPath</key><string>$log_file</string>
+</dict>
+</plist>
+EOF
+  launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+  echo "take-pr sync runs every 10 minutes and writes to $log_file."
+}
+
+uninstall() {
+  launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+  rm -f "$HOME/Library/LaunchAgents/$label.plist"
+  echo "take-pr sync no longer runs."
+}
+
+cd "$(git -C "$(dirname "$self")" rev-parse --show-toplevel)"
 case ${1:-} in
   "") list ;;
   done) [[ ${2:-} =~ ^[0-9]+$ ]] || die "usage: take-pr done <n>"; done_ "$2" ;;
-  *) [[ $1 =~ ^[0-9]+$ ]] || die "usage: take-pr [<n> | done <n>]"; take "$1" ;;
+  sync) sync ;;
+  _sync) sync_one "$2" ;;
+  install) install ;;
+  uninstall) uninstall ;;
+  *) [[ $1 =~ ^[0-9]+$ ]] || die "usage: take-pr [<n> | done <n> | sync | install | uninstall]"; take "$1" ;;
 esac
