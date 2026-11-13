@@ -67,6 +67,8 @@ tauri-plugin-clipboard-manager = "2"
 # NSUserNotificationCenter, which macOS no longer shows. It stays for a dev
 # build, which has no app bundle for UserNotifications.
 code-villain-notify = { workspace = true }
+# The window keeps drawing when WebKit loses its GPU helper (WIN-7).
+code-villain-webview = { workspace = true }
 notify-rust = "4"
 # Profiles (§25): bringing another copy of the app forward, and marking each
 # copy's Dock icon. Tauri has neither. Already in the build through tao, so

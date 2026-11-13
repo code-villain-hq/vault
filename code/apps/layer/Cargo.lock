@@ -786,6 +786,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-villain-webview"
+version = "0.1.0"
+dependencies = [
+ "block2",
+ "libc",
+ "objc2",
+ "objc2-foundation",
+ "tracing",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6451,6 +6462,7 @@ dependencies = [
  "chrono",
  "code-villain-desktop",
  "code-villain-notify",
+ "code-villain-webview",
  "futures-util",
  "hex",
  "keyring",

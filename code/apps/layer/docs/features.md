@@ -1601,7 +1601,13 @@ to fix on Repos. A running agent or chat is a live dot.
   field or terminal you were typing in, so no ring is left on a row
   (`studio/design/behaviour.md`, "Keys").
 
-Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Modal`, `Confirm`), `menu.tsx` (`ContextMenu`), `lib/modalFocus.ts`, `lib/press.ts` (`menuKeys`), `Splash.tsx`, `src-tauri/capabilities/default.json`.
+- **WIN-7** The window MUST keep drawing when WebKit gives up on its GPU
+  helper (it stops answering, often after the Mac sleeps, and macOS won't
+  let WebKit stop it). Within seconds the app stops the old helper itself,
+  the window draws again and its terminals come back, with no restart and
+  no agent stopped. Before, the window stayed black until the app quit.
+
+Code: `App.tsx` (`TopBar`), `FrameStatus.tsx`, `ui.tsx` (`Modal`, `Confirm`), `menu.tsx` (`ContextMenu`), `lib/modalFocus.ts`, `lib/press.ts` (`menuKeys`), `Splash.tsx`, `src-tauri/capabilities/default.json`, `code/kit/webview` (WIN-7, started in `lib.rs`).
 
 ## 16. Repo notes
 

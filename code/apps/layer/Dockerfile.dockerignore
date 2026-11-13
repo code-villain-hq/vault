@@ -9,6 +9,7 @@
 !kit/settings
 !kit/auth
 !kit/notify
+!kit/webview
 **/target
 **/node_modules
 apps/layer/dist

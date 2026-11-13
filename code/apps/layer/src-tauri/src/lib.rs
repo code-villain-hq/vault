@@ -194,6 +194,14 @@ pub fn run() {
             }
             // Before the window first draws, or a light theme opens dark.
             theme::apply(handle, &handle.state::<AppState>().config.read().ui.theme);
+            // On Nov 13 2026 the window stayed black after the Mac slept:
+            // WebKit gave up on its GPU helper and macOS refused to stop it
+            // (WIN-7). Restarting would have stopped every agent.
+            if let Some(window) = handle.get_webview_window("main") {
+                code_villain_webview::keep_drawing(move |look| {
+                    let _ = window.with_webview(move |webview| look(webview.inner()));
+                });
+            }
             messages::spawn_writer(handle.clone(), dirty)?;
             runs::spawn_writer(handle.clone(), runs_dirty)?;
 
