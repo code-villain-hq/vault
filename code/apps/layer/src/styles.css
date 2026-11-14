@@ -2176,11 +2176,6 @@ body.dragging * {
   color: var(--status-warn-ink);
 }
 
-.wide-head .agents-sort {
-  width: auto;
-  font-size: var(--type-ui-small-size);
-  padding: 3px 6px;
-}
 .agent-card {
   display: flex;
   align-items: center;

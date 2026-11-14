@@ -32,22 +32,21 @@ const tasks = [
 ] as Task[];
 
 describe("the All agents view's order (PANE-17)", () => {
-  test("latest activity puts agents at work first, then the most recently active", () => {
+  test("latest activity puts agents at work first, newest started on top, then the most recently active", () => {
     const panes = [
       pane("idle-early", { activity: "idle", activity_since: at(5) }),
-      pane("working-long", { activity: "working", activity_since: at(1) }),
+      pane("working-long", { activity: "working", started_at: at(1), activity_since: at(1) }),
       pane("done-late", { activity: "done", activity_since: at(30) }),
       pane("exited", { running: false, activity: "idle", activity_since: at(40) }),
-      pane("working-new", { activity: "working", activity_since: at(20) }),
+      pane("working-new", { activity: "working", started_at: at(20), activity_since: at(20) }),
       pane("shell", { kind: "shell", activity_since: at(59) }),
     ];
-    expect(sortAgents(panes, tasks, "activity")).toEqual([
-      "working-new",
-      "working-long",
-      "exited",
-      "done-late",
-      "idle-early",
-    ]);
+    const order = ["working-new", "working-long", "exited", "done-late", "idle-early"];
+    expect(sortAgents(panes, tasks, "activity")).toEqual(order);
+    // Each tool call a working agent reports restamps its activity_since;
+    // that alone must not swap it with the other one at work.
+    panes[1] = { ...panes[1], activity_since: at(58) };
+    expect(sortAgents(panes, tasks, "activity")).toEqual(order);
   });
 
   test("needs you first is the order it always had, ties kept as they came", () => {

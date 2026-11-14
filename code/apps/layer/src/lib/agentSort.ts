@@ -16,13 +16,16 @@ const time = (iso: string) => Date.parse(iso) || 0;
 
 /**
  * When an agent last did something. One at work is at it now, so every
- * working agent comes before the rest. Otherwise its `activity_since`:
- * when it finished, asked, or last worked before it exited. Looking at a
- * finished agent does not move it, so opening one does not reorder the list.
+ * working agent comes before the rest, the newest started first: its
+ * `activity_since` moves with every tool call it reports, and ordering by
+ * it swapped two busy agents every few seconds. The rest by
+ * `activity_since`: when it finished or asked, or last printed before it
+ * exited. Looking at a finished agent does not move it, so opening one does
+ * not reorder the list.
  */
 function lastActive(p: PaneInfo): [number, number] {
   const working = p.running && p.activity === "working";
-  return [working ? 1 : 0, time(p.activity_since)];
+  return [working ? 1 : 0, time(working ? p.started_at : p.activity_since)];
 }
 
 /**

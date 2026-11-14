@@ -6,6 +6,7 @@ import { CHAT_TASK_ID, needsYou, paneScope, paneState } from "../lib/derive";
 import { readOneOf, write } from "../lib/persist";
 import { markStopping, useStore } from "../store";
 import { Ago } from "./Ago";
+import { PickMenu } from "./tickets/PickMenu";
 import { BusyLabel, ErrorMessage, SidebarToggle, useFailure } from "./ui";
 
 /**
@@ -81,22 +82,16 @@ export function AgentsView() {
         </span>
         <div className="spacer" />
         {ids.length > 1 && (
-          <select
-            className="ui-field agents-sort"
+          <PickMenu
+            label="Sort"
+            options={AGENT_SORTS}
+            names={AGENT_SORT_LABEL}
             value={sort}
-            aria-label="Sort agents"
-            onChange={(e) => {
-              const next = e.target.value as AgentSort;
+            onChange={(next) => {
               setSort(next);
               write("agentsSort", next);
             }}
-          >
-            {AGENT_SORTS.map((o) => (
-              <option key={o} value={o}>
-                {AGENT_SORT_LABEL[o]}
-              </option>
-            ))}
-          </select>
+          />
         )}
         <button className="ui-button" onClick={() => void refreshPanes()}>
           Refresh

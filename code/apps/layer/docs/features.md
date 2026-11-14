@@ -477,9 +477,9 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   and further off on every row below.
 - **PANE-17** The All agents view MUST offer its order and remember the
   last one chosen on this Mac: **Needs you first** (the default, and what
-  the dock counts), **Latest activity** (agents at work first, the one
-  that began most recently on top, then the rest by when they last did
-  something: finished, asked, or exited), **By task** (task names in
+  the dock counts), **Latest activity** (agents at work first, the newest
+  started on top, then the rest by when they last did something: finished,
+  asked, or, for one that exited, last printed), **By task** (task names in
   reading order, ACME-2 before ACME-10, chats last, the newest agent first
   within a task) and **Newest first** (by when each started). Ties keep
   the order the panes came in. Looking at a finished agent does not move
