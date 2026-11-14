@@ -117,11 +117,10 @@ pub fn user_has_status_line() -> bool {
         .is_some_and(|v| owns_status_line(&v))
 }
 
-/// Whether these settings hold a status line that is the user's. Orca's is
-/// not: it installs one in the user's settings that stays after Orca is put
-/// away, and outside a pane Orca started (no `ORCA_*` variables) it reads
-/// its input and prints nothing, so in the app's panes it shows nothing to
-/// take away.
+/// Whether these settings hold a status line that is the user's. One another
+/// tool installed and left behind is not: outside that tool's own panes it
+/// reads its input and prints nothing, so in the app's panes it shows
+/// nothing to take away.
 fn owns_status_line(settings: &Value) -> bool {
     let Some(line) = settings.get("statusLine").filter(|s| !s.is_null()) else { return false };
     let command = line.get("command").and_then(Value::as_str).unwrap_or_default();

@@ -3424,12 +3424,13 @@ Known gaps:
 
 The sidebar's corner says, at all times, how much of each agent plan is
 used and when it starts over: a row per provider, its five-hour and weekly
-windows, each as `5h 42% 2h 13m` (used, and time to its reset), amber from
-80% and red from 95%. Hovering a row says exactly when each window resets
-and how old the reading is; clicking asks OpenAI again. A provider shows
-once it has said something, and nothing is shown before any has. It was
-what Orca kept in its status bar, and what was missed on moving: a usage
-limit was found by an agent stopping on it.
+windows, each as `5h 42%` (used), amber from 80% and red from 95%. An
+amber or red window adds the time to its reset, `5h 86% 2h 13m`: below
+that it does not matter yet, and a countdown on every window was cut short
+at the sidebar's usual width. Hovering a row says exactly when each window
+resets and how old the reading is; clicking OpenAI's asks it again. A
+provider shows once it has said something, and nothing is shown before any
+has. Without it, a usage limit was found by an agent stopping on it.
 
 - **LIMIT-1** Only a plan's own windows MUST be shown, as its provider
   states them: a percentage used and a reset time, never one estimated from
@@ -3439,13 +3440,14 @@ limit was found by an agent stopping on it.
   handed the plan's `rate_limits` with every update: the app's settings
   file (`claude-hooks.json`) adds a status line that posts them to
   `/limits/claude` with the hook token, at most every 15 seconds a pane,
-  only when they are there, printing nothing and always exiting 0. Not the
-  usage endpoint Orca polls: that needs Claude Code's token from the
-  Keychain, and Orca's own notes say polling it is refused with 429s. The
+  only when they are there, printing nothing and always exiting 0. Not
+  Anthropic's usage endpoint: that needs Claude Code's token from the
+  Keychain, and polling it is refused with 429s. The
   app's settings are laid over the user's, so a user with a status line of
   their own (`statusLine` in `~/.claude/settings.json`) keeps it and gets
-  no Claude row. Orca's is not counted as theirs: Orca leaves it there
-  after it is put away, and outside Orca's own panes it prints nothing.
+  no Claude row. A status line another tool installed and left behind
+  (`.orca/agent-hooks/claude-statusline`) is not counted as theirs: it
+  prints nothing outside that tool's own panes.
 - **LIMIT-3** OpenAI's MUST be asked of `chatgpt.com/backend-api/wham/usage`
   with the ChatGPT sign-in OpenCode keeps (`opencode.db`'s `credential`
   row for `openai`, or its older `auth.json`), only when it is an OAuth
@@ -3453,7 +3455,8 @@ limit was found by an agent stopping on it.
   not at all once it has expired, until OpenCode renews it. The database
   is read with the system's `sqlite3`, read-only, the sign-in passing
   through a pipe and never a command line. It is asked once at start,
-  every 5 minutes while an OpenCode agent runs, and when a row is clicked.
+  every 5 minutes while an OpenCode agent runs, and when its row is
+  clicked. Claude's row is not a button: there is nothing to ask.
   Of the two windows, the one a day long or shorter is the five-hour one.
 - **LIMIT-4** The latest reading of each provider MUST be kept in
   `limits.json` beside `config.json`, so the corner has something to say

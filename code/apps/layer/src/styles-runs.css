@@ -265,7 +265,6 @@
   display: flex;
   flex-direction: column;
   padding: 4px 8px 0;
-  border-top: 1px solid var(--line);
 }
 .plan-limit {
   display: flex;
@@ -280,9 +279,11 @@
   line-height: var(--type-ui-small-leading);
   text-align: left;
   white-space: nowrap;
+}
+button.plan-limit {
   cursor: pointer;
 }
-.plan-limit:hover {
+button.plan-limit:hover {
   color: var(--fg);
 }
 .plan-limit:disabled {

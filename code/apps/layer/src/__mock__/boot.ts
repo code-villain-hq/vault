@@ -50,6 +50,7 @@ import type {
 } from "../lib/types";
 import { acpAnswers, seedAcp } from "./acp";
 import { epicAnswers, seedEpic } from "./epic";
+import { limitAnswers } from "./limits";
 import { loopAnswers, seedLoop } from "./loop";
 import { profileAnswers } from "./profiles";
 import { runAnswers } from "./runs";
@@ -600,6 +601,8 @@ const answer: Record<string, Answer> = {
   ...epicAnswers(world, (a, taskId) => newPane(a, "agent", taskId)),
   // The run log (§22).
   ...runAnswers(world.tasks.length > 0),
+  // Plan limits (§27).
+  ...limitAnswers(world.tasks.length > 0),
   ...profileAnswers(),
   spawn_agent: (a) => {
     const p = newPane(a, "agent", a.taskId as string);

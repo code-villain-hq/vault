@@ -1,13 +1,15 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { limitsTitle, limitWindows, providerName, type PlanLimits } from "../../lib/limits";
+import { limitsTitle, limitWindows, providerName } from "../../lib/limits";
+import type { PlanLimits } from "../../lib/types-limits";
 import { useNow, useStore } from "../../store";
 
 /**
  * How much of each agent plan is used and when each window starts over,
  * always in the sidebar's corner (§27). Nothing until a provider has said.
- * Clicking asks OpenAI again; Claude's come as its agents reply (LIMIT-2).
+ * Clicking OpenAI's row asks it again; Claude's come as its agents reply
+ * (LIMIT-2), so its row is not a button.
  */
 export function PlanLimitsStrip() {
   const fail = useStore((s) => s.fail);
@@ -44,24 +46,35 @@ export function PlanLimitsStrip() {
 
   return (
     <div className="plan-limits" aria-label="Agent plan limits">
-      {limits.map((l) => (
-        <button
-          key={l.provider}
-          type="button"
-          className="plan-limit"
-          title={limitsTitle(l, now)}
-          disabled={asking}
-          onClick={refresh}
-        >
-          <span className="plan-name">{providerName(l.provider)}</span>
-          {limitWindows(l, now).map((w) => (
-            <span key={w.label} className={`plan-window ${w.tone}`}>
-              <span className="plan-label">{w.label}</span> {w.used}
-              {w.left && <span className="plan-left"> {w.left}</span>}
-            </span>
-          ))}
-        </button>
-      ))}
+      {limits.map((l) => {
+        const row = (
+          <>
+            <span className="plan-name">{providerName(l.provider)}</span>
+            {limitWindows(l, now).map((w) => (
+              <span key={w.label} className={`plan-window ${w.tone}`}>
+                <span className="plan-label">{w.label}</span> {w.used}
+                {w.left && <span className="plan-left"> {w.left}</span>}
+              </span>
+            ))}
+          </>
+        );
+        return l.provider === "openai" ? (
+          <button
+            key={l.provider}
+            type="button"
+            className="plan-limit"
+            title={limitsTitle(l, now)}
+            disabled={asking}
+            onClick={refresh}
+          >
+            {row}
+          </button>
+        ) : (
+          <div key={l.provider} className="plan-limit" title={limitsTitle(l, now)}>
+            {row}
+          </div>
+        );
+      })}
     </div>
   );
 }

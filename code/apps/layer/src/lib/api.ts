@@ -1,6 +1,5 @@
 import type { Operation, TrackerKind } from "@layer/types";
 import { Channel, invoke } from "@tauri-apps/api/core";
-import type { PlanLimits } from "./limits";
 import type {
   AcpVersion,
   AcpView,
@@ -75,6 +74,7 @@ import type {
   S3Found,
 } from "./types";
 import type { EpicView, Filed, StartedSubTask } from "./types-epic";
+import type { PlanLimits } from "./types-limits";
 import type {
   Elsewhere,
   ProfileView,

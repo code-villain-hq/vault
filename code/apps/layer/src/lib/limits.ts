@@ -1,24 +1,9 @@
 /**
- * Each agent plan's limits (§27), as `limits.rs` keeps them, mirrored here,
- * and how the sidebar's corner says them.
+ * How the sidebar's corner says each agent plan's limits (§27). The types,
+ * as `limits.rs` keeps them, are mirrored in `types-limits.ts`.
  */
-
-export interface PlanWindow {
-  /** From 0 to 100. */
-  used_percent: number;
-  /** Epoch milliseconds, when the provider said. */
-  resets_at: number | null;
-}
-
-export interface PlanLimits {
-  /** `claude` or `openai`. */
-  provider: string;
-  /** The five-hour window. */
-  session: PlanWindow | null;
-  weekly: PlanWindow | null;
-  /** Epoch milliseconds. */
-  read_at: number;
-}
+import { ago } from "./time";
+import type { PlanLimits, PlanWindow } from "./types-limits";
 
 const NAMES: Record<string, string> = { claude: "Claude", openai: "OpenAI" };
 
@@ -49,9 +34,13 @@ export interface WindowView {
   label: string;
   /** `42%`, or `reset` once the window has started over since it was read. */
   used: string;
-  /** Time to its reset, when known and still ahead. */
+  /**
+   * Time to its reset, once the window is amber or red: below that, when it
+   * starts over does not matter yet, and at the sidebar's usual width every
+   * countdown was cut short. The hover has every reset time.
+   */
   left: string | null;
-  /** Warn from 80% (where Orca warns), danger from 95%. */
+  /** Warn from 80%, with a fifth left; danger from 95%. */
   tone: LimitTone;
 }
 
@@ -69,7 +58,7 @@ export function windowView(label: string, w: PlanWindow | null, now: number): Wi
   return {
     label,
     used: `${pct}%`,
-    left: w.resets_at === null ? null : timeLeft(w.resets_at, now),
+    left: w.resets_at === null || tone === "ok" ? null : timeLeft(w.resets_at, now),
     tone,
   };
 }
@@ -95,9 +84,8 @@ export function limitsTitle(l: PlanLimits, now: number): string {
     const resets = w.resets_at === null ? "" : `, resets ${when(w.resets_at)}`;
     return `${name}: ${Math.round(w.used_percent)}% used${resets}`;
   };
-  const read = now - l.read_at < MINUTE ? "just now" : `${timeLeft(now, l.read_at)} ago`;
   return [
-    `${providerName(l.provider)} plan, read ${read}`,
+    `${providerName(l.provider)} plan, read ${ago(l.read_at, now)}`,
     say("5-hour window", l.session),
     say("Week", l.weekly),
     l.provider === "openai" ? "Click to ask OpenAI again." : "Updates as Claude agents reply.",
