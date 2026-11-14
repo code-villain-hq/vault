@@ -427,15 +427,15 @@ mod tests {
     #[test]
     fn an_epics_tasks_go_to_the_tickets_already_under_it_before_new_ones() {
         let under = [
-            ("DT-22265".to_string(), "Flight (P1)".to_string()),
-            ("DT-22270".to_string(), "Cancelled state\nfor all products".to_string()),
+            ("ACME-265".to_string(), "Invoice PDF (P1)".to_string()),
+            ("ACME-270".to_string(), "Cancelled state\nfor all orders".to_string()),
         ];
         let p = tasks_prompt(&two(), "reqs", "design", &[], Some(&under));
         assert!(p.contains("headed with its key and then its summary"), "{p}");
         assert!(p.contains("A heading without a key files a new ticket"));
         assert!(!p.contains("Two to six"));
         assert!(p.ends_with(
-            "# Tickets under the epic\n\n- DT-22265 Flight (P1)\n- DT-22270 Cancelled state for all products\n"
+            "# Tickets under the epic\n\n- ACME-265 Invoice PDF (P1)\n- ACME-270 Cancelled state for all orders\n"
         ));
     }
 

@@ -561,7 +561,7 @@ mod tests {
         assert_eq!(kept, ["0", "1", "2", "3", "4"], "the oldest exited panes went, not the waiting or open ones");
     }
 
-    /// DT-21480: a pane over the limit waited, then an agent was started in
+    /// A pane over the limit waited, then an agent was started in
     /// its folder and continued its conversation. The banner went on
     /// offering to reopen it, under the open conversation's own title.
     #[test]

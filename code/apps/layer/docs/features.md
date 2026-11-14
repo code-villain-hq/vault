@@ -311,7 +311,7 @@ count, running agents, uncommitted changes and the review verdict.
   opened the dialog.)
 
 - **TASK-19** A field at the top of the sidebar MUST find a task by its
-  ticket's key (`DT-4826`, or part of it), its title, its branch, its
+  ticket's key (`ACME-4826`, or part of it), its title, its branch, its
   epic's key and title, and, for a ticket on your own list, its
   description. Every word typed must be found, in any order and case. It
   narrows Epics and Tasks alike: an epic stays when it or one of its tasks

@@ -778,13 +778,13 @@ mod browse_tests {
 
     #[test]
     fn an_epics_tickets_are_asked_for_by_its_key_alone() {
-        assert_eq!(children_jql(" DT-22264 ", None).unwrap(), "parent = DT-22264 ORDER BY created ASC");
+        assert_eq!(children_jql(" ACME-264 ", None).unwrap(), "parent = ACME-264 ORDER BY created ASC");
         assert_eq!(
-            children_jql("DT-22264", Some("customfield_10014")).unwrap(),
-            "cf[10014] = DT-22264 ORDER BY created ASC"
+            children_jql("ACME-264", Some("customfield_10014")).unwrap(),
+            "cf[10014] = ACME-264 ORDER BY created ASC"
         );
-        assert!(children_jql("DT-1 OR project = X", None).is_err());
-        assert!(children_jql("DT-1", Some("customfield_1] OR x")).is_err());
+        assert!(children_jql("ACME-1 OR project = X", None).is_err());
+        assert!(children_jql("ACME-1", Some("customfield_1] OR x")).is_err());
     }
 
     #[test]

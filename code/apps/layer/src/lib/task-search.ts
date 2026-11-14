@@ -6,7 +6,7 @@ import type { Task, Ticket } from "./types";
  * ticket's key, its name (the ticket's title), its branch, its epic's key and
  * title, and — when the ticket is on your own list, so nothing more is asked
  * of the tracker — the ticket's title and description. Every word typed must
- * be found somewhere, in any order and case: "dt-48 login" finds DT-4826
+ * be found somewhere, in any order and case: "acme-48 login" finds ACME-4826
  * "Login fails on Safari".
  */
 export function taskMatches(

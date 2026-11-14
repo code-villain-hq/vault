@@ -545,9 +545,9 @@ mod tests {
 
     #[test]
     fn tasks_under_an_epics_ticket_become_its_sub_tasks_named_after_their_tickets() {
-        let mut epic = task("e", "DT-1");
+        let mut epic = task("e", "ACME-1");
         epic.epic = true;
-        let mut tasks = vec![epic.clone(), task("a", "DT-2"), task("b", "DT-3")];
+        let mut tasks = vec![epic.clone(), task("a", "ACME-2"), task("b", "ACME-3")];
         adopt(&mut tasks, &epic, &["a".into()]);
         assert_eq!(tasks[1].sub_task, Some(SubTaskOf { epic: "e".into(), title: "Work on a".into() }));
         assert_eq!(tasks[2].sub_task, None);
@@ -555,13 +555,13 @@ mod tests {
 
     #[test]
     fn adopting_leaves_epics_other_epics_sub_tasks_and_the_epics_own_old_task_alone() {
-        let mut epic = task("e", "DT-1");
+        let mut epic = task("e", "ACME-1");
         epic.epic = true;
-        let mut other = task("o", "DT-9");
+        let mut other = task("o", "ACME-9");
         other.epic = true;
-        let mut theirs = task("s", "DT-4");
+        let mut theirs = task("s", "ACME-4");
         theirs.sub_task = Some(SubTaskOf { epic: "o".into(), title: "Theirs".into() });
-        let old = task("old", "DT-1");
+        let old = task("old", "ACME-1");
         let mut tasks = vec![epic.clone(), other, theirs, old];
         adopt(&mut tasks, &epic, &["e".into(), "o".into(), "s".into(), "old".into()]);
         assert_eq!(tasks[0].sub_task, None);
