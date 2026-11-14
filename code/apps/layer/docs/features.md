@@ -343,7 +343,8 @@ prompt made from the ticket, which can be edited), in a terminal or as a
 conversation, resumes one, or opens a shell. When a task has several
 repos, a pane can be scoped to the whole task or to one repo. A pane can
 be handed off to another agent, or closed. The All agents view lists
-every agent pane in every task, with the ones that need you first.
+every agent pane in every task, with the ones that need you first, or in
+another order chosen at its top.
 
 | id | CLI | How it reports its state | How it gets the app's tools | Resume |
 |---|---|---|---|---|
@@ -474,9 +475,19 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   scale but 100% xterm read the pointer against an unscaled grid, so a
   selection, in OpenCode or in the terminal, was right on the top row
   and further off on every row below.
+- **PANE-17** The All agents view MUST offer its order and remember the
+  last one chosen on this Mac: **Needs you first** (the default, and what
+  the dock counts), **Latest activity** (agents at work first, the newest
+  started on top, then the rest by when they last did something: finished,
+  asked, or, for one that exited, last printed), **By task** (task names in
+  reading order, ACME-2 before ACME-10, chats last, the newest agent first
+  within a task) and **Newest first** (by when each started). Ties keep
+  the order the panes came in. Looking at a finished agent does not move
+  it, so opening one does not reorder the list under you.
 
 Code: `pty.rs`, `agents.rs`, `commands/panes.rs` (`restart_pane`),
-`Terminals.tsx`, `Terminal.tsx`, `AgentsView.tsx`, `PaneNotice.tsx`.
+`Terminals.tsx`, `Terminal.tsx`, `AgentsView.tsx` (`lib/agentSort.ts`),
+`PaneNotice.tsx`.
 
 Known gaps:
 - Resume, pre-trust, and drafting PR and ticket descriptions are Claude
