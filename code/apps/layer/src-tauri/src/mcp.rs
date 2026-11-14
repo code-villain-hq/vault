@@ -99,7 +99,11 @@ pub async fn serve(app: AppHandle) -> Result<Endpoint> {
     let _ = ENDPOINT.set(endpoint.clone());
 
     let ctx = Ctx { app, token, hook_token };
-    let router = Router::new().route("/mcp", post(handle)).route("/hook/{pane}", post(hook)).with_state(ctx);
+    let router = Router::new()
+        .route("/mcp", post(handle))
+        .route("/hook/{pane}", post(hook))
+        .route("/limits/claude", post(claude_limits))
+        .with_state(ctx);
 
     tauri::async_runtime::spawn(async move {
         if let Err(e) = axum::serve(listener, router).await {
@@ -156,6 +160,16 @@ async fn hook(
         use tauri::Emitter;
         let _ = ctx.app.emit("pty:activity", &pane);
     }
+    StatusCode::NO_CONTENT
+}
+
+/// Claude Code's status line, saying how much of its plan is used
+/// (LIMIT-2). The hook token admits it: it is a hook in all but name.
+async fn claude_limits(AxumState(ctx): AxumState<Ctx>, headers: HeaderMap, body: Json<Value>) -> StatusCode {
+    if !bearer_ok(&headers, &ctx.hook_token) {
+        return StatusCode::UNAUTHORIZED;
+    }
+    crate::limits::take_status_line(&ctx.app, &body.0);
     StatusCode::NO_CONTENT
 }
 

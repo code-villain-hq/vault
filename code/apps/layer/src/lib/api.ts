@@ -74,6 +74,7 @@ import type {
   S3Found,
 } from "./types";
 import type { EpicView, Filed, StartedSubTask } from "./types-epic";
+import type { PlanLimits } from "./types-limits";
 import type {
   Elsewhere,
   ProfileView,
@@ -445,6 +446,10 @@ export const api = {
   // the run log (§22)
   listRuns: () => invoke<RunLog>("list_runs"),
   clearRuns: () => invoke<void>("clear_runs"),
+
+  // each agent plan's limits (§27)
+  planLimits: () => invoke<PlanLimits[]>("plan_limits"),
+  refreshPlanLimits: () => invoke<PlanLimits[]>("refresh_plan_limits"),
 
   // profiles (§25)
   listProfiles: () => invoke<ProfileView[]>("list_profiles"),

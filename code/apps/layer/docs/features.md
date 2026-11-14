@@ -1520,7 +1520,7 @@ Known gaps:
 
 | Where | What |
 |---|---|
-| `~/Library/Application Support/eu.codevillain.villain-layer/` | `config.json`: repos, tasks, settings, saved panes, the Slack threads handed to chats (BOT-4). `messages.json`: the message center (MSG-4). `notes.json`: this Mac's copy of the repo notes (MEM-7). `runs.json`: the run log (RUN-5). `postgres/`: the workspace's Postgres, its data, password and binaries (PROF-11). At agent launch also `.mcp.json` (0600), `claude-hooks.json`, `copilot-plugin/`, `opencode-plugin.js` |
+| `~/Library/Application Support/eu.codevillain.villain-layer/` | `config.json`: repos, tasks, settings, saved panes, the Slack threads handed to chats (BOT-4). `messages.json`: the message center (MSG-4). `notes.json`: this Mac's copy of the repo notes (MEM-7). `runs.json`: the run log (RUN-5). `limits.json`: each agent plan's limits as last read (LIMIT-4). `postgres/`: the workspace's Postgres, its data, password and binaries (PROF-11). At agent launch also `.mcp.json` (0600), `claude-hooks.json`, `copilot-plugin/`, `opencode-plugin.js` |
 | Keychain, service `eu.codevillain.villain-layer` | one item holding every token, paired phones' included (PHONE-3), the workspace's session on its server (`layer-session`, PROF-16), and the passwords of the browser's saved sign-ins (BRW-18) |
 | `~/.villain-worktrees/` (settable) | task folders, `_chat/` rooms, and `.repos/`: the app's own copy of each repo (REPO-4) |
 | a task folder | the worktrees, `AGENTS.md` and `CLAUDE.md` (task context), `TICKET.md` (PANE-13), `.spec-drafts/`: spec drafts, what was approved, and checks (SPEC-2, SPEC-6, SPEC-15), `.mcp.json`, and `.gemini/settings.json`, `PR_DESCRIPTION.md` and `PR_IMAGES.json` (PR-4), `PR_FEEDBACK.md`, and hand-offs too long to type (`CONFLICTS.md`, `REVIEW_COMMENTS.md`, `PR_DRAFT_REQUEST.md`, `FIRST_PROMPT.md`, `CHECKS.md` (LOOP-6), PANE-11) as they come up |
@@ -3419,6 +3419,70 @@ Known gaps:
 - A project whose required fields have no fixed values cannot file
   sub-tasks from here (TKT-3). Filed by hand and named by key in the
   spec's headings (EPIC-4), they are taken as existing tickets.
+
+## 27. Plan limits
+
+The sidebar's corner says, at all times, how much of each agent plan is
+used and when it starts over: a row per provider, its five-hour and weekly
+windows, each as `5h 42%` (used), amber from 80% and red from 95%. An
+amber or red window adds the time to its reset, `5h 86% 2h 13m`: below
+that it does not matter yet, and a countdown on every window was cut short
+at the sidebar's usual width. Hovering a row says exactly when each window
+resets and how old the reading is; clicking OpenAI's asks it again. A
+provider shows once it has said something, and nothing is shown before any
+has. Without it, a usage limit was found by an agent stopping on it.
+
+- **LIMIT-1** Only a plan's own windows MUST be shown, as its provider
+  states them: a percentage used and a reset time, never one estimated from
+  tokens. Claude Code's and the ChatGPT plan OpenCode signs in with are
+  read; another agent's plan is not shown.
+- **LIMIT-2** Claude's MUST come from Claude Code's status line, which is
+  handed the plan's `rate_limits` with every update: the app's settings
+  file (`claude-hooks.json`) adds a status line that posts them to
+  `/limits/claude` with the hook token, at most every 15 seconds a pane,
+  only when they are there, printing nothing and always exiting 0. Not
+  Anthropic's usage endpoint: that needs Claude Code's token from the
+  Keychain, and polling it is refused with 429s. The
+  app's settings are laid over the user's, so a user with a status line of
+  their own (`statusLine` in `~/.claude/settings.json`) keeps it and gets
+  no Claude row. A status line another tool installed and left behind
+  (`.orca/agent-hooks/claude-statusline`) is not counted as theirs: it
+  prints nothing outside that tool's own panes.
+- **LIMIT-3** OpenAI's MUST be asked of `chatgpt.com/backend-api/wham/usage`
+  with the ChatGPT sign-in OpenCode keeps (`opencode.db`'s `credential`
+  row for `openai`, or its older `auth.json`), only when it is an OAuth
+  sign-in, never refreshed by the app (that would sign OpenCode out), and
+  not at all once it has expired, until OpenCode renews it. The database
+  is read with the system's `sqlite3`, read-only, the sign-in passing
+  through a pipe and never a command line. It is asked once at start,
+  every 5 minutes while an OpenCode agent runs, and when its row is
+  clicked. Claude's row is not a button: there is nothing to ask.
+  Of the two windows, the one a day long or shorter is the five-hour one.
+- **LIMIT-4** The latest reading of each provider MUST be kept in
+  `limits.json` beside `config.json`, so the corner has something to say
+  before an agent has replied today. A file that cannot be read is nothing
+  yet; the next reading replaces it.
+- **LIMIT-5** A window past its reset time MUST read `reset`, not the
+  number read before it: what is used since is not known until the
+  provider says again.
+
+Code: `limits.rs` (the readings, the status line, OpenAI),
+`commands/limits.rs`, `mcp.rs` (`/limits/claude`), `agents.rs`
+(`claude_hook_settings`), `lib/limits.ts`, `sidebar/PlanLimits.tsx`.
+
+Known gaps:
+- Any status line in Claude Code hides most of its footer's keyboard hints
+  (`esc to interrupt`, `? for shortcuts`), this one too, though it prints
+  nothing.
+- Claude's numbers move only while a Claude agent is replying; between
+  sessions the corner shows the last reading, its countdown still running.
+- A status line in a project's `.claude/settings.json` is not looked for,
+  and is replaced by the app's in its panes.
+- Both sources are undocumented for this use: Claude Code documents its
+  status line's fields, but OpenAI's usage endpoint is not documented at
+  all, and a change to it shows as no OpenAI row.
+- Several Claude accounts (`CLAUDE_CONFIG_DIR`) share one row: the last
+  to reply wins.
 
 ---
 
