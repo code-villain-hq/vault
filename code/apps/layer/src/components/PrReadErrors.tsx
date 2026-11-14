@@ -12,7 +12,6 @@ import { useStore } from "../store";
  */
 export function PrReadErrors({ rows }: { rows: CheckoutPr[] }) {
   const toggleSettings = useStore((s) => s.toggleSettings);
-  const refreshPrs = useStore((s) => s.refreshPrs);
   const webUrl = useStore((s) => s.settings?.github?.web_url);
   const fail = useStore((s) => s.fail);
   const failed = rows.filter((r) => r.error);
@@ -38,21 +37,23 @@ export function PrReadErrors({ rows }: { rows: CheckoutPr[] }) {
         <div className="card">
           <h3>{TOKEN_NEEDS_SSO}</h3>
           <p className="muted">
-            The organization that owns {sso.map((r) => r.repo).join(", ")} requires single sign-on. In
-            GitHub's token settings, choose Configure SSO beside the token Layer uses and authorize it
-            for the organization. The same token then works; nothing needs saving again.
+            The organization that owns {sso.map((r) => r.repo).join(", ")} requires single sign-on.
+            In GitHub's token settings, choose Configure SSO beside the token Layer uses and
+            authorize it for the organization. The same token then works; nothing needs saving
+            again, and Layer checks again on its own.
           </p>
-          <div className="row">
-            {webUrl && (
-              <button
-                className="ui-button"
-                onClick={() => void openUrl(`${webUrl}/settings/tokens`).catch(() => fail("Couldn't open the browser. Try again."))}
-              >
-                Open token settings
-              </button>
-            )}
-            <button className="ui-button" onClick={() => void refreshPrs()}>Check again</button>
-          </div>
+          {webUrl && (
+            <button
+              className="ui-button"
+              onClick={() =>
+                void openUrl(`${webUrl}/settings/tokens`).catch(() =>
+                  fail("Couldn't open the browser. Try again."),
+                )
+              }
+            >
+              Open token settings
+            </button>
+          )}
         </div>
       )}
       {others.length > 0 && (

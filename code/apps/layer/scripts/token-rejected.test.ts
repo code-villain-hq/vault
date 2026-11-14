@@ -18,7 +18,9 @@ describe("a token GitHub refused (PR-12)", () => {
     expect(githubRefusal({ a: [row(TOKEN_NEEDS_SSO)], b: [row(null)] })).toBe("sso");
     // A new token is the first thing needed; authorizing comes after.
     expect(githubRefusal({ a: [row(TOKEN_NEEDS_SSO)], b: [row(TOKEN_REJECTED)] })).toBe("rejected");
-    expect(githubRefusal({ a: [row("GitHub 403 Forbidden: {\"message\":\"API rate limit exceeded\"}")] })).toBe(null);
+    expect(
+      githubRefusal({ a: [row('GitHub 403 Forbidden: {"message":"API rate limit exceeded"}')] }),
+    ).toBe(null);
   });
 
   test("a sweep asked for during one runs again after it, with the new token's answer", async () => {
