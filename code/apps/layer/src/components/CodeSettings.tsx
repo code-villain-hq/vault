@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { githubRejected } from "../lib/derive";
+import { githubRefusal } from "../lib/derive";
 import { useStore } from "../store";
 import {
   ChangeRow,
@@ -23,7 +23,7 @@ export function CodeSettings() {
   const settings = useStore((s) => s.settings);
   const refreshSettings = useStore((s) => s.refreshSettings);
   const refreshPrs = useStore((s) => s.refreshPrs);
-  const ghRejected = useStore((s) => githubRejected(s.prs));
+  const ghRefusal = useStore((s) => githubRefusal(s.prs));
   // Connecting fails under its button, disconnecting under the connected
   // row (NOTE-6).
   const github = useFailure();
@@ -96,8 +96,10 @@ export function CodeSettings() {
       </p>
       {connected && (
         <div className="row" style={{ marginBottom: 14 }}>
-          {ghRejected ? (
+          {ghRefusal === "rejected" ? (
             <span className="ui-status ui-status-danger">token rejected</span>
+          ) : ghRefusal === "sso" ? (
+            <span className="ui-status ui-status-danger">needs single sign-on</span>
           ) : (
             <span className="ui-status">connected</span>
           )}
