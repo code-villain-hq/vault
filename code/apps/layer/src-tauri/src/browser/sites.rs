@@ -29,17 +29,64 @@ pub fn is_local(host: &str) -> bool {
 
 /// A site as the user or an agent wrote it, as it is kept: a bare host,
 /// lowercased, from a host or a URL. None for anything that is not one.
+/// A leading `*.` is dropped, as a site covers its subdomains anyway; a `*`
+/// elsewhere stays, as a wildcard (`pr-*.example.com`, see `host_matches`).
 pub fn normalize(site: &str) -> Option<String> {
     let site = site.trim();
     let host = if site.contains("://") { host_of(site)? } else { host_of(&format!("https://{site}"))? };
-    let host = host.strip_prefix("*.").unwrap_or(&host).to_string();
+    let mut host = host.as_str();
+    while let Some(rest) = host.strip_prefix("*.") {
+        host = rest;
+    }
     let valid = host.contains('.') || host == "localhost";
-    let clean = host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'));
-    (valid && clean && !host.starts_with('.') && !host.starts_with('-')).then_some(host)
+    let clean = host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '*'));
+    (valid && clean && !host.starts_with('.') && !host.starts_with('-') && wildcard_ok(host)).then(|| host.to_string())
+}
+
+/// Whether a site's wildcards leave its domain written out: a `*` may stand
+/// in the names in front of a domain (`pr-*.example.com`,
+/// `*.preview.example.com`), never in the domain itself (`example.*`,
+/// `*.com`), which would take in sites nobody meant. Under `.localhost`
+/// anything goes: it is all this machine.
+pub fn wildcard_ok(host: &str) -> bool {
+    let labels: Vec<&str> = host.split('.').collect();
+    if labels.last() == Some(&"localhost") {
+        return true;
+    }
+    labels.len() >= 2 && labels[labels.len() - 2..].iter().all(|l| !l.contains('*'))
+}
+
+/// Whether `host` is the host `pattern` names: the same number of names
+/// between the dots, each the same, where a `*` in the pattern stands for
+/// any run of letters, digits and dashes within that one name. So
+/// `pr-*.example.com` is `pr-12.example.com`, not `pr-1.x.example.com`.
+pub fn host_matches(pattern: &str, host: &str) -> bool {
+    if !pattern.contains('*') {
+        return pattern == host;
+    }
+    let (want, have): (Vec<&str>, Vec<&str>) = (pattern.split('.').collect(), host.split('.').collect());
+    want.len() == have.len() && want.iter().zip(&have).all(|(w, h)| label_matches(w, h))
+}
+
+/// One name of a host against one of a pattern, `*` standing for any run.
+fn label_matches(pattern: &str, label: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = label.strip_prefix(first) else { return false };
+    let mut parts: Vec<&str> = parts.collect();
+    let Some(last) = parts.pop() else { return rest.is_empty() };
+    for part in parts {
+        match rest.find(part) {
+            Some(at) => rest = &rest[at + part.len()..],
+            None => return false,
+        }
+    }
+    rest.ends_with(last)
 }
 
 /// Whether agents may use the page at `url`. A site covers its subdomains:
-/// allowing `example.com` allows `docs.example.com`.
+/// allowing `example.com` allows `docs.example.com`, and allowing
+/// `pr-*.example.com` allows `pr-12.example.com` and `api.pr-12.example.com`.
 pub fn allowed(url: &str, sites: &[String]) -> bool {
     if url == "about:blank" {
         return true;
@@ -47,8 +94,9 @@ pub fn allowed(url: &str, sites: &[String]) -> bool {
     let Some(host) = host_of(url) else {
         return false;
     };
-    is_local(&host)
-        || sites.iter().any(|s| host == *s || host.strip_suffix(s.as_str()).is_some_and(|sub| sub.ends_with('.')))
+    // The host, then each domain it is a subdomain of.
+    let mut suffixes = std::iter::successors(Some(host.as_str()), |h| h.split_once('.').map(|(_, rest)| rest));
+    is_local(&host) || suffixes.any(|h| sites.iter().any(|s| host_matches(s, h)))
 }
 
 /// A URL from an agent, with `http://` or `https://` put in front when it
@@ -104,6 +152,35 @@ mod tests {
         assert!(allowed("https://docs.example.com/a", &s));
         assert!(!allowed("https://badexample.com/", &s));
         assert!(!allowed("https://example.com.evil.test/", &s));
+    }
+
+    #[test]
+    fn a_wildcard_stands_for_any_run_within_one_name() {
+        let s: Vec<String> = ["pr-*.example.com", "*.preview.acme.test"].iter().filter_map(|x| normalize(x)).collect();
+        assert!(allowed("https://pr-12.example.com/", &s));
+        assert!(allowed("https://api.pr-12.example.com/", &s), "and its subdomains");
+        assert!(!allowed("https://example.com/", &s));
+        assert!(!allowed("https://pr12.example.com/", &s));
+        assert!(!allowed("https://pr-1.example.com.evil.test/", &s));
+        assert!(!allowed("https://evil-pr-1.example.com/", &s));
+        assert!(allowed("https://preview.acme.test/", &s), "a leading *. is the domain and its subdomains");
+        assert!(allowed("https://a.b.preview.acme.test/", &s));
+        assert!(host_matches("a*b*c.example.com", "aXXbYYc.example.com"));
+        assert!(!host_matches("a*b*c.example.com", "aXXcYYb.example.com"));
+        assert!(host_matches("*-api.example.com", "pr-3-api.example.com"));
+        assert!(!host_matches("*-api.example.com", "pr-3-api-x.example.com"));
+    }
+
+    #[test]
+    fn a_wildcard_never_stands_in_the_domain_itself() {
+        assert_eq!(normalize("pr-*.example.com").as_deref(), Some("pr-*.example.com"));
+        assert_eq!(normalize("*.*.example.com").as_deref(), Some("example.com"));
+        assert_eq!(normalize("https://PR-*.Example.com/x").as_deref(), Some("pr-*.example.com"));
+        assert_eq!(normalize("*.app.localhost").as_deref(), Some("app.localhost"));
+        assert_eq!(normalize("pr-*.localhost").as_deref(), Some("pr-*.localhost"));
+        for broad in ["*", "*.com", "example.*", "*.*", "ex*.com", "a.*.com"] {
+            assert_eq!(normalize(broad), None, "{broad}");
+        }
     }
 
     #[test]

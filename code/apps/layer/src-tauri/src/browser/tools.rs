@@ -211,7 +211,8 @@ pub fn list() -> Vec<Value> {
             "Ask the user to let agents use a site in the browser, saying what for. The user \
              answers in the app; this waits up to two minutes and says what they chose. Ask \
              only for what the task needs, and once: asking again waits on the same question. \
-             A site covers its subdomains.",
+             A site covers its subdomains, and a * stands for any part of one name in front of \
+             its domain (pr-*.example.com); ask for one only when the task needs many such sites.",
             json!({
                 "site": str_prop("The site, e.g. github.com, or a URL on it"),
                 "reason": str_prop("What you need it for, in a sentence the user reads before answering"),

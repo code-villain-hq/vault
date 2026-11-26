@@ -17,15 +17,16 @@ use crate::error::{Error, Result};
 use crate::secrets;
 
 /// A site as a sign-in is saved for: a lowercased host, with `:port` if one
-/// was given. From a host or a URL.
+/// was given. From a host or a URL. The host may hold a `*` in the names in
+/// front of its domain (`pr-*.example.com`, see `sites::host_matches`).
 pub fn site_of(typed: &str) -> Option<String> {
     let typed = typed.trim();
     let url = if typed.contains("://") { typed.to_string() } else { format!("http://{typed}") };
     let host = sites::host_of(&url)?;
     let port = port_of(&url);
     let valid = host.contains('.') || sites::is_local(&host);
-    let clean = host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':'));
-    if !valid || !clean {
+    let clean = host.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '*'));
+    if !valid || !clean || (host.contains('*') && !sites::wildcard_ok(&host)) {
         return None;
     }
     let host = if host.contains(':') { format!("[{host}]") } else { host };
@@ -48,12 +49,13 @@ fn port_of(url: &str) -> Option<u16> {
 }
 
 /// Whether a sign-in saved for `site` is for the page at `url` (BRW-18): the
-/// same host, and the same port, or any port of this machine when the site
-/// names none, or the default port elsewhere.
+/// same host (or one its wildcard stands for), and the same port, or any
+/// port of this machine when the site names none, or the default port
+/// elsewhere.
 pub fn is_for(site: &str, url: &str) -> bool {
     let Some(saved) = site_of(site).map(|s| format!("http://{s}/")) else { return false };
     let (Some(saved_host), Some(host)) = (sites::host_of(&saved), sites::host_of(url)) else { return false };
-    if saved_host != host {
+    if !sites::host_matches(&saved_host, &host) {
         return false;
     }
     match (port_of(&saved), port_of(url)) {
@@ -76,9 +78,14 @@ impl Browser {
     }
 }
 
-/// The saved sign-ins for the page at `url`.
+/// The saved sign-ins for the page at `url`: those saved for its own site
+/// first, so one written out wins over a wildcard's when no username is asked
+/// for.
 pub fn saved_for(state: &AppState, url: &str) -> Vec<SavedSignIn> {
-    state.config.read().browser.sign_ins.into_iter().filter(|s| is_for(&s.site, url)).collect()
+    let mut saved: Vec<SavedSignIn> =
+        state.config.read().browser.sign_ins.into_iter().filter(|s| is_for(&s.site, url)).collect();
+    saved.sort_by_key(|s| s.site.contains('*'));
+    saved
 }
 
 /// Save a sign-in: its password to the keychain, the rest to the config.
@@ -411,6 +418,22 @@ mod tests {
         forget(&state, &ada.id).unwrap();
         state.ptys.shutdown(Duration::from_secs(1));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_wildcard_site_is_every_host_it_stands_for_and_no_other() {
+        assert_eq!(site_of("https://PR-*.Example.com:8443/login").as_deref(), Some("pr-*.example.com:8443"));
+        assert_eq!(site_of("*.preview.example.com").as_deref(), Some("*.preview.example.com"));
+        for broad in ["*", "*.com", "example.*", "*.*"] {
+            assert_eq!(site_of(broad), None, "{broad}");
+        }
+        assert!(is_for("pr-*.example.com", "https://pr-12.example.com/login"));
+        assert!(!is_for("pr-*.example.com", "https://api.pr-12.example.com/"), "a subdomain is another site");
+        assert!(!is_for("pr-*.example.com", "https://pr-12.example.com:8443/"));
+        assert!(is_for("*.preview.example.com", "https://a.preview.example.com/"));
+        assert!(!is_for("*.preview.example.com", "https://preview.example.com/"));
+        assert!(!is_for("*.preview.example.com", "https://a.preview.example.com.evil.test/"));
+        assert!(is_for("*.localhost", "http://app.localhost:4200/"), "this machine's, any port");
     }
 
     #[test]

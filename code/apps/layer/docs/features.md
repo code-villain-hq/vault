@@ -1898,7 +1898,11 @@ ring marks where it clicked.
   `*.localhost`, `127.0.0.1`, `[::1]`) and on the sites the user allowed
   (Settings → Browser, the panel's Allow, or a request answered, BRW-11),
   over `http` or `https`. A site covers its subdomains, and is kept as its
-  host whatever was typed. Opening any other page is refused, and so is
+  host whatever was typed. A `*` in a site stands for any run of letters,
+  digits and dashes within one name (`pr-*.example.com` is
+  `pr-12.example.com`, and its subdomains), and only in the names in front
+  of the domain: `*.com` or `example.*` is not a site. A leading `*.` is
+  dropped, as the site covers its subdomains anyway. Opening any other page is refused, and so is
   reading or acting on a tab that a link or a redirect took elsewhere. A
   page's text is written by whoever runs the site, and an agent reads it
   as it reads a ticket: as something that may tell it what to do.
@@ -1993,7 +1997,13 @@ ring marks where it clicked.
   in `config.json`. A site is a host with or without a port: `localhost`
   alone is every port of this machine's (one app runs on :4200 for one
   task and :4210 for another), and a site elsewhere without a port is
-  its default port only. A site's subdomains are other sites. A saved
+  its default port only. A site's subdomains are other sites. A site MAY
+  hold a `*`, as on BRW-3, for one account on many hosts
+  (`*.staging.example.com`, `pr-*.example.com`); a `*` covers one name, so
+  `*.staging.example.com` is not `staging.example.com` nor
+  `a.b.staging.example.com`. When a site written out and a wildcard both
+  fit a page, the written-out one's account is the one used unless the
+  agent names another. A saved
   sign-in MAY be changed in place: its site, its username, and its
   password only when a new one is typed (an empty one keeps it). The
   password is never shown again, and a change that would save the same

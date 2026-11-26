@@ -20,7 +20,7 @@ export function BrowserSignIns() {
   return (
     <Field
       label="Saved sign-ins"
-      hint="The app types the password in, so agents never see it. It stays in the keychain. Use test accounts."
+      hint="The app types the password in, so agents never see it. It stays in the keychain. Use test accounts. A site can hold a *, as in *.staging.example.com, to use one account on all of them."
     >
       {signIns.length > 0 && (
         <div className="sign-ins">

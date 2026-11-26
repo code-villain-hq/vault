@@ -51,7 +51,7 @@ export function BrowserSettings() {
     <>
       <Field
         label="Sites agents may open"
-        hint="A page's text can tell an agent what to do, so agents open only these. A site covers its subdomains."
+        hint="A page's text can tell an agent what to do, so agents open only these. A site covers its subdomains, and * stands for any part of a name, as in pr-*.example.com."
       >
         <form className="browser-add" onSubmit={(e) => void add(e)}>
           <input
