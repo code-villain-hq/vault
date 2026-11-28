@@ -2,7 +2,6 @@
 mod cases {
     use super::super::*;
     use crate::config::GithubConfig;
-    use crate::integrations::github::GitHub;
     use crate::{commands::github, git};
     use axum::{extract::Path, http::StatusCode, routing::get, Json, Router};
     use parking_lot::Mutex;
@@ -88,16 +87,29 @@ mod cases {
                         }
                     }),
                 )
-                .route("/replacement/repos/acme/api/pulls", get(|| async { Json(json!([])) }));
+                .route(
+                    "/replacement/repos/acme/api/pulls",
+                    get(|| async {
+                        Json(json!([{
+                            "number": 1, "title": "Merged", "state": "closed", "draft": false,
+                            "merged_at": "2026-11-01T12:00:00Z", "user": {"login": "ana"},
+                            "head": {"ref": "ACME-1", "sha": ""}, "base": {"ref": "main"},
+                            "html_url": "https://gh.example/acme/api/pull/1"
+                        }]))
+                    }),
+                );
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let url = format!("http://{}", listener.local_addr().unwrap());
             let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
-            let dir = std::env::temp_dir().join(format!("vl-ticket-sweep-{}", uuid::Uuid::new_v4()));
-            std::fs::create_dir(&dir).unwrap();
+            let root = std::env::temp_dir().join(format!("vl-ticket-sweep-{}", uuid::Uuid::new_v4()));
+            // The app's own files sit beside the checkout, not in it: one
+            // untracked file there and the task never reads as merged.
+            let dir = root.join("api");
+            std::fs::create_dir_all(&dir).unwrap();
             git::run_for_tests(&dir, &["init", "-q", "-b", "ACME-1"]).unwrap();
             git::run_for_tests(&dir, &["remote", "add", "origin", "git@gh.example:acme/api.git"]).unwrap();
-            let cfg = serde_json::from_value(json!({
-                "github": { "api_url": url, "web_url": url },
+            let mut cfg: crate::config::AppConfig = serde_json::from_value(json!({
+                "github": { "api_url": url, "web_url": "https://gh.example" },
                 "jira": { "base_url": url, "email": "synthetic@example.test", "flow": { "ACME": {
                     "review": { "id":"review", "name":"Review" }, "merged": { "id":"merged", "name":"Merged" }
                 }}},
@@ -106,23 +118,22 @@ mod cases {
                 "checkouts": [{ "id":"c", "task_id":"t", "project_id":"p", "path":dir, "base":"main" }]
             }))
             .unwrap();
-            let state = Arc::new(crate::commands::repos::tests::state(&dir, cfg));
+            // The merge-driven move reads the task's pull requests afresh,
+            // through the source the checkout's origin names.
+            let source = cfg.github.clone().unwrap();
+            let credential = crate::config::github::GithubCredential::new(&source).unwrap();
+            credential.save("gh.example", "synthetic").unwrap();
+            cfg.github_sources.credentials.insert("gh.example".into(), credential);
+            let state = Arc::new(crate::commands::repos::tests::state(&root, cfg));
             let jira = Jira::new(&state.config.read().jira.unwrap(), "synthetic").unwrap();
-            Self { state, jira, remote, server, dir }
+            Self { state, jira, remote, server, dir: root }
         }
 
-        async fn observation(&self) -> github::ConnectedGitHub {
-            let session = self.state.github_session.lock().await;
-            let config = self.state.config.read().github.unwrap();
-            github::ConnectedGitHub {
-                client: GitHub::new(&config, "synthetic").unwrap(),
-                config,
-                generation: session.generation,
-                reviews_generation: session.reviews_generation,
-            }
+        async fn observation(&self) -> github::GitHubGate {
+            github::github_gate(&self.state).await
         }
 
-        async fn reconnect(&self) -> github::ConnectedGitHub {
+        async fn reconnect(&self) -> github::GitHubGate {
             let state = self.state.clone();
             timeout(
                 LIMIT,
@@ -142,7 +153,7 @@ mod cases {
             self.observation().await
         }
 
-        async fn follow(&self, observation: &github::ConnectedGitHub, task: &Task, stage: Stage) -> Option<TicketMove> {
+        async fn follow(&self, observation: &github::GitHubGate, task: &Task, stage: Stage) -> Option<TicketMove> {
             let rows = [match stage {
                 Stage::Review => row("open", false, false, 1),
                 Stage::Merged => row("closed", false, true, 0),
@@ -170,6 +181,11 @@ mod cases {
     impl Drop for Fixture {
         fn drop(&mut self) {
             self.server.abort();
+            if let Some(credential) =
+                self.state.config.with(|c| c.github_sources.credentials.get("gh.example").cloned())
+            {
+                let _ = credential.delete("gh.example");
+            }
             let _ = std::fs::remove_dir_all(&self.dir);
         }
     }
@@ -183,7 +199,7 @@ mod cases {
             fx.pause_at_review().await;
             let current = fx.reconnect().await;
             // An actual PR read and its publication gate are independent of the waiting Jira reply.
-            let rows = timeout(LIMIT, github::task_prs(&fx.state, &current, "t"))
+            let rows = timeout(LIMIT, github::task_prs(&fx.state, "t"))
                 .await
                 .expect("new PR read does not wait on Jira")
                 .unwrap();

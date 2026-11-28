@@ -11,9 +11,9 @@ use crate::git;
 use crate::integrations::github;
 
 use super::diff::RepoResult;
-use super::github::connected_github;
+use super::github_sources::checkout_client;
 use super::slack::{record_post, slack_for};
-use super::tickets::tracker;
+use super::tickets::linked_tracker;
 use super::{off_runtime, AppState};
 
 /// Push and open a PR in every repository that has changes, then post the whole
@@ -31,16 +31,24 @@ pub async fn github_open_prs(
 ) -> Result<Vec<RepoResult>> {
     let task = state.config.task(&task_id)?;
     super::pr_task::not_a_review(&task, "pushed or opened as a pull request")?;
-    let connected = connected_github(&state).await?;
-    let client = connected.client;
-    let tracker = tracker(&state).ok();
-    let body = fixes(tracker.as_ref().map(|t| t.kind()), task.issue_key.as_deref(), body);
+    let gate = super::github::github_gate(&state).await;
+    let tracker = linked_tracker(&state, &task).ok();
+    let kind = state.config.with(|c| c.tracker_in_use());
+    let issue_for = |host: &str| {
+        task.issue_key.as_deref().filter(|key| {
+            crate::tickets::github::parse_key(key).is_none()
+                || (kind == Some(TrackerKind::Github)
+                    && state
+                        .config
+                        .with(|c| c.github_issue_host() == Some(host) && crate::tickets::task_on_tracker(c, &task)))
+        })
+    };
 
     let mut results = Vec::new();
     let mut opened: Vec<github::Sibling> = Vec::new();
     // Every open PR of the task, new or not: one opened earlier does not know
     // about a repo added since.
-    let mut set: Vec<github::Sibling> = Vec::new();
+    let mut set = Vec::new();
 
     // Commit spec once for the task, in the repositories whose committed copy
     // is behind `spec/`, before anything is pushed.
@@ -57,7 +65,18 @@ pub async fn github_open_prs(
             continue;
         }
         let dir = PathBuf::from(&checkout.path);
-        let project = state.config.project(&checkout.project_id)?;
+        let project = match state.config.project(&checkout.project_id) {
+            Ok(project) => project,
+            Err(e) => {
+                results.push(RepoResult {
+                    checkout_id: checkout.id,
+                    repo: checkout.project_id,
+                    ok: false,
+                    detail: e.to_string(),
+                });
+                continue;
+            }
+        };
         let repo = project.name.clone();
         // The spec goes to review with the code (SPEC-35): what Commit spec
         // put in this repository above. One that could not be committed is
@@ -86,10 +105,6 @@ pub async fn github_open_prs(
                 )
             })
         };
-        let slug = {
-            let dir = dir.clone();
-            off_runtime(move || git::origin_slug(&dir)).await?
-        };
         let (mut changed, mut committed) = measure(checkout.base_commit.clone()).await?;
 
         // What the branch has had on GitHub, asked only of a repo with work to
@@ -98,24 +113,39 @@ pub async fn github_open_prs(
         // another was still in review had its finished work opened again.
         let mut open = None;
         let mut merged = None;
-        if changed > 0 && committed {
-            if let Ok((owner, name)) = &slug {
-                let prs = match client.pulls_for_branch(owner, name, &task.branch).await {
-                    Ok(prs) => prs,
-                    Err(e) => {
-                        results.push(RepoResult { checkout_id: checkout.id, repo, ok: false, detail: e.to_string() });
-                        continue;
+        let route = if changed > 0 && committed {
+            match checkout_client(&state, &checkout.path).await {
+                Ok((origin, client)) => {
+                    let (owner, name) = origin.slug();
+                    let prs = match client.pulls_for_branch(owner, name, &task.branch).await {
+                        Ok(prs) => prs,
+                        Err(e) => {
+                            results.push(RepoResult {
+                                checkout_id: checkout.id,
+                                repo,
+                                ok: false,
+                                detail: e.to_string(),
+                            });
+                            continue;
+                        }
+                    };
+                    open = prs.iter().find(|p| p.state == "open").cloned();
+                    if let Some(pr) = super::landed(&prs) {
+                        if let Some(point) = super::advance(&state, &checkout, &pr.head_sha).await? {
+                            (changed, committed) = measure(Some(point)).await?;
+                            merged = Some(pr.number);
+                        }
                     }
-                };
-                open = prs.iter().find(|p| p.state == "open").cloned();
-                if let Some(pr) = super::landed(&prs) {
-                    if let Some(point) = super::advance(&state, &checkout, &pr.head_sha).await? {
-                        (changed, committed) = measure(Some(point)).await?;
-                        merged = Some(pr.number);
-                    }
+                    Some((origin, client))
+                }
+                Err(e) => {
+                    results.push(RepoResult { checkout_id: checkout.id, repo, ok: false, detail: e.to_string() });
+                    continue;
                 }
             }
-        }
+        } else {
+            None
+        };
         if changed == 0 {
             results.push(RepoResult {
                 checkout_id: checkout.id,
@@ -139,6 +169,9 @@ pub async fn github_open_prs(
             });
             continue;
         }
+        let Some((origin, client)) = route else { continue };
+        let issue = issue_for(&origin.host);
+        let pr_body = body_for(kind, issue, task.issue_key.as_deref(), task.issue_url.as_deref(), &body);
 
         // Whether the PR came out of this call or was already there. Only the
         // new ones are announced: an existing PR was posted to the ticket and
@@ -147,30 +180,45 @@ pub async fn github_open_prs(
         let outcome: Result<(github::Sibling, bool)> = async {
             // A push is a network round trip with no timeout of its own; on
             // the async workers it held up the MCP server until git gave up.
-            let (owner, name) = {
-                let (dir, branch, lease) = (dir.clone(), task.branch.clone(), checkout.push_lease.clone());
-                off_runtime(move || git::push(&dir, &branch, lease.as_deref())).await??;
+            {
+                let (dir, branch, lease, expected) =
+                    (dir.clone(), task.branch.clone(), checkout.push_lease.clone(), origin.clone());
+                off_runtime(move || {
+                    git::verify_github_push_origin(&dir, &expected)?;
+                    git::push(&dir, &branch, lease.as_deref())
+                })
+                .await??;
                 // Spent by the push itself, whatever comes after it. Kept
                 // because the slug could not be read, it was sent with every
                 // later push and refused each one as "someone else pushed".
                 super::diff::pushed(&state, &checkout.id);
-                slug?
-            };
+            }
+            let (owner, name) = origin.slug();
 
             let (pr, new) = match open {
                 Some(existing) => (existing, false),
-                None => {
-                    (client.create_pull(&owner, &name, &title, &body, &task.branch, &checkout.base, draft).await?, true)
-                }
+                None => (
+                    client.create_pull(owner, name, &title, &pr_body, &task.branch, &checkout.base, draft).await?,
+                    true,
+                ),
             };
-            Ok((github::Sibling { repo: repo.clone(), owner, name, url: pr.url, number: pr.number }, new))
+            Ok((
+                github::Sibling {
+                    repo: repo.clone(),
+                    owner: owner.into(),
+                    name: name.into(),
+                    url: pr.url,
+                    number: pr.number,
+                },
+                new,
+            ))
         }
         .await;
 
         match outcome {
             Ok((pr, new)) => {
                 results.push(RepoResult {
-                    checkout_id: checkout.id,
+                    checkout_id: checkout.id.clone(),
                     repo,
                     ok: true,
                     detail: if new {
@@ -179,7 +227,7 @@ pub async fn github_open_prs(
                         format!("#{} already open, pushed", pr.number)
                     },
                 });
-                set.push(pr.clone());
+                set.push((checkout.id, origin.host, client, pr.clone()));
                 if new {
                     opened.push(pr);
                 }
@@ -189,13 +237,24 @@ pub async fn github_open_prs(
     }
 
     if !opened.is_empty() && set.len() > 1 {
-        for (repo, e) in client.link_siblings(&set, task.issue_key.as_deref()).await {
-            results.push(RepoResult {
-                checkout_id: repo.clone(),
-                repo,
-                ok: false,
-                detail: format!("the PR is open, but listing the others in it failed ({e})"),
-            });
+        for (checkout, host, client, pr) in &set {
+            let others: Vec<_> = set
+                .iter()
+                .filter(|(_, from, _, sibling)| from == host && sibling.url != pr.url)
+                .map(|(_, _, _, sibling)| sibling)
+                .collect();
+            if others.is_empty() {
+                continue;
+            }
+            let issue = issue_for(host);
+            if let Err(e) = client.list_others(pr, &others, issue).await {
+                results.push(RepoResult {
+                    checkout_id: checkout.clone(),
+                    repo: pr.repo.clone(),
+                    ok: false,
+                    detail: format!("the PR is open, but listing the others in it failed ({e})"),
+                });
+            }
         }
     }
 
@@ -241,7 +300,7 @@ pub async fn github_open_prs(
 
     // What was just opened is the sweep's to follow from now (PR-8).
     let mut session = state.github_session.lock().await;
-    if session.generation == connected.generation {
+    if session.generation == gate.generation {
         session.settled.remove(&task_id);
     }
     Ok(results)
@@ -249,6 +308,41 @@ pub async fn github_open_prs(
 
 /// A pull request for a GitHub issue says it fixes it, which is how GitHub
 /// links the two and closes the issue on merge (TKT-18).
+fn body_for(
+    tracker: Option<TrackerKind>,
+    allowed: Option<&str>,
+    task_issue: Option<&str>,
+    task_url: Option<&str>,
+    body: &str,
+) -> String {
+    if let Some(key) = task_issue.filter(|key| allowed.is_none() && crate::tickets::github::parse_key(key).is_some()) {
+        // The draft model and the agent share a body across repositories.
+        // Prompts alone cannot keep the task's issue reference out of it.
+        let key = key.to_ascii_lowercase();
+        let url = task_url.map(str::to_ascii_lowercase);
+        let short = key.rsplit_once('#').map(|(_, n)| format!("#{n}"));
+        return body
+            .lines()
+            .filter(|line| {
+                let line = line.to_ascii_lowercase();
+                let has = |reference: &str| {
+                    line.match_indices(reference)
+                        .any(|(at, matched)| !line.as_bytes().get(at + matched.len()).is_some_and(u8::is_ascii_digit))
+                };
+                !has(&key)
+                    && !url.as_deref().is_some_and(has)
+                    && !short.as_deref().is_some_and(|short| {
+                        ["close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved"]
+                            .iter()
+                            .any(|verb| has(&format!("{verb} {short}")))
+                    })
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+    fixes(tracker, allowed, body.to_string())
+}
+
 fn fixes(tracker: Option<TrackerKind>, key: Option<&str>, body: String) -> String {
     let Some(key) = key.filter(|_| tracker == Some(TrackerKind::Github)) else {
         return body;
@@ -282,6 +376,19 @@ mod tests {
         // Jira moves its tickets itself, and a task without one fixes nothing.
         assert_eq!(fixes(Some(TrackerKind::Jira), Some("ACME-1"), "x".into()), "x");
         assert_eq!(fixes(gh, None, "x".into()), "x");
+    }
+
+    #[test]
+    fn a_foreign_pr_cannot_publish_the_tasks_issue_from_a_generated_body() {
+        let src = "Summary\n\nIssue: https://git.example.com/acme/web/issues/42\nFIXES Acme/Web#42\nCloses #42\nKeep acme/web#420.";
+        let body = body_for(
+            Some(TrackerKind::Github),
+            None,
+            Some("acme/web#42"),
+            Some("https://git.example.com/acme/web/issues/42"),
+            src,
+        );
+        assert_eq!(body, "Summary\n\nKeep acme/web#420.");
     }
 
     #[test]

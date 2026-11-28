@@ -155,6 +155,7 @@ export function StartWorkDialog({
         suffix || null,
         base.trim() || null,
         epic,
+        issue.url,
         toolset,
         specFirst,
       );

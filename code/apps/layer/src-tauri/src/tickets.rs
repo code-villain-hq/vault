@@ -9,7 +9,7 @@ mod jira;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::config::{AppConfig, JiraConfig, TrackerKind};
+use crate::config::{AppConfig, JiraConfig, Task, TrackerKind};
 use crate::error::{Error, Result};
 use crate::integrations::github::GitHub;
 use crate::integrations::jira::Jira;
@@ -125,9 +125,11 @@ impl Tracker {
             }
             // Code's own connection: nothing more to connect (TKT-17).
             Some(TrackerKind::Github) => {
-                let gh = cfg.github.clone().ok_or(Error::NotConfigured("GitHub"))?;
-                let token = secrets::get(secrets::GITHUB)?.ok_or(Error::NotConfigured("GitHub"))?;
-                Ok(Self::Github(GitHub::new(&gh, &token)?, github::Issues::of(cfg, &gh.web_url)))
+                let source = cfg
+                    .github_issue_host()
+                    .ok_or_else(|| Error::Other("Choose the GitHub Issues source in Settings → Tickets.".into()))?;
+                let (client, gh) = crate::commands::github_sources::client_for(cfg, source)?;
+                Ok(Self::Github(client, github::Issues::of(cfg, &gh.web_url)))
             }
         }
     }
@@ -142,7 +144,7 @@ impl Tracker {
     pub async fn ticket(&self, key: &str) -> Result<Ticket> {
         match self {
             Self::Jira(client, _) => client.issue(key).await,
-            Self::Github(client, _) => github::ticket(client, key).await,
+            Self::Github(client, issues) => github::ticket(client, issues, key).await,
         }
     }
 
@@ -166,7 +168,7 @@ impl Tracker {
     pub async fn by_key(&self, keys: &[String]) -> Result<Vec<Ticket>> {
         match self {
             Self::Jira(client, _) => jira::by_key(client, keys).await,
-            Self::Github(client, _) => github::by_key(client, keys).await,
+            Self::Github(client, issues) => github::by_key(client, issues, keys).await,
         }
     }
 
@@ -221,7 +223,7 @@ impl Tracker {
     pub async fn children(&self, key: &str) -> Result<TicketPage> {
         match self {
             Self::Jira(client, _) => client.children(key, 100).await,
-            Self::Github(client, _) => client.sub_issues(&github::issue(key)?).await,
+            Self::Github(client, issues) => client.sub_issues(&github::in_workspace(issues, key)?).await,
         }
     }
 
@@ -229,7 +231,9 @@ impl Tracker {
     pub async fn put_under(&self, key: &str, parent: &str) -> Result<()> {
         match self {
             Self::Jira(client, _) => client.set_parent(key, parent).await,
-            Self::Github(client, _) => client.put_under(&github::issue(key)?, &github::issue(parent)?).await,
+            Self::Github(client, issues) => {
+                client.put_under(&github::in_workspace(issues, key)?, &github::in_workspace(issues, parent)?).await
+            }
         }
     }
 
@@ -239,14 +243,14 @@ impl Tracker {
     pub async fn take(&self, ticket: &Ticket) -> Result<()> {
         match self {
             Self::Jira(..) => Ok(()),
-            Self::Github(client, _) => github::take(client, ticket).await,
+            Self::Github(client, issues) => github::take(client, issues, ticket).await,
         }
     }
 
     pub async fn comment(&self, key: &str, text: &str) -> Result<()> {
         match self {
             Self::Jira(client, _) => client.comment(key, text).await,
-            Self::Github(client, _) => client.comment_issue(&github::issue(key)?, text).await,
+            Self::Github(client, issues) => client.comment_issue(&github::in_workspace(issues, key)?, text).await,
         }
     }
 }
@@ -255,6 +259,67 @@ impl Tracker {
 pub fn url_of(cfg: &AppConfig, key: &str) -> Option<String> {
     match cfg.tracker_in_use()? {
         TrackerKind::Jira => Some(format!("{}/browse/{key}", cfg.jira.as_ref()?.base_url.trim_end_matches('/'))),
-        TrackerKind::Github => github::url_of(&cfg.github.as_ref()?.web_url, key),
+        TrackerKind::Github => github::url_of(&cfg.github_source(cfg.github_issue_host()?)?.config.web_url, key),
+    }
+}
+
+/// A bare GitHub key is only meaningful within the source where it was
+/// picked. When the workspace chooses another one, the link stays, but an
+/// old task cannot read or change a different issue with the same key.
+pub(crate) fn task_on_tracker(cfg: &AppConfig, task: &Task) -> bool {
+    let Some(key) = task.issue_key.as_deref() else { return false };
+    match cfg.tracker_in_use() {
+        Some(TrackerKind::Jira) => github::parse_key(key).is_none(),
+        Some(TrackerKind::Github) => task.issue_url.as_deref().is_some_and(|url| github_issue_matches(cfg, key, url)),
+        None => false,
+    }
+}
+
+pub(crate) fn github_issue_matches(cfg: &AppConfig, key: &str, url: &str) -> bool {
+    if cfg.tracker_in_use() != Some(TrackerKind::Github) {
+        return false;
+    }
+    let linked = layer_domain::github_address(url).ok();
+    let expected = url_of(cfg, key).and_then(|url| layer_domain::github_address(&url).ok());
+    linked.zip(expected).is_some_and(|(linked, expected)| {
+        linked.origin() == expected.origin()
+            && linked.path().trim_end_matches('/').eq_ignore_ascii_case(expected.path().trim_end_matches('/'))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn switching_github_issues_neither_retargets_old_tasks_nor_falls_back() {
+        let mut cfg: AppConfig = serde_json::from_value(json!({
+            "tracker": "github",
+            "github_sources": {
+                "legacy_host": "github.com",
+                "shared": [
+                    {"api_url": "https://api.github.com", "web_url": "https://github.com"},
+                    {"api_url": "https://git.example.com/api/v3", "web_url": "https://git.example.com"}
+                ]
+            }
+        }))
+        .unwrap();
+        let task: Task = serde_json::from_value(json!({
+            "id": "t", "name": "Old issue", "root": "/w/t", "branch": "42-old",
+            "created_at": "2026-01-01T00:00:00Z", "issue_key": "acme/web#42",
+            "issue_url": "https://github.com/acme/web/issues/42"
+        }))
+        .unwrap();
+        assert!(task_on_tracker(&cfg, &task));
+        cfg.github_issue_source = Some("git.example.com".into());
+        assert!(!task_on_tracker(&cfg, &task));
+        let next = url_of(&cfg, "acme/web#42");
+        assert_eq!(next.as_deref(), Some("https://git.example.com/acme/web/issues/42"));
+        let error = Tracker::connect(&cfg).err().unwrap();
+        assert!(error.to_string().contains("git.example.com"));
+        assert_eq!(task.issue_url.as_deref(), Some("https://github.com/acme/web/issues/42"));
+        cfg.tracker = Some(TrackerKind::Jira);
+        assert!(!task_on_tracker(&cfg, &task));
     }
 }

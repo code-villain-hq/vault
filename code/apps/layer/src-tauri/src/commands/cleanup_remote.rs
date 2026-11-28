@@ -9,17 +9,17 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use futures_util::StreamExt;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::git::{self, OriginBranch};
-use crate::integrations::github::{BranchPr, PrState, PullRequest, MY_PULLS_LIMIT};
+use crate::integrations::github::{BranchPr, GitHub, PrState, PullRequest, MY_PULLS_LIMIT};
 
 use super::cleanup::{in_use, Action, CleanupItem, Planned, Verdict};
-use super::github::github_client;
+use super::github_sources::client_for_repo;
 use super::repos::store_of;
-use super::AppState;
 
 /// How many pull request lookups are in flight at once: GitHub turns away
 /// a burst of concurrent requests as abuse.
@@ -28,10 +28,12 @@ const AT_ONCE: usize = 8;
 /// One repo, as git sees it: the branches on origin no task uses, who
 /// commits here, and where to ask GitHub.
 struct Repo {
+    origin: git::GithubOrigin,
     name: String,
     store: PathBuf,
     base: String,
     slug: (String, String),
+    client: Arc<GitHub>,
     branches: Vec<OriginBranch>,
     me: Option<String>,
     /// The pull requests the copy's review branches came from.
@@ -63,9 +65,11 @@ pub(super) struct Remote {
 /// A branch judged done with, waiting on whether a pull request is open
 /// from it.
 struct Candidate {
+    origin: git::GithubOrigin,
     repo: String,
     store: PathBuf,
     slug: (String, String),
+    client: Arc<GitHub>,
     branch: OriginBranch,
     verdict: Verdict,
     detail: String,
@@ -75,47 +79,47 @@ struct Candidate {
 /// blocked row for each repo GitHub could not be asked about. Nothing
 /// without a GitHub connection: there is nobody to ask.
 pub(super) async fn plan(app: &AppHandle) -> Remote {
-    let Ok((client, cfg)) = github_client(&app.state::<AppState>()).await else { return Remote::default() };
-    let host = |url: &str| git::remote_key(url).split('/').next().unwrap_or_default().to_string();
-    let ours = host(&cfg.web_url);
-
     let looked = super::blocking(app.clone(), move |state| {
         let cfg = state.config.read();
+        if cfg.github_source_list().is_empty() {
+            return Ok((Vec::new(), Vec::new()));
+        }
         let used = in_use(state, &cfg);
         let mut repos = Vec::new();
         let mut out = Vec::new();
         for project in &cfg.projects {
             let Some(store) = store_of(project) else { continue };
-            // Another host's pull requests are not on this GitHub, and a
-            // branch whose open one went unseen would be deleted under it.
-            if git::origin_url(store).is_none_or(|u| host(&u) != ours) {
-                continue;
-            }
-            let found = git::origin_slug(store)
-                .and_then(|slug| Ok((slug, git::origin_branches(store, &project.default_branch)?)));
+            let Ok(mut origin) = git::github_origin(store) else { continue };
+            let display = format!("{} · {}", project.name, origin.host);
+            let found = client_for_repo(&cfg, &origin).and_then(|(client, web)| {
+                origin.web_origin = Some(web);
+                git::verify_github_push_origin(store, &origin)?;
+                Ok((client, git::origin_branches(store, &project.default_branch)?))
+            });
             match found {
-                Ok((slug, branches)) => repos.push(Repo {
-                    name: project.name.clone(),
+                Ok((client, branches)) => repos.push(Repo {
+                    name: display,
                     store: store.to_path_buf(),
                     base: project.default_branch.clone(),
-                    slug,
+                    slug: (origin.owner.clone(), origin.repo.clone()),
+                    origin,
+                    client: Arc::new(client),
                     branches: branches.into_iter().filter(|b| !used.branches.contains(&b.name)).collect(),
                     me: git::user_email(store),
                     reviewed: git::branch_tips(store)
                         .map(|tips| tips.iter().filter_map(|(b, _)| review_number(b)).collect())
                         .unwrap_or_default(),
                 }),
-                Err(e) => out.push(problem(&project.name, store.to_path_buf(), e.to_string())),
+                Err(e) => out.push(problem(&display, store.to_path_buf(), e.to_string())),
             }
         }
         Ok((repos, out))
     })
     .await;
     let Ok((repos, mut out)) = looked else { return Remote::default() };
-    let client = &client;
 
     // Your pull requests, a repo at a time in parallel.
-    let asked = futures_util::future::join_all(repos.iter().map(|r| client.my_pulls(&r.slug.0, &r.slug.1))).await;
+    let asked = futures_util::future::join_all(repos.iter().map(|r| r.client.my_pulls(&r.slug.0, &r.slug.1))).await;
     let mut pulls: HashMap<PathBuf, Pulls> = HashMap::new();
     let mut candidates = Vec::new();
     for (repo, prs) in repos.iter().zip(asked) {
@@ -137,14 +141,16 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
                             ),
                             verdict: Verdict::Blocked,
                         },
-                        action: Action::OriginBranch(repo.store.clone(), String::new(), String::new()),
+                        action: Action::Blocked,
                     });
                 }
                 for (branch, verdict, detail) in judge(&repo.branches, repo.me.as_deref(), &prs, &repo.base) {
                     candidates.push(Candidate {
+                        origin: repo.origin.clone(),
                         repo: repo.name.clone(),
                         store: repo.store.clone(),
                         slug: repo.slug.clone(),
+                        client: Arc::clone(&repo.client),
                         branch: branch.clone(),
                         verdict,
                         detail,
@@ -161,10 +167,10 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
     // among yours, and asked one at a time.
     let mut reviews = Vec::new();
     for r in &repos {
-        reviews.extend(r.reviewed.iter().map(|n| (r.store.clone(), r.slug.clone(), *n)));
+        reviews.extend(r.reviewed.iter().map(|n| (r.store.clone(), r.slug.clone(), Arc::clone(&r.client), *n)));
     }
     let looked_up: Vec<_> =
-        futures_util::stream::iter(reviews.into_iter().map(|(store, (owner, name), n)| async move {
+        futures_util::stream::iter(reviews.into_iter().map(|(store, (owner, name), client, n)| async move {
             let found = client.pull(&owner, &name, n).await;
             (store, n, found)
         }))
@@ -179,7 +185,7 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
     // Anyone's open pull request from a branch keeps it: deleting the branch
     // would close it. Asked per branch, since GitHub filters by head.
     let checked: Vec<(Candidate, _)> = futures_util::stream::iter(candidates.into_iter().map(|c| async move {
-        let open = client.pull_for_branch(&c.slug.0, &c.slug.1, &c.branch.name).await;
+        let open = c.client.pull_for_branch(&c.slug.0, &c.slug.1, &c.branch.name).await;
         (c, open)
     }))
     .buffered(AT_ONCE)
@@ -193,14 +199,22 @@ pub(super) async fn plan(app: &AppHandle) -> Remote {
         };
         out.push(Planned {
             item: CleanupItem {
-                id: format!("origin_branch:{}:{}:{}", c.store.display(), c.branch.name, c.branch.tip),
+                id: format!(
+                    "origin_branch:{}:{}/{}/{}:{}:{}",
+                    c.store.display(),
+                    c.origin.web_origin.as_deref().unwrap_or(&c.origin.host),
+                    c.origin.owner,
+                    c.origin.repo,
+                    c.branch.name,
+                    c.branch.tip,
+                ),
                 kind: "origin_branch",
                 repo: Some(c.repo),
                 title: c.branch.name.clone(),
                 detail,
                 verdict,
             },
-            action: Action::OriginBranch(c.store, c.branch.name, c.branch.tip),
+            action: Action::OriginBranch(c.store, c.branch.name, c.branch.tip, c.origin),
         });
     }
     Remote { planned: out, pulls }
@@ -294,7 +308,7 @@ fn problem(repo: &str, store: PathBuf, detail: String) -> Planned {
             detail,
             verdict: Verdict::Blocked,
         },
-        action: Action::OriginBranch(store, String::new(), String::new()),
+        action: Action::Blocked,
     }
 }
 

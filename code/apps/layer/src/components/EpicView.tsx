@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { taskReview } from "../lib/derive";
 import { openJiraEpic, useEpicViews } from "../lib/epicState";
 import { specProgress, useSpecs } from "../lib/specs";
-import { trackerOfKey } from "../lib/tracker";
+import { issueForTask, trackerOfKey } from "../lib/tracker";
 import type { TaskView } from "../lib/types";
 import { type State, useStore } from "../store";
 import { EpicChat } from "./epic/EpicChat";
@@ -22,7 +22,7 @@ export function EpicMain({ epic }: { epic: TaskView }) {
   const tab = useStore((s) => s.tab);
   const setTab = useStore((s) => s.setTab);
   const prs = useStore((s) => s.prs);
-  const ticket = useStore((s) => s.issues.find((i) => i.key === epic.issue_key));
+  const ticket = useStore((s) => issueForTask(s.issues, epic));
   const view = useEpicViews((s) => s.byEpic[epic.id]);
   const load = useEpicViews((s) => s.load);
   const specBadge = useSpecs((s) => specProgress(s.byTask[epic.id]?.spec ?? null));

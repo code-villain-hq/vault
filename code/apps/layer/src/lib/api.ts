@@ -135,8 +135,8 @@ export const api = {
   renameTag: (tag: string, to: string) => invoke<string>("rename_tag", { tag, to }),
   deleteTag: (tag: string) => invoke<void>("delete_tag", { tag }),
   /** The task for one of your pull requests, made on its branch if there is none (REV-7). */
-  taskForPr: (repo: string, head: string, base: string, title: string) =>
-    invoke<Task>("task_for_pr", { repo, head, base, title }),
+  taskForPr: (repo: string, head: string, base: string, title: string, url: string) =>
+    invoke<Task>("task_for_pr", { repo, head, base, title, url }),
   /** Per repo, the commits a push would send and the leftovers they add (PR-11). */
   taskOutgoing: (taskId: string) => invoke<RepoOutgoing[]>("task_outgoing", { taskId }),
   deleteTask: (id: string, force = false) => invoke<RepoResult[]>("delete_task", { id, force }),
@@ -349,7 +349,8 @@ export const api = {
     order: string,
   ) => invoke<TicketPage>("tickets_find", { text: text || null, whose, includeDone, types, order }),
   ticketPriorities: () => invoke<string[]>("ticket_priorities"),
-  setTracker: (uses: TrackerKind) => invoke<void>("set_tracker", { uses }),
+  setTracker: (uses: TrackerKind, githubSource?: string) =>
+    invoke<void>("set_tracker", { uses, githubSource }),
   ticketsByKey: (keys: string[]) => invoke<Ticket[]>("tickets_by_key", { keys }),
   ticketRequiredFields: (projectKey: string, issueTypeId: string) =>
     invoke<RequiredField[]>("ticket_required_fields", { projectKey, issueTypeId }),
@@ -369,6 +370,7 @@ export const api = {
     branchSuffix?: string | null,
     base?: string | null,
     epic = false,
+    expectedUrl?: string,
     /** The spec toolset the task is made with; none: the app's default. */
     toolset?: string | null,
     /** Tell the agent to write the spec first, for this start (Spec first does it for every one). */
@@ -381,6 +383,7 @@ export const api = {
       branchSuffix: branchSuffix ?? null,
       base: base ?? null,
       epic,
+      expectedUrl,
       toolset: toolset ?? null,
       writeSpec,
     }),
@@ -402,8 +405,13 @@ export const api = {
     invoke<StartedSubTask>("start_sub_task", { taskId, agentId, anyway }),
 
   // github
-  githubConnect: (apiUrl: string, webUrl: string, token: string, reviewTeam: string | null) =>
-    invoke<string>("github_connect", { apiUrl, webUrl, token, reviewTeam }),
+  githubConnect: (
+    apiUrl: string,
+    webUrl: string,
+    token: string,
+    reviewTeam: string | null,
+    source: string | null,
+  ) => invoke<string>("github_connect", { apiUrl, webUrl, token, reviewTeam, source }),
   githubReviewQueue: () => invoke<ReviewQueue>("github_review_queue"),
   githubReviewPrDetails: (repo: string, number: number, url: string) =>
     invoke<ReviewPrDetails>("github_review_pr_details", { repo, number, url }),
@@ -415,10 +423,11 @@ export const api = {
     invoke<void>("set_checkout_base", { checkoutId, base }),
   taskBranchFacts: (taskId: string) => invoke<RepoBranchFacts[]>("task_branch_facts", { taskId }),
   checkoutBranches: (checkoutId: string) => invoke<string[]>("checkout_branches", { checkoutId }),
-  githubRetargetPr: (checkoutId: string) => invoke<string>("github_retarget_pr", { checkoutId }),
+  githubRetargetPr: (checkoutId: string, expectedUrl: string) =>
+    invoke<string>("github_retarget_pr", { checkoutId, expectedUrl }),
   /** Whether the PR is a draft afterwards (PR-15). */
-  githubSetPrDraft: (checkoutId: string, number: number, draft: boolean) =>
-    invoke<boolean>("github_set_pr_draft", { checkoutId, number, draft }),
+  githubSetPrDraft: (checkoutId: string, number: number, draft: boolean, expectedUrl: string) =>
+    invoke<boolean>("github_set_pr_draft", { checkoutId, number, draft, expectedUrl }),
   /** `skip`: checkout ids left out of this call, neither pushed nor opened. */
   githubOpenPrs: (taskId: string, title: string, body: string, draft: boolean, skip: string[]) =>
     invoke<RepoResult[]>("github_open_prs", { taskId, title, body, draft, skip }),
@@ -426,7 +435,12 @@ export const api = {
   showPrImages: (taskId: string, images: DraftImage[]) =>
     invoke<RepoResult[]>("show_pr_images", {
       taskId,
-      images: images.map(({ path, caption, repo }) => ({ path, caption, repo })),
+      images: images.map(({ path, caption, repo, checkout_id }) => ({
+        path,
+        caption,
+        repo,
+        checkout_id,
+      })),
     }),
   /** Screenshots an agent offered with `pr_images`, waiting for the user (PR-13). */
   prImageOffer: (taskId: string) => invoke<PrImageOffer | null>("pr_image_offer", { taskId }),
@@ -521,8 +535,8 @@ export const api = {
   setSpecFirst: (on: boolean) => invoke<void>("set_spec_first", { on }),
   setWorktreeRoot: (path: string | null) => invoke<void>("set_worktree_root", { path }),
   setUiPrefs: (ui: UiPrefs) => invoke<void>("set_ui_prefs", { ui }),
-  disconnect: (which: "jira" | "github" | "slack" | "grafana") =>
-    invoke<void>("disconnect", { which }),
+  disconnect: (which: "jira" | "github" | "slack" | "grafana", source?: string) =>
+    invoke<void>("disconnect", { which, source }),
   cursorIdeInstalled: () => invoke<boolean>("cursor_ide_installed"),
   openInCursor: (path: string) => invoke<void>("open_in_cursor", { path }),
 

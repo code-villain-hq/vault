@@ -18,19 +18,45 @@ pub(crate) fn tracker(state: &AppState) -> Result<Tracker> {
     state.config.with(Tracker::connect)
 }
 
+pub(crate) fn linked_tracker(state: &AppState, task: &Task) -> Result<Tracker> {
+    state.config.with(|cfg| {
+        if !crate::tickets::task_on_tracker(cfg, task) {
+            return Err(Error::Other("This task's ticket is not on the selected issue tracker.".into()));
+        }
+        Tracker::connect(cfg)
+    })
+}
+
 /// Choose where the workspace's tickets come from (TKT-15). Admins only:
 /// it is the workspace's, the same for everyone in it. Tasks keep the
 /// tickets they have (TKT-16); the cached types were the old tracker's.
 #[tauri::command]
-pub fn set_tracker(state: State<AppState>, uses: TrackerKind) -> Result<()> {
+pub fn set_tracker(state: State<AppState>, uses: TrackerKind, github_source: Option<String>) -> Result<()> {
     state.config.update(|c| {
         if c.shared.workspace.as_ref().is_some_and(|w| !w.is_admin()) {
             return Err(Error::Other("only the workspace's admins choose its tracker".into()));
         }
+        let selected = if uses == TrackerKind::Github {
+            if let Some(key) = github_source {
+                if !c.github_source(&key).is_some_and(|g| g.shared) {
+                    return Err(Error::Other("Choose a GitHub source shared by this workspace.".into()));
+                }
+                Some(key)
+            } else if let Some(host) = c.github_issue_host() {
+                Some(host.to_string())
+            } else {
+                let shared: Vec<_> = c.github_source_list().into_iter().filter(|g| g.shared).collect();
+                (shared.len() == 1).then(|| shared[0].key.clone())
+            }
+        } else {
+            None
+        };
         c.tracker = Some(uses);
+        c.github_issue_source = selected;
         Ok(())
     })??;
     *state.ticket_types.lock() = None;
+    state.news.forget_tickets();
     Ok(())
 }
 
@@ -195,6 +221,7 @@ pub async fn start_work_on_ticket(
     branch_suffix: Option<String>,
     base: Option<String>,
     epic: Option<bool>,
+    expected_url: Option<String>,
     toolset: Option<String>,
     write_spec: Option<bool>,
 ) -> Result<Started> {
@@ -203,7 +230,11 @@ pub async fn start_work_on_ticket(
     // twice and fail deep inside git. Unless a suffix asks for a distinct
     // branch, point at what already exists.
     if branch_suffix.as_deref().unwrap_or_default().trim().is_empty() {
-        if let Some(existing) = state.config.read().tasks.iter().find(|t| t.issue_key.as_deref() == Some(key.as_str()))
+        let cfg = state.config.read();
+        if let Some(existing) = cfg
+            .tasks
+            .iter()
+            .find(|t| t.issue_key.as_deref() == Some(key.as_str()) && crate::tickets::task_on_tracker(&cfg, t))
         {
             return Err(Error::Other(format!(
                 "{key} already has a task on branch {}. Open that one, or pass a \
@@ -213,7 +244,19 @@ pub async fn start_work_on_ticket(
         }
     }
 
-    let tracker = tracker(&state)?;
+    let tracker = state.config.with(|cfg| {
+        if let Some(url) = expected_url.as_deref() {
+            let github = crate::tickets::github::parse_key(&key).is_some();
+            if (github || cfg.tracker_in_use() == Some(TrackerKind::Github))
+                && !crate::tickets::github_issue_matches(cfg, &key, url)
+            {
+                return Err(Error::Other(
+                    "This ticket is not on the selected issue source. Refresh Tickets and try again.".into(),
+                ));
+            }
+        }
+        Tracker::connect(cfg)
+    })?;
     let issue = tracker.ticket(&key).await?;
 
     let new = NewTask {

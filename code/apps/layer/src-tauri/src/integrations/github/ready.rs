@@ -12,11 +12,20 @@ use crate::error::{Error, Result};
 impl GitHub {
     /// Make pull request `number` a draft, or ready for review. Returns
     /// whether it is a draft now.
-    pub async fn set_pull_draft(&self, owner: &str, repo: &str, number: u64, draft: bool) -> Result<bool> {
+    pub async fn set_pull_draft(
+        &self,
+        owner: &str,
+        repo: &str,
+        number: u64,
+        draft: bool,
+        expected_url: &str,
+    ) -> Result<bool> {
         const ID: &str = "query($owner: String!, $name: String!, $number: Int!) {
-          repository(owner: $owner, name: $name) { pullRequest(number: $number) { id } }
+          repository(owner: $owner, name: $name) { pullRequest(number: $number) { id url } }
         }";
         let v = self.graphql(ID, json!({ "owner": owner, "name": repo, "number": number })).await?;
+        let url = answer(&v, "/data/repository/pullRequest/url")?.as_str().unwrap_or_default();
+        crate::commands::github_sources::verify_pull_url(expected_url, url)?;
         let id = answer(&v, "/data/repository/pullRequest/id")?
             .as_str()
             .ok_or_else(|| Error::Other(format!("GitHub has no pull request #{number} in {owner}/{repo}")))?

@@ -198,7 +198,7 @@ test.each(["api_url", "web_url"] as const)(
       return oldRows;
     };
     api.githubAllPrs = () => oldSweep.promise;
-    const empty: ReviewQueue = { mine: [], mine_more: false, team: null, authored: null };
+    const empty: ReviewQueue = { sources: [] };
     api.githubReviewQueue = async () => reviews;
     api.addMessage = async () => 1;
     await store.refreshTaskPrs("previous-host");
@@ -210,7 +210,10 @@ test.each(["api_url", "web_url"] as const)(
     const queue = store.refreshReviewQueue();
     api.getSettings = async () => ({
       ...store.settings!,
-      github: { ...store.settings!.github!, [host]: "https://github.example.test" },
+      github_sources: store.settings!.github_sources.map((g) => ({
+        ...g,
+        [host]: "https://github.example.test",
+      })),
     });
     api.githubReviewQueue = async () => empty;
     await store.refreshSettings();
@@ -234,7 +237,7 @@ test.each(["api_url", "web_url"] as const)(
     const results = await Promise.allSettled([manual, manualError, sweep, queue]);
     expect(switched.prs).toEqual({});
     expect(switched.prReadRevision).toEqual({});
-    expect(switched.reviewQueue?.mine).toEqual([]);
+    expect(switched.reviewQueue?.sources).toEqual([]);
     expect(results.map((r) => r.status)).toEqual([
       "fulfilled",
       "fulfilled",
@@ -242,7 +245,7 @@ test.each(["api_url", "web_url"] as const)(
       "fulfilled",
     ]);
     expect(savedState().prs).toEqual({});
-    expect(savedState().reviewQueue?.mine).toEqual([]);
+    expect(savedState().reviewQueue?.sources).toEqual([]);
     expect(savedState().failure).toBeNull();
   },
 );
@@ -302,7 +305,10 @@ test("review team metadata keeps task snapshots and their in-flight reads", asyn
   api.githubReviewQueue = async () => reviews;
   api.getSettings = async () => ({
     ...store.settings!,
-    github: { ...store.settings!.github!, review_team: "acme/backend" },
+    github_sources: store.settings!.github_sources.map((g) => ({
+      ...g,
+      review_team: "acme/backend",
+    })),
   });
   const inFlight = store.refreshTaskPrs("team-change-task");
   await store.refreshSettings();

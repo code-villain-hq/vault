@@ -125,8 +125,11 @@ mod cases {
         }
 
         async fn save(&self, token: &str, team: Option<&str>) {
+            let state = self.app.state::<AppState>();
+            let source = state.config.with(|c| c.github_source("gh.example")).map(|g| g.key);
             github_connect(
                 self.app.handle().clone(),
+                source,
                 self.api.clone(),
                 "https://gh.example".into(),
                 token.into(),
@@ -138,15 +141,15 @@ mod cases {
 
         async fn review(&self) -> Result<ReviewQueue> {
             let state = self.app.state::<AppState>();
-            let connected = connected_github(&state).await?;
-            let queue = review_queue(&state, &connected).await?;
+            let connected = github_gate(&state).await;
+            let queue = review_queue(&state, &connected, false).await?;
             crate::news::saw_reviews(self.app.handle().clone(), connected.reviews_generation, queue).await
         }
 
         async fn deferred_banner(&self) -> (crate::commands::SubmitBanner, String) {
             let state = self.app.state::<AppState>();
-            let connected = connected_github(&state).await.unwrap();
-            let queue = review_queue(&state, &connected).await.unwrap();
+            let connected = github_gate(&state).await;
+            let queue = review_queue(&state, &connected, false).await.unwrap();
             let (tx, rx) = tokio::sync::oneshot::channel();
             crate::news::saw_reviews_with(
                 self.app.handle().clone(),
@@ -163,7 +166,11 @@ mod cases {
     impl Drop for Fixture {
         fn drop(&mut self) {
             self.server.abort();
-            let _ = secrets::delete(secrets::GITHUB);
+            let credential =
+                self.app.state::<AppState>().config.with(|c| c.github_sources.credentials.get("gh.example").cloned());
+            if let Some(credential) = credential {
+                let _ = credential.delete("gh.example");
+            }
             let _ = std::fs::remove_dir_all(&self.dir);
         }
     }
@@ -195,7 +202,7 @@ mod cases {
 
         let items = fx.app.state::<AppState>().messages.list();
         let targets: Vec<_> = items.iter().filter_map(|item| item.target.as_deref()).collect();
-        assert_eq!(targets, ["review:acme/api#3"], "only a later arrival on the new connection is news");
+        assert_eq!(targets, ["review:gh.example/acme/api#3"], "only a later arrival on the new connection is news");
     }
 
     #[tokio::test]
@@ -204,18 +211,18 @@ mod cases {
         let fx = Fixture::new().await;
         let state = fx.app.state::<AppState>();
         fx.connect("synthetic-old").await;
-        let old = connected_github(&state).await.unwrap();
-        let rows = task_prs(&state, &old, "t").await.unwrap();
+        let old = github_gate(&state).await;
+        let rows = task_prs(&state, "t").await.unwrap();
         assert!(rows[0].pr.as_ref().unwrap().merged);
         assert!(sweep_ids(&state, &old, None).await.is_empty(), "same-connection merge keeps the normal pacing");
 
         fx.paused.hold_old.store(true, Ordering::SeqCst);
-        let (late, (first_sweep, new)) = tokio::join!(task_prs(&state, &old, "t"), async {
+        let (late, (first_sweep, new)) = tokio::join!(task_prs(&state, "t"), async {
             fx.paused.wait_started().await;
             fx.connect("synthetic-new").await;
-            let new = connected_github(&state).await.unwrap();
+            let new = github_gate(&state).await;
             let due = sweep_ids(&state, &new, None).await;
-            assert!(task_prs(&state, &new, "t").await.unwrap()[0].pr.is_none());
+            assert!(task_prs(&state, "t").await.unwrap()[0].pr.is_none());
             fx.paused.release.notify_one();
             (due, new)
         });
@@ -233,8 +240,8 @@ mod cases {
         let fx = Fixture::new().await;
         let state = fx.app.state::<AppState>();
         fx.connect("synthetic-old").await;
-        let connected = connected_github(&state).await.unwrap();
-        let rows = task_prs(&state, &connected, "t").await.unwrap();
+        let connected = github_gate(&state).await;
+        let rows = task_prs(&state, "t").await.unwrap();
         assert!(rows[0].pr.as_ref().unwrap().merged);
         assert!(
             sweep_ids(&state, &connected, None).await.is_empty(),
@@ -282,12 +289,16 @@ mod cases {
         fx.review().await.unwrap();
 
         fx.save("", Some("acme/devs")).await;
-        let team = fx.review().await.unwrap().team.unwrap();
+        let team = fx.review().await.unwrap().sources.remove(0).team.unwrap();
         assert_eq!(team.slug, "acme/devs");
         assert_eq!(team.prs[0].number, 4);
         let items = fx.app.state::<AppState>().messages.list();
         let targets: Vec<_> = items.iter().filter_map(|item| item.target.as_deref()).collect();
-        assert_eq!(targets, ["review:acme/api#3"], "the new team primes quietly without forgetting personal requests");
+        assert_eq!(
+            targets,
+            ["review:gh.example/acme/api#3"],
+            "the new team primes quietly without forgetting personal requests"
+        );
     }
 
     #[tokio::test]
@@ -297,7 +308,7 @@ mod cases {
         fx.connect("synthetic-old").await;
         fx.review().await.unwrap();
         let (old, old_target) = fx.deferred_banner().await;
-        assert_eq!(old_target, "review:acme/api#5");
+        assert_eq!(old_target, "review:gh.example/acme/api#5");
 
         fx.connect("synthetic-new").await;
         fx.review().await.unwrap();
@@ -310,7 +321,7 @@ mod cases {
 
         assert_eq!(
             *posted.lock().unwrap(),
-            ["review:acme/api#3"],
+            ["review:gh.example/acme/api#3"],
             "only the active generation reaches native delivery"
         );
     }

@@ -2,7 +2,7 @@ import type { TrackerKind } from "@layer/types";
 import type { SavedSignIn } from "./types-browser";
 import type { HenchmanAgent } from "./types-henchman";
 import type {
-  GithubConfig,
+  GithubSource,
   GrafanaConfig,
   JiraConfig,
   LogSource,
@@ -34,6 +34,8 @@ export interface Project {
   /** The toolset Start work offers here, and what Commit spec puts here (`none`: the app keeps it, SPEC-28). */
   spec_toolset?: string | null;
   spec_commit?: SpecCommit;
+  /** Host-qualified registered origin, or a local path. */
+  remote?: string | null;
 }
 
 /** How a registered repository is doing (REPO-5). */
@@ -488,7 +490,9 @@ export interface UiPrefs {
 export interface Settings extends SpecSettings {
   ui: UiPrefs;
   jira: JiraConfig | null;
-  github: GithubConfig | null;
+  github_sources: GithubSource[];
+  github_legacy_host: string | null;
+  github_issue_source: string | null;
   slack: SlackConfig | null;
   grafana: GrafanaConfig | null;
   slack_bot: SlackBotConfig | null;
@@ -524,7 +528,7 @@ export interface Settings extends SpecSettings {
   workspace: WorkspaceView | null;
 }
 
-export type ConnectionKind = "jira" | "github" | "slack" | "grafana" | "tracker";
+export type ConnectionKind = "jira" | "github" | "github_sources" | "slack" | "grafana" | "tracker";
 
 /** Settings' workspace (SET-7): who changes its connections, and what they say. */
 export interface WorkspaceView {

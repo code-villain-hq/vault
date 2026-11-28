@@ -18,6 +18,7 @@ const THREAD_LIMIT: usize = 100;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AuthoredPr {
+    pub source: String,
     /// `owner/name`.
     pub repo: String,
     pub number: u64,
@@ -154,6 +155,7 @@ fn to_authored(v: &Value) -> Option<AuthoredPr> {
         .count() as u32;
 
     Some(AuthoredPr {
+        source: String::new(),
         repo: text("/repository/nameWithOwner"),
         number,
         title: text("/title"),

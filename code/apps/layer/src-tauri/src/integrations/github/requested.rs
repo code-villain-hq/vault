@@ -23,6 +23,7 @@ const REQUESTED_LIMIT: usize = 100;
 /// has checked out.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
 pub struct ReviewRequest {
+    pub source: String,
     /// `owner/name` of the repository it merges into.
     pub repo: String,
     pub number: u64,
@@ -151,6 +152,7 @@ fn to_requested(v: &Value) -> Option<ReviewRequest> {
         my_review != "none" && matches!(reviewed_at, Some(oid) if !head_sha.is_empty() && oid != head_sha);
 
     Some(ReviewRequest {
+        source: String::new(),
         repo: text("/repository/nameWithOwner"),
         number,
         title: text("/title"),

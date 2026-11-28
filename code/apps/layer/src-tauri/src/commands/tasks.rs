@@ -788,7 +788,23 @@ pub async fn finish_task(
     transition_id: Option<String>,
     landed: std::collections::HashMap<String, String>,
 ) -> Result<Finished> {
-    let task = app.state::<AppState>().config.task(&task_id)?;
+    let state = app.state::<AppState>();
+    let task = state.config.task(&task_id)?;
+    // A cached PR card can predate a disconnect or an origin change.
+    // Never use it as proof that the current source has landed the work.
+    let landed = if state.config.with(|c| !c.github_source_list().is_empty()) {
+        let current = super::finish_tool::merged_heads(&state, &task_id).await?;
+        if landed.iter().any(|(id, head)| current.get(id) != Some(head)) {
+            return Err(Error::Other("The merged pull requests changed. Refresh before finishing.".into()));
+        }
+        current
+    } else if landed.is_empty() {
+        landed
+    } else {
+        return Err(Error::Other(
+            "The GitHub source for these pull requests is not connected. Refresh before finishing.".into(),
+        ));
+    };
     let (repos, branches) = {
         let (task_id, branch) = (task_id.clone(), task.branch.clone());
         super::blocking(app.clone(), move |state| {
@@ -849,7 +865,8 @@ pub async fn finish_task(
     if finished.repos.iter().any(|r| !r.ok) {
         return Ok(finished);
     }
-    if let (Some(id), Some(key)) = (transition_id, task.issue_key.as_deref()) {
+    let key = task.issue_key.as_deref().filter(|_| state.config.with(|c| crate::tickets::task_on_tracker(c, &task)));
+    if let (Some(id), Some(key)) = (transition_id, key) {
         let state = app.state::<AppState>();
         let moved = match super::jira::jira_client(&state) {
             Ok((client, _)) => client.transition(key, &id).await,

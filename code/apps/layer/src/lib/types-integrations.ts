@@ -21,6 +21,14 @@ export interface GithubConfig {
   review_team: string | null;
 }
 
+/** One GitHub host, as Settings → Code lists it (PR-19). */
+export interface GithubSource extends GithubConfig {
+  key: string;
+  shared: boolean;
+  status: "connected" | "disconnected" | "reconnect_required";
+  revision: string | null;
+}
+
 export interface SlackConfig {
   channel: string;
   enabled: boolean;

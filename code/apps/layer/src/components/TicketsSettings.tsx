@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { taskUsesTracker } from "../lib/tracker";
 import { useStore } from "../store";
 import {
   ChangeRow,
@@ -15,7 +16,7 @@ import {
 } from "./SharedSettings";
 import { TicketFlowSettings } from "./TicketFlow";
 import { TrackerChoice } from "./TrackerChoice";
-import { ErrorMessage, Field, useFailure } from "./ui";
+import { Confirm, ErrorMessage, Field, useFailure } from "./ui";
 
 const ATLASSIAN_TOKENS = "https://id.atlassian.com/manage-profile/security/api-tokens";
 
@@ -30,23 +31,7 @@ export function TicketsSettings({ toCode }: { toCode: () => void }) {
     <>
       <TrackerChoice />
       {settings?.tracker_chosen === "github" ? (
-        <>
-          <p className="muted">
-            Issues come from the workspace's repositories on GitHub: the open ones assigned to you,
-            each started as a task, and closed when its pull request merges. They use the token
-            under Code.
-          </p>
-          {settings.github_connected ? (
-            <div className="row">
-              <span className="ui-status">connected</span>
-              <span className="muted">{settings.github?.web_url}</span>
-            </div>
-          ) : (
-            <button className="ui-button ui-button-primary" onClick={toCode}>
-              Connect GitHub
-            </button>
-          )}
-        </>
+        <GithubIssuesSettings toCode={toCode} />
       ) : (
         <JiraSettings />
       )}
@@ -54,6 +39,86 @@ export function TicketsSettings({ toCode }: { toCode: () => void }) {
   );
 }
 
+function GithubIssuesSettings({ toCode }: { toCode: () => void }) {
+  const settings = useStore((s) => s.settings);
+  const tasks = useStore((s) => s.tasks);
+  const refresh = useStore((s) => s.refreshSettings);
+  const workspace = useWorkspace();
+  const failure = useFailure();
+  const [confirm, setConfirm] = useState<string | null>(null);
+  if (!settings) return null;
+  const here = settings;
+  const selected = here.github_issue_source;
+  const sources = here.github_sources.filter((g) => g.shared);
+  const live = here.github_sources.find((g) => g.key === selected)?.status === "connected";
+  const keeping = selected ? tasks.filter((t) => taskUsesTracker(here, t)).length : 0;
+  async function choose(source: string) {
+    failure.clear();
+    try {
+      await api.setTracker("github", source);
+      await refresh();
+      setConfirm(null);
+    } catch (error) {
+      failure.fail(error);
+    }
+  }
+  return (
+    <>
+      <p className="muted">
+        Tickets use one GitHub source. Other connected hosts still provide pull requests and
+        reviews.
+      </p>
+      <Field
+        label="GitHub Issues source"
+        hint={workspace?.admin === false ? "Admins change this for the workspace." : undefined}
+      >
+        {workspace?.admin === false ? (
+          <span>{selected ?? "Not selected"}</span>
+        ) : (
+          <select
+            className="ui-field"
+            value={selected ?? ""}
+            onChange={(event) => {
+              const source = event.target.value;
+              if (keeping > 0) setConfirm(source);
+              else void choose(source);
+            }}
+          >
+            <option value="" disabled>
+              Choose a source
+            </option>
+            {selected && !sources.some((s) => s.key === selected) && (
+              <option value={selected} disabled>
+                {selected} (unavailable)
+              </option>
+            )}
+            {sources.map((source) => (
+              <option key={source.key} value={source.key}>
+                {source.key}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      {!live && (
+        <button className="ui-button ui-button-primary" onClick={toCode}>
+          {selected ? `Connect ${selected}` : "Manage GitHub sources"}
+        </button>
+      )}
+      {confirm && (
+        <Confirm
+          title={`Take tickets from ${confirm}?`}
+          body={`${keeping} existing task${keeping === 1 ? "" : "s"} will keep the original ticket link. Layer will no longer read or move those tickets.`}
+          confirmLabel={`Use ${confirm}`}
+          danger={false}
+          onConfirm={() => choose(confirm)}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      <ErrorMessage>{failure.error}</ErrorMessage>
+    </>
+  );
+}
 /**
  * Jira's connection, and how tickets follow the work once connected.
  * Connected, the connection is text, and its form opens behind Change…

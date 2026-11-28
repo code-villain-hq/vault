@@ -130,6 +130,7 @@ mod epic_tools;
 mod epics;
 mod finish_tool;
 mod github;
+pub(crate) mod github_sources;
 mod grafana;
 mod henchman;
 mod henchman_feed;

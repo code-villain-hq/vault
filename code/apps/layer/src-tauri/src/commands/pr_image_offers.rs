@@ -77,6 +77,7 @@ mod tests {
         let night = dir.join("night.png");
         std::fs::write(&night, b"\x89PNG\r\n\x1a\nnight").unwrap();
         let image = |p: &Path, caption: &str| DraftImage {
+            checkout_id: None,
             path: p.to_string_lossy().into_owned(),
             caption: caption.into(),
             repo: Some("web".into()),

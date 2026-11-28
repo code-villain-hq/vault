@@ -68,7 +68,9 @@ pub async fn finish_call(app: &AppHandle, args: Value, caller: Option<&str>) -> 
     let wanted = args.get("transition").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
     let ticket = match (
         task.issue_key.as_deref(),
-        state.config.with(|c| c.tracker_in_use() == Some(crate::config::TrackerKind::Jira)),
+        state.config.with(|c| {
+            c.tracker_in_use() == Some(crate::config::TrackerKind::Jira) && crate::tickets::task_on_tracker(c, &task)
+        }),
     ) {
         (Some(key), true) => Some((key.to_string(), closing(&state, key, wanted).await?)),
         _ if wanted.is_some() => {
@@ -109,12 +111,18 @@ pub async fn finish_call(app: &AppHandle, args: Value, caller: Option<&str>) -> 
 /// Each checkout's merged pull request head, as the dialog passes it. A
 /// branch with no merged PR covering it is kept, so without GitHub every
 /// branch with work on it is.
-async fn merged_heads(state: &AppState, task_id: &str) -> Result<HashMap<String, String>> {
-    if !state.config.with(|c| c.github.is_some()) {
+pub(super) async fn merged_heads(state: &AppState, task_id: &str) -> Result<HashMap<String, String>> {
+    if !state.config.with(|c| !c.github_source_list().is_empty()) {
         return Ok(HashMap::new());
     }
-    let connected = super::github::connected_github(state).await?;
-    let rows = super::github::task_prs(state, &connected, task_id).await?;
+    let rows = super::github::read_task_prs(state, task_id, true).await?;
+    if let Some(row) = rows.iter().find(|r| r.error.is_some()) {
+        return Err(Error::Other(format!(
+            "Couldn't verify {}'s pull request: {}. Nothing was changed.",
+            row.repo,
+            row.error.as_deref().unwrap_or_default()
+        )));
+    }
     if let Some(open) = rows.iter().find(|r| r.pr.as_ref().is_some_and(|p| p.state == "open")) {
         let number = open.pr.as_ref().map(|p| p.number).unwrap_or_default();
         return Err(Error::Other(format!(

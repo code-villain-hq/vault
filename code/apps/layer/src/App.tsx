@@ -239,7 +239,7 @@ function TaskMain({ task }: { task: TaskView }) {
   const cursorIde = useStore((s) => s.cursorIde);
   const fail = useStore((s) => s.fail);
   // Where the board has it, from your ticket list: in step with the work or not.
-  const ticket = useStore((s) => s.issues.find((i) => i.key === task.issue_key));
+  const ticket = useStore((s) => issueForTask(s.issues, task));
   // The Agents badge counts what is open now. The task's own count comes
   // from the task poll, which can be a minute behind a pane just opened.
   const paneCount = useStore((s) => s.panes.filter((p) => p.task_id === task.id).length);
@@ -450,6 +450,10 @@ function Shell() {
   const opening = useStore((s) => s.opening);
   const view = useStore((s) => s.view);
   const settingsOpen = useStore((s) => s.settingsOpen);
+  const ticketScope = useStore(
+    (s) =>
+      `${s.settings?.tracker_chosen ?? ""}:${s.settings?.github_issue_source ?? ""}:${s.settings?.tracker ?? ""}`,
+  );
   const sidebarHidden = useStore((s) => s.sidebarHidden);
   const scale = useStore((s) => s.settings?.ui.scale ?? 1);
 
@@ -482,7 +486,7 @@ function Shell() {
         )}
 
         {view === "henchman" && <HenchmanView />}
-        {view === "tickets" && <TicketsView />}
+        {view === "tickets" && <TicketsView key={ticketScope} />}
         {view === "reviews" && <ReviewsView />}
         {view === "chat" && <ChatView />}
         {view === "routines" && <RoutinesView />}
@@ -495,3 +499,4 @@ function Shell() {
     </div>
   );
 }
+import { issueForTask } from "./lib/tracker";

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 
 mod browser;
+pub(crate) mod github;
 mod henchman;
 mod integrations;
 pub mod item_details;
@@ -38,7 +39,8 @@ pub use ui::UiPrefs;
 /// 3: the shared setup is kept in a workspace (§25), `shared` says which.
 /// 4: a repository's check command runs only once confirmed on this Mac
 /// (`Project::check_approved`, LOOP-1).
-pub const SCHEMA_VERSION: u32 = 4;
+/// 5: GitHub credentials are bound to each source and its original API origin.
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// One ticket's worth of work, spanning one or more repositories.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,6 +276,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub github: Option<GithubConfig>,
     #[serde(default)]
+    pub(crate) github_sources: github::GithubSources,
+    #[serde(default)]
     pub slack: Option<SlackConfig>,
     #[serde(default)]
     pub grafana: Option<GrafanaConfig>,
@@ -281,6 +285,8 @@ pub struct AppConfig {
     /// connection says (TKT-15). Read through `tracker_in_use`.
     #[serde(default)]
     pub tracker: Option<TrackerKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) github_issue_source: Option<String>,
     /// Logs in S3 agents read (OBS-9).
     #[serde(default)]
     pub log_sources: Vec<LogSource>,
@@ -345,6 +351,9 @@ impl AppConfig {
             for p in &mut self.projects {
                 p.check_approved = p.check.clone();
             }
+        }
+        if from < 5 {
+            self.migrate_github();
         }
         if self.workspaces.is_empty() {
             return bumped;
@@ -716,6 +725,29 @@ mod tests {
         let mut cfg: AppConfig = serde_json::from_str(r#"{"version":99}"#).unwrap();
         assert!(!cfg.migrate());
         assert_eq!(cfg.version, 99);
+    }
+
+    #[test]
+    fn a_legacy_github_credential_keeps_its_original_origin_after_upgrade() {
+        let mut cfg: AppConfig = serde_json::from_value(serde_json::json!({
+            "version": 4,
+            "github": {
+                "api_url": "https://Git.example.com:443/api/v3",
+                "web_url": "https://git.example.com",
+                "review_team": "acme/reviewers"
+            }
+        }))
+        .unwrap();
+        assert!(cfg.migrate());
+        assert!(!cfg.migrate());
+        let replacement = serde_json::json!({
+            "api_url": "https://different.example.com/api/v3", "web_url": "https://git.example.com",
+        });
+        shared::take_held(&mut cfg, "github", &replacement, true);
+        let saved = serde_json::to_value(cfg).unwrap();
+        assert_eq!(saved["github"]["api_url"], replacement["api_url"]);
+        assert_eq!(saved["github_sources"]["credentials"]["git.example.com"]["origin"], "https://git.example.com");
+        assert_eq!(saved["github_sources"]["legacy_host"], "git.example.com");
     }
 
     #[test]

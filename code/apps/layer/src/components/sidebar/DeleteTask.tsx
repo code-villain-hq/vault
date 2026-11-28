@@ -25,7 +25,7 @@ export function DeleteTask({
 }) {
   const settings = useStore((s) => s.settings);
   const rows = useStore((s) => s.prs[task.id]);
-  const issue = useStore((s) => s.issues.find((i) => i.key === task.issue_key));
+  const issue = useStore((s) => issueForTask(s.issues, task));
   // They keep the epic in the list while they sit under its ticket (EPIC-13).
   const subs = useStore((s) => s.tasks.filter((t) => t.sub_task?.epic === task.id).length);
   // Only Jira has transitions to offer (TKT-18). An epic's ticket is never
@@ -150,3 +150,4 @@ export function DeleteTask({
     </Modal>
   );
 }
+import { issueForTask } from "../../lib/tracker";

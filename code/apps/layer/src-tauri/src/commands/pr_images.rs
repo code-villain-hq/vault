@@ -12,12 +12,11 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::config::{Checkout, Task};
 use crate::error::{Error, Result};
-use crate::git;
 use crate::integrations::github::{self, Image, MAX_BYTES, MAX_IMAGES};
 use crate::mcp::{required, str_prop, tool};
 
 use super::diff::RepoResult;
-use super::github::github_client;
+use super::github_sources::checkout_client;
 use super::{off_runtime, AppState};
 
 pub fn pr_images_tools() -> Vec<Value> {
@@ -34,7 +33,7 @@ pub fn pr_images_tools() -> Vec<Value> {
          waiting there. task_prs shows the PR's description once they are added.",
         json!({
             "task_id": str_prop("Task id from list_tasks"),
-            "repo": str_prop("The repository's name as list_tasks shows it; may be left out when the task has one"),
+            "repo": str_prop("The repository's name, host/owner/repo or checkout id as list_tasks shows it; may be left out when the task has one"),
             "images": {
                 "type": "array",
                 "description": "At most 10, in the order to show them",
@@ -77,6 +76,7 @@ pub async fn pr_images_call(app: &AppHandle, args: Value) -> Result<Value> {
             path: path.to_string_lossy().into_owned(),
             caption: image.caption,
             repo: Some(repo.clone()),
+            checkout_id: Some(checkout.id.clone()),
             preview: String::new(),
         })
         .collect::<Vec<_>>();
@@ -101,6 +101,8 @@ pub struct DraftImage {
     pub caption: String,
     #[serde(default)]
     pub repo: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkout_id: Option<String>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub preview: String,
 }
@@ -155,7 +157,7 @@ type Wanted = Vec<(PathBuf, Option<String>)>;
 fn by_repo(images: Vec<DraftImage>) -> Vec<(Option<String>, Wanted)> {
     let mut groups: Vec<(Option<String>, Wanted)> = Vec::new();
     for image in images {
-        let repo = image.repo.map(|r| r.trim().to_string()).filter(|r| !r.is_empty());
+        let repo = image.checkout_id.or(image.repo).map(|r| r.trim().to_string()).filter(|r| !r.is_empty());
         let caption = Some(image.caption).filter(|c| !c.trim().is_empty());
         let item = (PathBuf::from(image.path.trim()), caption);
         let same = |r: &Option<String>| match (r, &repo) {
@@ -195,6 +197,7 @@ pub(crate) fn listed_images(list: &Path) -> (Vec<DraftImage>, Vec<String>) {
                 preview: preview(&image),
                 caption: image.caption,
                 repo: item.repo,
+                checkout_id: None,
             }),
             Err(e) => problems.push(format!("A screenshot was left out: {e}.")),
         }
@@ -219,33 +222,48 @@ async fn show_in_pr(
     let repo = state.config.project(&checkout.project_id)?.name;
     let images = off_runtime(move || read_images(&wanted)).await??;
 
-    let dir = PathBuf::from(&checkout.path);
-    let (owner, name) = off_runtime(move || git::origin_slug_cached(&dir)).await??;
-    let (client, _) = github_client(state).await?;
+    let (origin, client) = checkout_client(state, &checkout.path).await?;
+    let (owner, name) = origin.slug();
     let branches = super::pr_branches::branches(checkout, &task.branch).await?;
-    let pr = super::pr_branches::open_pull(&client, &owner, &name, &branches).await?.ok_or_else(|| {
+    let pr = super::pr_branches::open_pull(&client, owner, name, &branches).await?.ok_or_else(|| {
         Error::Other(format!("{repo} has no open pull request for {}: open it with open_prs first", task.branch))
     })?;
-    let shown = client.show_images(&owner, &name, pr.number, &pr.url, &images).await?;
+    let shown = client.show_images(owner, name, pr.number, &pr.url, &images).await?;
     Ok((pr.url, shown.into_iter().map(|s| (s.caption, s.url)).collect()))
 }
 
 /// The task's checkout of `repo`, or its only one when none is named.
 fn checkout_for(state: &AppState, task_id: &str, repo: Option<&str>) -> Result<Checkout> {
-    let named: Vec<(String, Checkout)> = state
+    let named: Vec<(String, Option<String>, Checkout)> = state
         .config
         .checkouts_of(task_id)
         .into_iter()
-        .map(|c| (state.config.project(&c.project_id).map(|p| p.name).unwrap_or_default(), c))
+        .map(|c| {
+            let (name, remote) = state.config.project(&c.project_id).map(|p| (p.name, p.remote)).unwrap_or_default();
+            (name, remote, c)
+        })
         .collect();
-    let names = || named.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", ");
+    let names = || named.iter().map(|(n, remote, _)| remote.as_deref().unwrap_or(n)).collect::<Vec<_>>().join(", ");
     match repo.map(str::trim).filter(|r| !r.is_empty()) {
-        Some(want) => named
-            .iter()
-            .find(|(n, _)| n.eq_ignore_ascii_case(want))
-            .map(|(_, c)| c.clone())
-            .ok_or_else(|| Error::Other(format!("the task has no repository {want}; it has {}", names()))),
-        None if named.len() == 1 => Ok(named[0].1.clone()),
+        Some(want) => {
+            if let Some((_, _, c)) = named.iter().find(|(_, _, c)| c.id == want) {
+                return Ok(c.clone());
+            }
+            let mut matches = named.iter().filter(|(name, remote, _)| {
+                name.eq_ignore_ascii_case(want) || remote.as_ref().is_some_and(|r| r.eq_ignore_ascii_case(want))
+            });
+            let (_, _, found) = matches
+                .next()
+                .ok_or_else(|| Error::Other(format!("the task has no repository {want}; it has {}", names())))?;
+            if matches.next().is_some() {
+                return Err(Error::Other(format!(
+                    "more than one repository is named {want}; use its host or checkout id ({})",
+                    names()
+                )));
+            }
+            Ok(found.clone())
+        }
+        None if named.len() == 1 => Ok(named[0].2.clone()),
         None if named.is_empty() => Err(Error::Other("the task has no repositories".into())),
         None => Err(Error::Other(format!("say which repo: the task has {}", names()))),
     }
@@ -391,6 +409,7 @@ mod tests {
     #[test]
     fn screenshots_go_to_their_repositorys_pull_request_in_their_order() {
         let image = |path: &str, repo: Option<&str>| DraftImage {
+            checkout_id: None,
             path: path.into(),
             caption: String::new(),
             repo: repo.map(str::to_string),

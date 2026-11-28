@@ -11,9 +11,10 @@ import { Combo, Field } from "../ui";
  */
 export function useProjectChoice() {
   const github = useStore((s) => s.settings?.tracker_chosen === "github");
+  const host = useStore((s) => s.settings?.github_issue_source);
   const jiraDefault = useStore((s) => s.settings?.jira?.project_key);
   const issues = useStore((s) => s.issues);
-  const remembered = github ? "githubRepo" : "jiraProject";
+  const remembered = github ? `githubRepo:${host ?? ""}` : "jiraProject";
   const [project, setProject] = useState(() => read(remembered, ""));
   const options = useMemo(
     () => [...new Set(issues.map((i) => projectOf(i.key)).filter(Boolean))],
@@ -22,9 +23,8 @@ export function useProjectChoice() {
   const fallback = (github ? undefined : jiraDefault) ?? options[0] ?? "";
 
   useEffect(() => {
-    setProject((current) => current || fallback);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setProject(read(remembered, "") || fallback);
+  }, [remembered, fallback]);
 
   return {
     github,

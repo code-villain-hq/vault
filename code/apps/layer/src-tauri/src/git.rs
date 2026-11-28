@@ -19,7 +19,10 @@ pub use landed::{all_landed, have_commit, landed_through};
 pub use only::{commit_only, committed_texts, head_commit};
 pub use outgoing::{outgoing_commits, outgoing_from, outgoing_patch};
 pub(crate) use remote::effective_origin_url;
-pub use remote::{clone_at, clone_by_key, forget_origins, origin_slug, origin_slug_cached};
+pub use remote::{
+    clone_at, clone_by_key, forget_origins, github_origin, github_origin_cached, verify_github_push_origin,
+    GithubOrigin,
+};
 pub use snapshot::fingerprint;
 pub use store::{
     adopt_worktree, belongs_to, changed_between, copy_local_config, create_store, default_tip, follow_clone_origin,
@@ -1417,7 +1420,7 @@ mod tests {
     fn parses_origin_slug_from_ssh_url_with_a_port() {
         let repo = fixture();
         run(&repo, &["remote", "add", "origin", "ssh://git@ghe.example.com:2222/acme/web.git"]).unwrap();
-        assert_eq!(origin_slug(&repo).unwrap(), ("acme".into(), "web".into()));
+        assert_eq!(github_origin(&repo).unwrap().slug(), ("acme", "web"));
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -1425,10 +1428,10 @@ mod tests {
     fn parses_origin_slug_from_both_url_styles() {
         let repo = fixture();
         run(&repo, &["remote", "add", "origin", "git@github.com:acme/web.git"]).unwrap();
-        assert_eq!(origin_slug(&repo).unwrap(), ("acme".into(), "web".into()));
+        assert_eq!(github_origin(&repo).unwrap().slug(), ("acme", "web"));
 
         run(&repo, &["remote", "set-url", "origin", "https://ghe.example.com/acme/web.git"]).unwrap();
-        assert_eq!(origin_slug(&repo).unwrap(), ("acme".into(), "web".into()));
+        assert_eq!(github_origin(&repo).unwrap().slug(), ("acme", "web"));
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
 
@@ -1436,8 +1439,8 @@ mod tests {
     fn an_origin_on_disk_is_not_read_as_a_github_repository() {
         let repo = fixture();
         run(&repo, &["remote", "add", "origin", "/Users/me/work/platform/tool"]).unwrap();
-        let err = origin_slug(&repo).unwrap_err().to_string();
-        assert!(err.contains("folder on this Mac"), "got: {err}");
+        let err = github_origin(&repo).unwrap_err().to_string();
+        assert!(err.contains("not a GitHub repository URL"), "got: {err}");
         std::fs::remove_dir_all(repo.parent().unwrap()).ok();
     }
     /// A clone of a bare remote, and a worktree of it on `feature`, so the

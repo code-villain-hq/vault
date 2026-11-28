@@ -31,6 +31,7 @@ pub use siblings::Sibling;
 
 pub struct GitHub {
     api_url: String,
+    api_origin: String,
     token: String,
     client: reqwest::Client,
 }
@@ -86,9 +87,10 @@ pub enum ReadState {
 
 impl GitHub {
     pub fn new(cfg: &GithubConfig, token: &str) -> Result<Self> {
-        super::require_https(&cfg.api_url, "The GitHub API URL")?;
+        let url = layer_domain::github_address(&cfg.api_url).map_err(|e| Error::Other(e.0))?;
         Ok(Self {
-            api_url: cfg.api_url.trim_end_matches('/').to_string(),
+            api_url: url.as_str().trim_end_matches('/').to_string(),
+            api_origin: url.origin().ascii_serialization(),
             token: token.to_string(),
             client: http_client(),
         })
@@ -105,6 +107,9 @@ impl GitHub {
 
     async fn json(&self, rb: reqwest::RequestBuilder) -> Result<Value> {
         let res = rb.send().await?;
+        if res.url().origin().ascii_serialization() != self.api_origin {
+            return Err(Error::Other("GitHub redirected the API request to another site.".into()));
+        }
         let status = res.status();
         let sso = res.headers().get("x-github-sso").and_then(|v| v.to_str().ok()).map(str::to_owned);
         let body = res.text().await?;

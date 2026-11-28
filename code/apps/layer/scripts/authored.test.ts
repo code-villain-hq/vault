@@ -75,8 +75,17 @@ describe("the task a pull request belongs to", () => {
     expect(taskOfPr(at("https://x/pull/1"), prs, tasks)).toBe("t-1");
     expect(taskOfPr(at("https://x/pull/2"), prs, tasks)).toBe("t-2");
   });
-  test("is found by its branch before the sweep has seen it (REV-7)", () => {
-    expect(taskOfPr(at("https://x/pull/9", "ACME-3"), prs, tasks)).toBe("t-3");
+  test("matches the checkout's host before the sweep has seen its PR", () => {
+    const tied = [
+      { id: "enterprise", branch: "ACME-3", checkouts: [{ project_id: "ent" }] },
+      { id: "public", branch: "ACME-3", checkouts: [{ project_id: "pub" }] },
+    ];
+    const projects = [
+      { id: "ent", remote: "git.example.com/acme/api" },
+      { id: "pub", remote: "github.com/acme/api" },
+    ];
+    expect(taskOfPr(pr({ head: "ACME-3" }), prs, tied, projects)).toBe("public");
+    expect(taskOfPr(pr({ head: "ACME-3" }), prs, tied.slice(0, 1), projects)).toBeNull();
   });
   test("is none for one no task made", () => {
     expect(taskOfPr(at("https://x/pull/9"), prs, tasks)).toBeNull();

@@ -713,7 +713,12 @@ const CEILINGS: Record<string, number> = {
   // took it to 1113. The trackers' tools (TKT-20) moved out to
   // commands/tracker_tools.rs, which brought it back to 944. The routine
   // tools (§29) and set_base joining the spec tools' dispatch took it to 963.
-  "src-tauri/src/mcp.rs": 970,
+  // The GitHub source of a ticket a task is linked to (PR-19) took it to 971.
+  "src-tauri/src/mcp.rs": 975,
+  // Sub-task tickets read through the tracker each epic is linked to (PR-19)
+  // took these to 601 and 602.
+  "src-tauri/src/commands/epics.rs": 610,
+  "src/components/sidebar/Sidebar.tsx": 610,
   // The same for the browser's tools (BRW-*); each tool's work lives in
   // its own module (sign_in.rs, session.rs, tabs.rs), its definition here.
   "src-tauri/src/browser/tools.rs": 700,

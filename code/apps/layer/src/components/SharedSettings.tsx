@@ -51,6 +51,7 @@ export function Theirs({
   rows,
   folded,
   keep,
+  shared,
   children,
 }: {
   kind: ConnectionKind;
@@ -61,6 +62,8 @@ export function Theirs({
   folded?: boolean;
   /** An admin's controls that stay out when folded, saved as they change. */
   keep?: ReactNode;
+  /** A specific item in a collection, rather than the whole connection kind. */
+  shared?: boolean;
   children: ReactNode;
 }) {
   const workspace = useWorkspace();
@@ -74,7 +77,7 @@ export function Theirs({
     children
   );
   if (!workspace) return <>{fields}</>;
-  if (!workspace.admin && !held) {
+  if (!workspace.admin && !(shared ?? Boolean(held))) {
     return (
       <section className="settings-block">
         <p className="settings-alone">
@@ -165,6 +168,7 @@ export function ConnectRow({
   disabled,
   onConnect,
   onCancel,
+  cancel = connected,
 }: {
   connected: boolean;
   busy: boolean;
@@ -173,6 +177,7 @@ export function ConnectRow({
   onConnect: () => void;
   /** Puts the form back as stored, and folds it. */
   onCancel: () => void;
+  cancel?: boolean;
 }) {
   return (
     <div className="row">
@@ -183,7 +188,7 @@ export function ConnectRow({
       >
         <BusyLabel busy={busy} idle={connected ? "Reconnect" : "Connect"} working="Connecting…" />
       </button>
-      {connected && (
+      {cancel && (
         <button className="ui-button" disabled={busy} onClick={onCancel}>
           Cancel
         </button>

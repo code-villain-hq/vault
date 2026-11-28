@@ -11,7 +11,8 @@ use crate::error::{Error, Result};
 use crate::git;
 use crate::integrations::github::{GitHub, PrComments};
 
-use super::{github_client, off_runtime, pr_branches, AppState};
+use super::github_sources::client_for;
+use super::{off_runtime, pr_branches, AppState};
 
 #[derive(Debug, Serialize)]
 pub struct CheckoutPrComments {
@@ -39,7 +40,17 @@ pub async fn github_pr_comments(
             .ok_or_else(|| Error::Other("That task is no longer available.".into()))?;
         Ok::<_, Error>((checkout, branch))
     })?;
-    let (client, config) = github_client(&state).await.map_err(safe_connection_error)?;
+    // The checkout's origin picks the GitHub source to ask; GitHub.com's
+    // SSH-over-443 remote names ssh.github.com but belongs to github.com.
+    let cfg = state.config.read();
+    let path = checkout.path.clone();
+    let (client, config) = off_runtime(move || {
+        let origin = git::github_origin(Path::new(&path))?;
+        let key = if origin.host == "ssh.github.com" { "github.com" } else { origin.host.as_str() };
+        client_for(&cfg, key)
+    })
+    .await?
+    .map_err(safe_connection_error)?;
     read_checkout_comments(&client, &config, checkout, branch, number).await
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { api, errMessage, failureText } from "./lib/api";
+import { coalesce, type RefreshSlot } from "./lib/coalesce";
 import { CHAT_TASK_ID } from "./lib/derive";
 import type { EpicOf } from "./lib/grouping";
 import {
@@ -194,7 +195,8 @@ export interface State extends ItemDetailsState, TaskPrSnapshots {
   refreshSettings: (opts?: {
     githubReconnected?: boolean;
     githubDisconnected?: boolean;
-    githubReviewTeam?: string | null;
+    /** A team-only save for one source, already confirmed by the backend. */
+    githubReviewTeam?: { source: string; team: string | null };
   }) => Promise<void>;
   setSpecFirst: (on: boolean) => Promise<void>; // Spec first (SPEC-38), then the settings again
   /** `quiet` is a timer tick: no toast, and no spinner over a list already shown. */
@@ -204,41 +206,6 @@ export interface State extends ItemDetailsState, TaskPrSnapshots {
 let toastSeq = 0;
 let noteSeq = 0;
 
-interface RefreshSlot {
-  current: Promise<void> | null;
-  next?: Promise<void> | null;
-}
-
-/**
- * Share overlapping polls; explicit refreshes share one successor instead.
- * They asked after something changed, which the in-flight read cannot see.
- */
-async function coalesce(
-  slot: RefreshSlot,
-  poll: boolean,
-  work: () => Promise<void>,
-): Promise<void> {
-  if (slot.current) {
-    if (poll) return slot.current;
-    if (!slot.next) {
-      slot.next = slot.current
-        .catch(() => {})
-        .then(() => {
-          slot.next = null;
-          return coalesce(slot, false, work);
-        });
-    }
-    return slot.next;
-  }
-  const run = work();
-  slot.current = run;
-  try {
-    await run;
-  } finally {
-    if (slot.current === run) slot.current = null;
-  }
-}
-
 const tasksSlot: RefreshSlot = { current: null };
 const panesSlot: RefreshSlot = { current: null };
 const messagesSlot: RefreshSlot = { current: null };
@@ -247,6 +214,9 @@ let reviewsSlot: RefreshSlot = { current: null };
 // but don't make a reconnect wait for an obsolete sweep.
 let sweepSlot = { busy: false, again: false };
 const settingsReads = { started: 0, accepted: 0 };
+// A ticket list read for one tracker or GitHub issue source is not kept
+// once the settings name another.
+let issueEpoch = 0;
 
 function sameMessages(a: Message[], b: Message[]): boolean {
   return (
@@ -266,6 +236,21 @@ const BOOT_WAIT = 1500;
 // it again. Use request order, not timestamps that two reads can share.
 let prReadSequence = 0;
 const latestTaskPrRequest = new Map<string, number>();
+
+/** What makes a GitHub connection: each source's address, state and token. */
+function githubConnection(settings: Settings | null | undefined) {
+  return (settings?.github_sources ?? []).map((g) => [
+    g.key,
+    g.api_url,
+    g.web_url,
+    g.status,
+    g.revision,
+  ]);
+}
+
+function githubTeams(settings: Settings | null | undefined) {
+  return (settings?.github_sources ?? []).map((g) => [g.key, g.review_team]);
+}
 
 function resetReviewReads() {
   // An obsolete search (or its queued successor) cannot publish or block the next one.
@@ -640,54 +625,63 @@ export const useStore = create<State>((set, get) => {
       const connectionSaved = opts?.githubReconnected || opts?.githubDisconnected;
       const prior = get().settings;
       const team = opts?.githubReviewTeam;
-      const teamSaved = team !== undefined && prior?.github && team !== prior.github.review_team;
+      const was = team && prior?.github_sources.find((g) => g.key === team.source);
+      const teamSaved = !!team && !!was && team.team !== was.review_team;
       // A confirmed save supersedes earlier settings snapshots even before its reload.
       if (connectionSaved || teamSaved) settingsReads.accepted = read;
       if (connectionSaved) {
-        set((s) => ({
-          ...resetGitHubReads(s.githubConnectionRevision),
-          ...(opts.githubDisconnected && s.settings
-            ? { settings: { ...s.settings, github_connected: false, github: null } }
-            : {}),
-        }));
-      } else if (teamSaved && prior?.github) {
-        const github = { ...prior.github, review_team: team };
-        set({ ...resetReviewReads(), settings: { ...prior, github } });
+        set((s) => resetGitHubReads(s.githubConnectionRevision));
+      } else if (team && teamSaved && prior) {
+        const github_sources = prior.github_sources.map((g) =>
+          g.key === team.source ? { ...g, review_team: team.team } : g,
+        );
+        set({ ...resetReviewReads(), settings: { ...prior, github_sources } });
         void get().refreshReviewQueue({ quiet: true });
       }
       const settings = await api.getSettings();
       if (read < settingsReads.accepted) return;
       settingsReads.accepted = read;
       const { settings: before, githubConnectionRevision: revision } = get();
+      // Any source added, removed, moved or given a new token is a new
+      // connection; a review team alone only needs a new search.
       const connectionChanged =
         Boolean(before?.github_connected) !== settings.github_connected ||
-        before?.github?.api_url !== settings.github?.api_url ||
-        before?.github?.web_url !== settings.github?.web_url;
-      const teamChanged = before?.github?.review_team !== settings.github?.review_team;
+        !sameJson(githubConnection(before), githubConnection(settings));
+      const teamChanged = !sameJson(githubTeams(before), githubTeams(settings));
+      const issuesChanged =
+        before?.tracker !== settings.tracker ||
+        before?.github_issue_source !== settings.github_issue_source;
+      if (issuesChanged) issueEpoch++;
       set({
         ...(!opts?.githubReconnected && connectionChanged ? resetGitHubReads(revision) : {}),
         ...(teamChanged && !connectionChanged ? resetReviewReads() : {}),
         settings: keep(before, settings),
       });
-      // Only until the first list lands: someone with nothing assigned has an
-      // empty list for good, and every settings change re-fetched 500 issues.
-      if (settings.tracker != null && !get().issuesLoaded && !get().issuesLoading) {
-        void get().refreshIssues();
-      }
-      // Disconnecting has to take the list with it, or the badge keeps counting
-      // tickets from a site the app can no longer reach.
-      if (settings.tracker == null && (get().issues.length > 0 || get().issuesLoaded)) {
+      // Another tracker or issue source, or none: the list goes with it, or
+      // the badge keeps counting tickets from a site no longer connected.
+      if (issuesChanged && (get().issues.length > 0 || get().issuesLoaded || get().issuesLoading)) {
         set({
           issues: [],
           issueTypes: [],
           priorities: [],
           issuesTruncated: false,
           issuesLoaded: false,
+          issuesLoading: false,
         });
+      }
+      // Only until the first list lands: someone with nothing assigned has an
+      // empty list for good, and every settings change re-fetched 500 issues.
+      if (settings.tracker != null && !get().issuesLoaded && !get().issuesLoading) {
+        void get().refreshIssues();
       }
       // A team change needs a new search, but does not change the connection.
       if (!settings.github_connected) return;
-      if (opts?.githubReconnected || teamChanged || (!teamSaved && get().reviewQueue === null))
+      if (
+        opts?.githubReconnected ||
+        (connectionChanged && !opts?.githubDisconnected) ||
+        teamChanged ||
+        (!teamSaved && get().reviewQueue === null)
+      )
         void get().refreshReviewQueue({ quiet: true });
     },
 
@@ -724,6 +718,7 @@ export const useStore = create<State>((set, get) => {
 
     refreshIssues: async (opts) => {
       if (get().settings?.tracker == null) return;
+      const epoch = issueEpoch;
       // A timer tick should not flash the spinner over a list already on screen.
       const spin = !opts?.quiet || !get().issuesLoaded;
       if (spin) set({ issuesLoading: true });
@@ -738,7 +733,7 @@ export const useStore = create<State>((set, get) => {
           get().priorities.length > 0 ? get().priorities : api.ticketPriorities().catch(() => []),
         ]);
         // As for reviews: an answer from a site disconnected meanwhile is not kept.
-        if (get().settings?.tracker == null) return;
+        if (epoch !== issueEpoch || get().settings?.tracker == null) return;
         set((s) => ({
           issues: reuse(s.issues, page.issues, (i) => i.key),
           issuesTruncated: page.more,
@@ -747,9 +742,9 @@ export const useStore = create<State>((set, get) => {
           issuesLoaded: true,
         }));
       } catch (e) {
-        if (!opts?.quiet) get().fail(e);
+        if (epoch === issueEpoch && !opts?.quiet) get().fail(e);
       } finally {
-        if (spin) set({ issuesLoading: false });
+        if (epoch === issueEpoch && spin) set({ issuesLoading: false });
       }
     },
   };

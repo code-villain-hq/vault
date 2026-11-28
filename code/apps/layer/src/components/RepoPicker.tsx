@@ -128,7 +128,10 @@ export function RepoPicker({
                       checked={picked.includes(p.id)}
                       onChange={() => toggle(p.id)}
                     />
-                    <span style={{ flex: 1 }}>{p.name}</span>
+                    <span style={{ flex: 1 }}>
+                      {p.name}
+                      {repoHost(p.remote) && <span className="muted"> · {repoHost(p.remote)}</span>}
+                    </span>
                     <span className="path">{p.path}</span>
                   </label>
                 ))}
@@ -139,3 +142,4 @@ export function RepoPicker({
     </div>
   );
 }
+import { repoHost } from "../lib/github-source";

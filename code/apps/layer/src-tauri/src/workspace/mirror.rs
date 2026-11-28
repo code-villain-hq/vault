@@ -176,16 +176,35 @@ fn merge(
 
     // A connection needs this Mac's half (a token, the Jira email) before it
     // is one, so only those set up here take the workspace's settings.
+    for kind in ["github", "github_sources"] {
+        if c.shared.held.contains_key(kind) && !connections.iter().any(|r| r.kind == kind) {
+            c.shared.connections.remove(kind);
+            if kind == "github" {
+                c.github = None;
+            } else {
+                c.github_sources.shared.clear();
+            }
+        }
+    }
     c.shared.held =
         connections.iter().map(|r| (r.kind.clone(), Held { id: r.id.clone(), settings: r.settings.clone() })).collect();
     // A tracker the workspace no longer has is gone here too.
     c.tracker = None;
+    c.github_issue_source = None;
     c.shared.connections.remove("tracker");
     for record in connections {
         if take_held(c, &record.kind, &record.settings, true) {
             c.shared.connections.insert(record.kind, record.id);
         }
     }
+    // Fresh Macs joining an older workspace also need a fixed legacy
+    // identity. It must not follow edits after this first snapshot.
+    if c.github_sources.legacy_host.is_none() {
+        c.github_sources.legacy_host = c.github.as_ref().and_then(crate::config::GithubConfig::source_key);
+    }
+    let shared_hosts: std::collections::BTreeSet<_> =
+        c.github_source_list().into_iter().filter(|g| g.shared).map(|g| g.key).collect();
+    c.github_sources.local.retain(|g| g.source_key().is_none_or(|host| !shared_hosts.contains(&host)));
 
     // The workspace's log sources, each keeping the AWS profile it has here.
     let profiles: BTreeMap<String, String> = c.log_sources.iter().map(|s| (s.id.clone(), s.profile.clone())).collect();
@@ -216,9 +235,11 @@ fn shared_view(c: &AppConfig) -> Value {
         "projects": c.projects,
         "jira": c.jira,
         "github": c.github,
+        "github_sources": c.github_sources,
         "slack": c.slack,
         "grafana": c.grafana,
         "tracker": c.tracker,
+        "github_issue_source": c.github_issue_source,
         "log_sources": c.log_sources,
         "agent_models": c.agent_models,
         "shared": c.shared,

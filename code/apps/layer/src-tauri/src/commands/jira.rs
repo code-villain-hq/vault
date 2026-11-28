@@ -259,7 +259,7 @@ pub(crate) async fn bare_prompt(
     };
 
     if let Some(key) = task.issue_key.as_deref() {
-        if let Ok(tracker) = super::tracker(state) {
+        if let Ok(tracker) = super::tickets::linked_tracker(state, &task) {
             if let Ok(issue) = tracker.ticket(key).await {
                 let prompt = ticket_prompt(&issue, &task, &repos, at_task_root);
                 keep_ticket(app, task, issue).await;
@@ -464,7 +464,7 @@ pub async fn draft_pr_description(app: AppHandle, state: State<'_, AppState>, ta
 
     let repos = reviewed_repos(&state, &task);
     let branch = task.branch.clone();
-    let issue_key = task.issue_key.clone();
+    let issue_key = task.issue_key.clone().filter(|key| crate::tickets::github::parse_key(key).is_none());
 
     // The same directory an interactive agent for this task would get, from
     // the helper that decides it, rather than a second opinion that will not
@@ -489,7 +489,7 @@ pub async fn draft_pr_description(app: AppHandle, state: State<'_, AppState>, ta
                 "conversation that produced it. Say what changed and why, call out anything ",
                 "risky or worth a closer look, and note what is not covered. Do not walk ",
                 "through the diff file by file, and do not pad it — a few short sections is ",
-                "right for most changes.\n\n",
+                "right for most changes. Do not add GitHub issue references; Layer adds them per repository.\n\n",
                 "Reply with the Markdown body and nothing else: no preamble, no closing ",
                 "remark, no code fence around the whole thing.{spec_ask}\n{template}\n",
                 "# The change\n{context}\n{spec}",
@@ -624,11 +624,16 @@ pub async fn request_pr_description(app: AppHandle, task_id: String, pane_id: St
              left unfinished, and where review effort is best spent. Mention what you \
              verified and what you did not. Do not pad it, and do not restate the diff \
              file by file.\n\n\
+             Do not add GitHub issue references; Layer adds them per repository.\n\
              Base it on the actual diff{}. {}{}\n\n\
              Save it as Markdown to:\n{}\n\n\
              {}",
             task.branch,
-            task.issue_key.as_ref().map(|k| format!(" for {k}")).unwrap_or_default(),
+            task.issue_key
+                .as_ref()
+                .filter(|key| crate::tickets::github::parse_key(key).is_none())
+                .map(|k| format!(" for {k}"))
+                .unwrap_or_default(),
             if names.len() > 1 { format!(" across {}", names.join(", ")) } else { String::new() },
             super::pr_template::PLACES,
             super::pr_template::take_images(&wanting, &list),

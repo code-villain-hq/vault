@@ -21,15 +21,16 @@ const REPOS_PER_SEARCH: usize = 25;
 
 impl Issues {
     pub fn of(cfg: &AppConfig, web_url: &str) -> Self {
-        let host = host_of(web_url);
+        let host = layer_domain::github_host(web_url).unwrap_or_default();
         let mut repos: Vec<String> = cfg
             .projects
             .iter()
             .filter_map(|p| p.remote.as_deref())
+            .chain(cfg.shared.elsewhere.iter().map(|p| p.remote_key.as_str()))
             .filter_map(|remote| {
                 let parts: Vec<&str> = remote.split('/').collect();
                 match parts.as_slice() {
-                    [h, owner, name] if host_of(h).eq_ignore_ascii_case(&host) => Some(format!("{owner}/{name}")),
+                    [h, owner, name] if h.eq_ignore_ascii_case(&host) => Some(format!("{owner}/{name}")),
                     _ => None,
                 }
             })
@@ -43,14 +44,6 @@ impl Issues {
         let repo = format!("{owner}/{name}");
         self.repos.iter().any(|r| r.eq_ignore_ascii_case(&repo))
     }
-}
-
-/// A host without its scheme, credentials or port.
-fn host_of(url: &str) -> String {
-    let rest = url.split_once("://").map_or(url, |(_, r)| r);
-    let host = rest.split('/').next().unwrap_or_default();
-    let host = host.rsplit_once('@').map_or(host, |(_, h)| h);
-    host.split(':').next().unwrap_or_default().to_string()
 }
 
 /// `owner/name#12`, as GitHub writes a reference to an issue. Owner and name
@@ -93,7 +86,7 @@ pub(super) async fn find(client: &GitHub, issues: &Issues, find: Find) -> Result
     // A key, or a bare number that names that issue in each repository (TKT-19).
     if let Some(text) = text {
         let wanted: Vec<IssueRef> = match (parse_key(text), text.parse::<u64>()) {
-            (Some(one), _) => vec![one],
+            (Some(one), _) if issues.holds(&one) => vec![one],
             (None, Ok(n)) if n > 0 => issues
                 .repos
                 .iter()
@@ -181,15 +174,16 @@ fn sort_like(all: &mut [Ticket], query: &str) {
     }
 }
 
-pub(super) async fn by_key(client: &GitHub, keys: &[String]) -> Result<Vec<Ticket>> {
+pub(super) async fn by_key(client: &GitHub, issues: &Issues, keys: &[String]) -> Result<Vec<Ticket>> {
     // As Jira's: the sidebar and both review lists, and no more.
     const CAP: usize = 100;
-    let wanted: Vec<IssueRef> = keys.iter().filter_map(|k| parse_key(k)).take(CAP).collect();
+    let wanted: Vec<IssueRef> =
+        keys.iter().filter_map(|k| parse_key(k)).filter(|r| issues.holds(r)).take(CAP).collect();
     client.issues(&wanted).await
 }
 
-pub(super) async fn ticket(client: &GitHub, key: &str) -> Result<Ticket> {
-    let one = parse_key(key).ok_or_else(|| Error::NotFound(format!("{key}: not a GitHub issue (owner/repo#12)")))?;
+pub(super) async fn ticket(client: &GitHub, issues: &Issues, key: &str) -> Result<Ticket> {
+    let one = in_workspace(issues, key)?;
     client.issues(&[one]).await?.into_iter().next().ok_or_else(|| Error::NotFound(key.to_string()))
 }
 
@@ -222,7 +216,7 @@ pub(super) fn issue(key: &str) -> Result<IssueRef> {
 /// File into the repository asked for, else the parent's, else the
 /// workspace's only one. Its key is the new issue's.
 pub(super) async fn file(client: &GitHub, issues: &Issues, new: &NewTicket) -> Result<String> {
-    let parent = new.parent_key.as_deref().map(issue).transpose()?;
+    let parent = new.parent_key.as_deref().map(|key| in_workspace(issues, key)).transpose()?;
     let asked = new.project_key.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let repo = match (asked, &parent, issues.repos.as_slice()) {
         (Some(repo), _, _) => repo.to_string(),
@@ -230,8 +224,7 @@ pub(super) async fn file(client: &GitHub, issues: &Issues, new: &NewTicket) -> R
         (None, None, [only]) => only.clone(),
         _ => return Err(Error::Other("choose the repository to file the issue in".into())),
     };
-    let (owner, name, _) = parse_key(&format!("{repo}#1"))
-        .ok_or_else(|| Error::Other(format!("{repo} is not a GitHub repository (owner/name)")))?;
+    let (owner, name, _) = in_workspace(issues, &format!("{repo}#1"))?;
     let number = client.create_issue(&owner, &name, new.summary.trim(), &new.description).await?;
     let child = (owner.clone(), name.clone(), number);
     if let Some(parent) = parent {
@@ -242,12 +235,12 @@ pub(super) async fn file(client: &GitHub, issues: &Issues, new: &NewTicket) -> R
 
 /// An issue has no state to move to, so starting work on one gives it to
 /// you, unless someone has it (TKT-18).
-pub(super) async fn take(client: &GitHub, ticket: &Ticket) -> Result<()> {
+pub(super) async fn take(client: &GitHub, issues: &Issues, ticket: &Ticket) -> Result<()> {
     if ticket.assignee.is_some() {
         return Ok(());
     }
     let login = client.login().await?;
-    client.assign(&issue(&ticket.key)?, &login).await
+    client.assign(&in_workspace(issues, &ticket.key)?, &login).await
 }
 
 #[cfg(test)]

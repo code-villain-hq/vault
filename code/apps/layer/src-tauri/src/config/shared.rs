@@ -229,6 +229,9 @@ fn connection_settings(cfg: &AppConfig) -> Vec<(&'static str, Value)> {
     if let Some(g) = &cfg.github {
         out.push(("github", json!({ "api_url": g.api_url, "web_url": g.web_url, "review_team": g.review_team })));
     }
+    if !cfg.github_sources.shared.is_empty() || cfg.shared.connections.contains_key("github_sources") {
+        out.push(("github_sources", json!({ "sources": cfg.github_sources.shared })));
+    }
     if let Some(s) = &cfg.slack {
         out.push(("slack", json!({ "channel": s.channel })));
     }
@@ -236,7 +239,13 @@ fn connection_settings(cfg: &AppConfig) -> Vec<(&'static str, Value)> {
         out.push(("grafana", json!({ "base_url": g.base_url, "datasource": g.datasource })));
     }
     if let Some(t) = cfg.tracker {
-        out.push(("tracker", json!({ "uses": t })));
+        let mut settings = json!({ "uses": t });
+        if t == layer_domain::TrackerKind::Github {
+            if let Some(source) = &cfg.github_issue_source {
+                settings["github_source"] = json!(source);
+            }
+        }
+        out.push(("tracker", settings));
     }
     out
 }
@@ -319,9 +328,11 @@ struct Settings {
     api_url: Option<String>,
     web_url: Option<String>,
     review_team: Option<String>,
+    sources: Option<Vec<super::GithubConfig>>,
     channel: Option<String>,
     datasource: Option<String>,
     uses: Option<layer_domain::TrackerKind>,
+    github_source: Option<String>,
 }
 
 /// The workspace's settings for this Mac's connection of `kind`, if it has
@@ -338,11 +349,10 @@ pub fn take_held(c: &mut AppConfig, kind: &str, settings: &Value, everything: bo
             j.epic_field = s.epic_field;
             j.flow = s.flow.unwrap_or_default();
         }),
-        "github" => c.github.as_mut().filter(|_| everything).map(|g| {
-            g.api_url = s.api_url.unwrap_or_else(|| g.api_url.clone());
-            g.web_url = s.web_url.unwrap_or_else(|| g.web_url.clone());
-            g.review_team = s.review_team;
+        "github" if everything => s.api_url.zip(s.web_url).map(|(api_url, web_url)| {
+            c.github = Some(super::GithubConfig { api_url, web_url, review_team: s.review_team });
         }),
+        "github_sources" if everything => s.sources.map(|sources| c.github_sources.shared = sources),
         "slack" => c
             .slack
             .as_mut()
@@ -355,7 +365,10 @@ pub fn take_held(c: &mut AppConfig, kind: &str, settings: &Value, everything: bo
             g.datasource = s.datasource;
         }),
         // No half of it is this Mac's: the choice is the workspace's alone.
-        "tracker" => s.uses.map(|t| c.tracker = Some(t)),
+        "tracker" => s.uses.map(|t| {
+            c.tracker = Some(t);
+            c.github_issue_source = s.github_source;
+        }),
         _ => None,
     };
     here.is_some()

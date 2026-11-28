@@ -330,7 +330,7 @@ export function PrFeedback({
   const current = built.find((b) => b.row.checkout_id === shown);
   const title =
     built.length === 1 && current
-      ? `Feedback on ${current.row.repo} #${current.row.number}`
+      ? `Feedback on ${current.row.repo}${current.row.source ? ` · ${current.row.source}` : ""} #${current.row.number}`
       : "Feedback on the pull requests";
 
   function toggle(set: Set<string>, key: string): Set<string> {
@@ -402,7 +402,10 @@ export function PrFeedback({
             title={row.title || undefined}
             onClick={() => setShown(row.checkout_id)}
           >
-            <span style={{ color: "var(--muted)" }}>{row.repo}</span>
+            <span style={{ color: "var(--muted)" }}>
+              {row.repo}
+              {row.source ? ` · ${row.source}` : ""}
+            </span>
             {row.number > 0 && ` #${row.number}`}
             <span className="ui-tab-count" title={`${n} of ${list.length} picked`}>
               {n}/{list.length}
@@ -482,7 +485,10 @@ function PrItems({
     <div className="fb-repo" ref={top}>
       <div className="row fb-pr">
         <h3>
-          <span style={{ color: "var(--muted)" }}>{row.repo}</span>
+          <span style={{ color: "var(--muted)" }}>
+            {row.repo}
+            {row.source ? ` · ${row.source}` : ""}
+          </span>
           {row.number > 0 && ` #${row.number} ${row.title}`}
         </h3>
         <div className="spacer" />

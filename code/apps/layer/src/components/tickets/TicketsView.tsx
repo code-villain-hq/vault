@@ -17,7 +17,7 @@ import {
   TICKET_SORTS,
   type TicketSort,
 } from "../../lib/ticket-sort";
-import { ticketLink, trackerName } from "../../lib/tracker";
+import { taskUsesTracker, ticketLink, trackerName } from "../../lib/tracker";
 import type { Ticket, TicketPage } from "../../lib/types";
 import { useStore } from "../../store";
 import { isEpicType, typeMap } from "../IssueType";
@@ -309,9 +309,11 @@ export function TicketsView() {
   const taskByKey = useMemo(() => {
     // The first task for a ticket wins, as it did when this was a find().
     const m = new Map<string, string>();
-    for (const t of tasks) if (t.issue_key && !m.has(t.issue_key)) m.set(t.issue_key, t.id);
+    for (const t of tasks)
+      if (t.issue_key && taskUsesTracker(settings, t) && !m.has(t.issue_key))
+        m.set(t.issue_key, t.id);
     return m;
-  }, [tasks]);
+  }, [settings, tasks]);
   const epics = useMemo(
     () => groupByEpic(filtered, new Set(taskByKey.keys())),
     [filtered, taskByKey],

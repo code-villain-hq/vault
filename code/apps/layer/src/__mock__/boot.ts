@@ -548,6 +548,19 @@ const answer: Record<string, Answer> = {
     return null;
   },
   disconnect: (a) => {
+    if (a.which === "github") {
+      world.settings.github_sources = world.settings.github_sources.flatMap((source) =>
+        source.key !== a.source
+          ? [source]
+          : source.shared
+            ? [{ ...source, status: "disconnected" as const, revision: null }]
+            : [],
+      );
+      world.settings.github_connected = world.settings.github_sources.some(
+        (g) => g.status === "connected",
+      );
+      return null;
+    }
     if (a.which === "slack") {
       world.settings.slack_bot = null;
       world.settings.slack = null;
@@ -556,7 +569,7 @@ const answer: Record<string, Answer> = {
       void emit("slackbot:changed");
       return null;
     }
-    const which = a.which as "jira" | "github" | "grafana";
+    const which = a.which as "jira" | "grafana";
     world.settings[which] = null;
     world.settings[`${which}_connected`] = false;
     return null;
@@ -908,10 +921,37 @@ const answer: Record<string, Answer> = {
     }));
   },
   // GitHub.
+  github_connect: (a) => {
+    const key = new URL(String(a.webUrl)).hostname;
+    const was = world.settings.github_sources.find((g) => g.key === a.source);
+    if (world.settings.github_sources.some((g) => g.key === key && g !== was))
+      throw new Error(`${key} is already a GitHub source.`);
+    if (a.token === "rejected") throw new Error(`${key} did not accept this token.`);
+    world.settings.github_sources = [
+      ...world.settings.github_sources.filter((g) => g !== was),
+      {
+        key,
+        api_url: String(a.apiUrl),
+        web_url: String(a.webUrl),
+        review_team: (a.reviewTeam as string | null) ?? null,
+        shared: was?.shared ?? world.settings.workspace?.admin !== false,
+        status: "connected",
+        revision: `mock-${Date.now()}`,
+      },
+    ].sort((a, b) => a.key.localeCompare(b.key)) as typeof world.settings.github_sources;
+    world.settings.github_connected = true;
+    return "ada";
+  },
   task_for_pr: (a) => {
-    const had = world.tasks.find((t) => t.branch === a.head);
+    const project = world.projects.find(
+      (p) => p.remote?.toLowerCase() === String(a.repo).toLowerCase(),
+    );
+    if (!project) throw new Error(`${String(a.repo)} is not one of your repositories.`);
+    const had = world.tasks.find(
+      (t) => t.branch === a.head && t.checkouts.some((c) => c.project_id === project.id),
+    );
     if (had) return had;
-    const repo = String(a.repo).split("/").pop() ?? "repo";
+    const repo = project.name;
     const id = `t-pr-${world.tasks.length}`;
     const root = `/Users/you/.villain-worktrees/${a.head as string}`;
     const task: TaskView = {
@@ -927,7 +967,7 @@ const answer: Record<string, Answer> = {
         {
           id: `c-${id}`,
           task_id: id,
-          project_id: `p-${repo}`,
+          project_id: project.id,
           project_name: repo,
           path: `${root}/${repo}`,
           base: String(a.base),
@@ -1017,15 +1057,30 @@ const answer: Record<string, Answer> = {
     droppedOffers.add(String(a.taskId));
     return null;
   },
-  github_review_queue: () => structuredClone(world.reviews),
+  github_review_queue: () =>
+    structuredClone({
+      sources: world.reviews.sources.filter((source) =>
+        world.settings.github_sources.some(
+          (g) => g.key === source.source && g.status === "connected",
+        ),
+      ),
+    }),
   github_review_pr_details: ({ repo, number, url }) => {
     const repoKey = typeof repo === "string" ? repo.toLowerCase() : "";
     const permalink = typeof url === "string" ? prPermalinkIdentity(url) : null;
-    const { mine, team, authored } = world.reviews;
-    const card = [...mine, ...(team?.prs ?? []), ...(authored?.prs ?? [])].find(
-      (pr) => pr.repo.toLowerCase() === repoKey && pr.number === number,
-    );
-    if (!card || !permalink || prPermalinkIdentity(card.url) !== permalink)
+    const card = world.reviews.sources
+      .flatMap(({ mine, team, authored }) => [
+        ...mine,
+        ...(team?.prs ?? []),
+        ...(authored?.prs ?? []),
+      ])
+      .find(
+        (pr) =>
+          pr.repo.toLowerCase() === repoKey &&
+          pr.number === number &&
+          prPermalinkIdentity(pr.url) === permalink,
+      );
+    if (!card || !permalink)
       throw new Error("Couldn’t read details for this pull request. Try again.");
     const fixture = world.reviewDetails[`${repoKey}#${card.number}`];
     const details =
@@ -1120,7 +1175,20 @@ const answer: Record<string, Answer> = {
   ticket_priorities: () => (world.settings.tracker === "github" ? [] : PRIORITIES),
   set_tracker: (a) => {
     world.settings.tracker_chosen = a.uses as typeof world.settings.tracker;
-    world.settings.tracker = world.settings.tracker_chosen;
+    if (a.uses === "github") {
+      world.settings.github_issue_source =
+        (a.githubSource as string | undefined) ??
+        world.settings.github_issue_source ??
+        world.settings.github_legacy_host;
+      world.settings.tracker = world.settings.github_sources.some(
+        (g) => g.key === world.settings.github_issue_source && g.status === "connected",
+      )
+        ? "github"
+        : null;
+    } else {
+      world.settings.tracker = world.settings.jira_connected ? "jira" : null;
+      world.settings.github_issue_source = null;
+    }
     return null;
   },
   tickets_by_key: (a) =>

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { useRunningAgentsOf } from "../lib/panes";
 import { trackerOfKey } from "../lib/tracker";
-import type { DraftImage, RepoResult, TaskView } from "../lib/types";
+import type { CheckoutPr, DraftImage, RepoResult, TaskView } from "../lib/types";
 import { PrShots } from "./PrShots";
 import { Field, Spinner } from "./ui";
 
@@ -61,7 +61,10 @@ export function usePrDescription(task: TaskView, dialog: Failure) {
   }, [task.id]);
 
   useEffect(() => {
-    setBody(task.issue_url ? `${trackerOfKey(task.issue_key ?? "")}: ${task.issue_url}\n` : "");
+    const tracker = trackerOfKey(task.issue_key ?? "");
+    // The editable body is shared by every checkout. GitHub issue
+    // references are added by the backend only to PRs on their own source.
+    setBody(task.issue_url && tracker !== "GitHub" ? `${tracker}: ${task.issue_url}\n` : "");
     setImages([]);
     setProblems([]);
     setUntaken([]);
@@ -146,13 +149,17 @@ export function usePrDescription(task: TaskView, dialog: Failure) {
     taskId: string,
     opened: RepoResult[],
     leftOut: string[],
+    rows: CheckoutPr[],
   ): Promise<RepoResult[]> {
     // Seen by now: the dialog showed them before Open was pressed.
     setProblems([]);
-    const skip = new Set(
-      [...opened.filter((r) => !r.ok).map((r) => r.repo), ...leftOut].map((r) => r.toLowerCase()),
-    );
-    const going = images.filter((i) => !i.repo || !skip.has(i.repo.toLowerCase()));
+    const skip = new Set([...opened.filter((r) => !r.ok).map((r) => r.checkout_id), ...leftOut]);
+    const going = images.flatMap((image) => {
+      const matching = rows.filter((r) => r.repo.toLowerCase() === image.repo?.toLowerCase());
+      const checkout =
+        image.checkout_id ?? (matching.length === 1 ? matching[0].checkout_id : undefined);
+      return checkout && skip.has(checkout) ? [] : [{ ...image, checkout_id: checkout }];
+    });
     if (going.length === 0) return [];
     const added = await api.showPrImages(taskId, going);
     if (added.every((r) => r.ok)) setImages([]);

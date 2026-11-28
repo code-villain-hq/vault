@@ -26,20 +26,8 @@ pub struct Sibling {
 }
 
 impl GitHub {
-    /// Give every PR in `set` a list of the others. Returns the repos whose
-    /// PR could not be updated, and why: the PRs are open either way.
-    pub async fn link_siblings(&self, set: &[Sibling], ticket: Option<&str>) -> Vec<(String, String)> {
-        let mut failed = Vec::new();
-        for pr in set {
-            let others: Vec<&Sibling> = set.iter().filter(|o| o.url != pr.url).collect();
-            if let Err(e) = self.list_others(pr, &others, ticket).await {
-                failed.push((pr.repo.clone(), e.to_string()));
-            }
-        }
-        failed
-    }
-
-    async fn list_others(&self, pr: &Sibling, others: &[&Sibling], ticket: Option<&str>) -> Result<()> {
+    /// Add siblings the caller has already scoped to this source.
+    pub(crate) async fn list_others(&self, pr: &Sibling, others: &[&Sibling], ticket: Option<&str>) -> Result<()> {
         let path = format!("/repos/{}/{}/pulls/{}", pr.owner, pr.name, pr.number);
         let v = self.json(self.req(reqwest::Method::GET, &path)).await?;
         let body = v.get("body").and_then(Value::as_str).unwrap_or_default();

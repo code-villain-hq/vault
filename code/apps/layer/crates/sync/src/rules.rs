@@ -84,14 +84,19 @@ impl Rules for Layer {
                     )));
                 }
             }
+            ModelKind::Connection => {
+                if let (Some(kind), Some(settings)) = (kind_of(row), row.get("settings")) {
+                    check_github_hosts(db, actor, kind, settings).await?;
+                }
+            }
             _ => {}
         }
         Ok(())
     }
 
     async fn prepare_update(
-        _db: &mut PgConnection,
-        _actor: Actor,
+        db: &mut PgConnection,
+        actor: Actor,
         model: ModelKind,
         _id: Uuid,
         before: Option<&Value>,
@@ -110,10 +115,14 @@ impl Rules for Layer {
         // The patch carries only the settings; which kind they must be is
         // the record's.
         if model == ModelKind::Connection
-            && let (Some(settings), Some(kind)) = (data.get("settings"), before.and_then(kind_of))
+            && let (Some(settings), Some(kind)) = (
+                data.get("settings"),
+                before.and_then(Value::as_object).and_then(kind_of),
+            )
         {
             kind.check_settings(settings)
                 .map_err(|e| SyncError::Invalid(e.0))?;
+            check_github_hosts(db, actor, kind, settings).await?;
         }
         Ok(())
     }
@@ -196,8 +205,44 @@ async fn note_count(db: &mut PgConnection, actor: Actor, repo: &str) -> Result<i
     )
 }
 
-fn kind_of(record: &Value) -> Option<ConnectionKind> {
+fn kind_of(record: &Map<String, Value>) -> Option<ConnectionKind> {
     serde_json::from_value(record.get("kind")?.clone()).ok()
+}
+
+/// The sync engine locks the workspace for the transaction, so two updates
+/// cannot claim the same host in the two different record kinds.
+async fn check_github_hosts(
+    db: &mut PgConnection,
+    actor: Actor,
+    kind: ConnectionKind,
+    settings: &Value,
+) -> Result<(), SyncError> {
+    let (other_kind, other_name) = match kind {
+        ConnectionKind::Github => (ConnectionKind::GithubSources, "github_sources"),
+        ConnectionKind::GithubSources => (ConnectionKind::Github, "github"),
+        _ => return Ok(()),
+    };
+    let other: Option<Value> = sqlx::query_scalar(
+        "SELECT settings FROM connections WHERE workspace_id = $1 AND kind = $2",
+    )
+    .bind(actor.workspace_id)
+    .bind(other_name)
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some(other) = other {
+        let hosts = kind
+            .github_hosts(settings)
+            .map_err(|e| SyncError::Invalid(e.0))?;
+        let taken = other_kind
+            .github_hosts(&other)
+            .map_err(|e| SyncError::Invalid(e.0))?;
+        if hosts.iter().any(|host| taken.contains(host)) {
+            return Err(SyncError::Invalid(
+                "The workspace already has a GitHub source for that host.".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// What a broken constraint means, for the ones people run into.

@@ -602,9 +602,13 @@ pub(crate) fn write_chat_context(state: &AppState, dir: &Path) -> Result<()> {
         )),
         None => md.push_str("- Jira — not connected\n"),
     }
-    match &cfg.github {
-        Some(g) => md.push_str(&format!("- **GitHub** — {}\n", g.api_url)),
-        None => md.push_str("- GitHub — not connected\n"),
+    let github = cfg.github_source_list().into_iter().filter(|g| g.status == "connected").collect::<Vec<_>>();
+    if github.is_empty() {
+        md.push_str("- GitHub — not connected\n");
+    } else {
+        for source in github {
+            md.push_str(&format!("- **GitHub ({})** — {}\n", source.key, source.config.web_url));
+        }
     }
     match &cfg.slack {
         Some(sl) => md.push_str(&format!("- **Slack** — {}\n", sl.channel)),

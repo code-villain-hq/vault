@@ -10,6 +10,7 @@ export type * from "./generated/ConnectionPatch";
 export type * from "./generated/ConnectionSettings";
 export type * from "./generated/FlowStatus";
 export type * from "./generated/GithubSettings";
+export type * from "./generated/GithubSourcesSettings";
 export type * from "./generated/GrafanaSettings";
 export type * from "./generated/JiraSettings";
 export type * from "./generated/LogSource";

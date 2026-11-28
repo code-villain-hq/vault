@@ -1,5 +1,5 @@
 import { type Confirmation, ConfirmDialog } from "@code-villain/web";
-import type { Connection, ConnectionKind, ConnectionSettings } from "@layer/types";
+import type { Connection, ConnectionKind, ConnectionSettings, GithubSettings } from "@layer/types";
 import { type FormEvent, useState } from "react";
 import { PageBody, PageHeader } from "./layout";
 import { MoreMenu } from "./page-parts";
@@ -121,15 +121,94 @@ export function ConnectionsPage() {
           email, stays in Layer on their own Mac.
           {!admin && " Admins change these."}
         </p>
-        {KINDS.map((spec) => (
-          <ConnectionSection
-            key={spec.kind}
-            spec={spec}
-            connection={connections.find((c) => c.kind === spec.kind)}
-            admin={admin}
-          />
-        ))}
+        {KINDS.map((spec) =>
+          spec.kind === "github" ? (
+            <GithubConnections
+              key={spec.kind}
+              spec={spec}
+              connections={connections}
+              admin={admin}
+            />
+          ) : (
+            <ConnectionSection
+              key={spec.kind}
+              spec={spec}
+              connection={connections.find((c) => c.kind === spec.kind)}
+              admin={admin}
+            />
+          ),
+        )}
       </PageBody>
+    </>
+  );
+}
+
+function hostOf(source: GithubSettings): string {
+  try {
+    return new URL(source.web_url).hostname.toLowerCase().replace(/\.+$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function GithubConnections({
+  spec,
+  connections,
+  admin,
+}: {
+  spec: (typeof KINDS)[number];
+  connections: readonly Connection[];
+  admin: boolean;
+}) {
+  const { sync } = useWorkspace();
+  const legacy = connections.find((c) => c.kind === "github");
+  const extra = connections.find((c) => c.kind === "github_sources");
+  const original = legacy?.settings && "web_url" in legacy.settings ? legacy.settings : null;
+  const additional = extra?.settings && "sources" in extra.settings ? extra.settings.sources : [];
+  const sources = [
+    ...(legacy && original ? [{ record: legacy, source: original, old: true }] : []),
+    ...(extra ? additional.map((source) => ({ record: extra, source, old: false })) : []),
+  ];
+  const add = (settings: GithubSettings, from?: GithubSettings) => {
+    const host = hostOf(settings);
+    if (!host) throw new Error("Enter a GitHub web URL with a host.");
+    if (sources.some((s) => s.source !== from && hostOf(s.source) === host)) {
+      throw new Error(`${host} is already a GitHub source.`);
+    }
+    return settings;
+  };
+  const saveExtra = (settings: GithubSettings[]) => {
+    if (extra) sync.update("Connection", extra.id, { settings: { sources: settings } });
+    else sync.create("Connection", { kind: "github_sources", settings: { sources: settings } });
+  };
+  return (
+    <>
+      {sources.map(({ record, source, old }) => (
+        <ConnectionSection
+          key={hostOf(source) || source.web_url}
+          spec={{ ...spec, name: hostOf(source) || "GitHub" }}
+          connection={{ ...record, settings: source }}
+          admin={admin}
+          onSave={(settings) => {
+            const next = add(settings as GithubSettings, source);
+            if (old) sync.update("Connection", record.id, { settings: next });
+            else saveExtra(additional.map((s) => (s === source ? next : s)));
+          }}
+          onDisconnect={() => {
+            if (old) sync.delete("Connection", record.id);
+            else saveExtra(additional.filter((s) => s !== source));
+          }}
+        />
+      ))}
+      {(admin || sources.length === 0) && (
+        <ConnectionSection
+          spec={{ ...spec, name: "GitHub sources" }}
+          connection={undefined}
+          admin={admin}
+          addLabel="Add GitHub source"
+          onSave={(settings) => saveExtra([...additional, add(settings as GithubSettings)])}
+        />
+      )}
     </>
   );
 }
@@ -138,10 +217,16 @@ function ConnectionSection({
   spec,
   connection,
   admin,
+  addLabel = "Connect",
+  onSave,
+  onDisconnect,
 }: {
   spec: (typeof KINDS)[number];
   connection: Connection | undefined;
   admin: boolean;
+  addLabel?: string;
+  onSave?: (settings: ConnectionSettings) => void;
+  onDisconnect?: () => void;
 }) {
   const { sync } = useWorkspace();
   const [editing, setEditing] = useState(false);
@@ -162,7 +247,7 @@ function ConnectionSection({
                 title: `Disconnect ${spec.name}?`,
                 body: `Nobody in the workspace reaches ${spec.name} from Layer until it is connected again. Tokens stay on each Mac.`,
                 action: "Disconnect",
-                onConfirm: () => sync.delete("Connection", connection.id),
+                onConfirm: onDisconnect ?? (() => sync.delete("Connection", connection.id)),
               }),
           },
         ]}
@@ -172,7 +257,12 @@ function ConnectionSection({
   return (
     <Section title={spec.name} aside={aside}>
       {editing ? (
-        <ConnectionForm spec={spec} connection={connection} onDone={() => setEditing(false)} />
+        <ConnectionForm
+          spec={spec}
+          connection={connection}
+          onDone={() => setEditing(false)}
+          onSave={onSave}
+        />
       ) : connection ? (
         <dl className="grid max-w-lg grid-cols-[8rem_1fr] gap-x-4 gap-y-2">
           {spec.fields.map((field) => (
@@ -193,7 +283,7 @@ function ConnectionSection({
           <p className="flex-1 text-muted">{spec.about}</p>
           {admin && (
             <Button variant="secondary" onClick={() => setEditing(true)}>
-              Connect
+              {addLabel}
             </Button>
           )}
         </div>
@@ -207,12 +297,15 @@ function ConnectionForm({
   spec,
   connection,
   onDone,
+  onSave,
 }: {
   spec: (typeof KINDS)[number];
   connection: Connection | undefined;
   onDone: () => void;
+  onSave?: (settings: ConnectionSettings) => void;
 }) {
   const { sync } = useWorkspace();
+  const [error, setError] = useState<string | null>(null);
   const saved = (connection?.settings ?? {}) as Record<string, unknown>;
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -231,12 +324,18 @@ function ConnectionForm({
       if (value) settings[field.key] = value;
       else delete settings[field.key];
     }
-    if (connection) {
-      sync.update("Connection", connection.id, { settings: settings as ConnectionSettings });
-    } else {
-      sync.create("Connection", { kind: spec.kind, settings: settings as ConnectionSettings });
+    try {
+      if (onSave) {
+        onSave(settings as ConnectionSettings);
+      } else if (connection) {
+        sync.update("Connection", connection.id, { settings: settings as ConnectionSettings });
+      } else {
+        sync.create("Connection", { kind: spec.kind, settings: settings as ConnectionSettings });
+      }
+      onDone();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : String(value));
     }
-    onDone();
   };
 
   return (
@@ -254,6 +353,11 @@ function ConnectionForm({
           onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
         />
       ))}
+      {error && (
+        <p role="alert" className="text-danger">
+          {error}
+        </p>
+      )}
       <div className="flex gap-2">
         <Button type="submit" disabled={!complete}>
           {connection ? "Save" : "Connect"}

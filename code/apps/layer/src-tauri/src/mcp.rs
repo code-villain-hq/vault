@@ -822,6 +822,7 @@ async fn call(app: &AppHandle, name: &str, args: Value, caller: Option<&str>) ->
                 None,
                 None,
                 None,
+                None,
             )
             .await?;
             if let Some(room) = chat {

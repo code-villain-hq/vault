@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::net::IpAddr;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
+use url::Url;
 use uuid::Uuid;
 
 use crate::model::{Validate, ValidationError, invalid, parse, text, web_address};
@@ -35,6 +37,7 @@ pub struct Connection {
 pub enum ConnectionSettings {
     Jira(JiraSettings),
     Github(GithubSettings),
+    GithubSources(GithubSourcesSettings),
     Slack(SlackSettings),
     Grafana(GrafanaSettings),
     Tracker(TrackerSettings),
@@ -46,6 +49,7 @@ pub enum ConnectionSettings {
 pub enum ConnectionKind {
     Jira,
     Github,
+    GithubSources,
     Slack,
     Grafana,
     Tracker,
@@ -58,9 +62,24 @@ impl ConnectionKind {
         match self {
             ConnectionKind::Jira => parse::<JiraSettings>(settings)?.validate(),
             ConnectionKind::Github => parse::<GithubSettings>(settings)?.validate(),
+            ConnectionKind::GithubSources => parse::<GithubSourcesSettings>(settings)?.validate(),
             ConnectionKind::Slack => parse::<SlackSettings>(settings)?.validate(),
             ConnectionKind::Grafana => parse::<GrafanaSettings>(settings)?.validate(),
-            ConnectionKind::Tracker => parse::<TrackerSettings>(settings).map(|_| ()),
+            ConnectionKind::Tracker => parse::<TrackerSettings>(settings)?.validate(),
+        }
+    }
+
+    pub fn github_hosts(self, settings: &Value) -> Result<Vec<String>, ValidationError> {
+        match self {
+            Self::Github => Ok(vec![github_host(
+                &parse::<GithubSettings>(settings.clone())?.web_url,
+            )?]),
+            Self::GithubSources => parse::<GithubSourcesSettings>(settings.clone())?
+                .sources
+                .iter()
+                .map(|source| github_host(&source.web_url))
+                .collect(),
+            _ => Ok(Vec::new()),
         }
     }
 }
@@ -129,6 +148,53 @@ pub struct GithubSettings {
     pub review_team: Option<String>,
 }
 
+/// Additional GitHub hosts. Keep the old singleton's settings shape so an
+/// older desktop never mistakes one of these for the connection it knows.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct GithubSourcesSettings {
+    pub sources: Vec<GithubSettings>,
+}
+
+/// Parse the address the desktop will use, without letting secrets into
+/// shared settings through URL userinfo or query parameters.
+pub fn github_address(value: &str) -> Result<Url, ValidationError> {
+    let bad = || {
+        ValidationError(
+            "A GitHub address must be HTTPS, without credentials, a query or a fragment.".into(),
+        )
+    };
+    if value.len() > 500 || value.contains(char::is_whitespace) {
+        return Err(bad());
+    }
+    let url = Url::parse(value).map_err(|_| bad())?;
+    let host = url.host_str().ok_or_else(bad)?;
+    let loopback = host.eq_ignore_ascii_case("localhost")
+        || host
+            .trim_matches(['[', ']'])
+            .parse::<IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback());
+    if !(url.scheme() == "https" || url.scheme() == "http" && loopback)
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(bad());
+    }
+    Ok(url)
+}
+
+pub fn github_host(value: &str) -> Result<String, ValidationError> {
+    let url = github_address(value)?;
+    Ok(url
+        .host_str()
+        .unwrap_or_default()
+        .trim_end_matches('.')
+        .to_ascii_lowercase())
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 #[ts(export)]
@@ -152,9 +218,24 @@ pub struct GrafanaSettings {
 /// those connected before there was a choice keep it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
-#[ts(export)]
+#[ts(export, optional_fields)]
 pub struct TrackerSettings {
     pub uses: TrackerKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github_source: Option<String>,
+}
+
+impl Validate for TrackerSettings {
+    fn validate(&self) -> Result<(), ValidationError> {
+        if let Some(host) = &self.github_source
+            && (self.uses != TrackerKind::Github
+                || host.is_empty()
+                || github_host(&format!("https://{host}")).ok().as_ref() != Some(host))
+        {
+            return invalid("Choose a GitHub host for GitHub Issues.");
+        }
+        Ok(())
+    }
 }
 
 /// The issue trackers a workspace can use. Forge joins once it is built.
@@ -221,10 +302,24 @@ impl Validate for JiraSettings {
 
 impl Validate for GithubSettings {
     fn validate(&self) -> Result<(), ValidationError> {
-        web_address(&self.api_url, "GitHub's API address")?;
-        web_address(&self.web_url, "GitHub's web address")?;
+        github_address(&self.api_url)?;
+        github_address(&self.web_url)?;
         if let Some(team) = &self.review_team {
             text(team, "A review team", 100)?;
+        }
+        Ok(())
+    }
+}
+
+impl Validate for GithubSourcesSettings {
+    fn validate(&self) -> Result<(), ValidationError> {
+        let mut hosts = HashSet::new();
+        for source in &self.sources {
+            source.validate()?;
+            let host = github_host(&source.web_url)?;
+            if !hosts.insert(host) {
+                return invalid("The workspace already has a GitHub source for that host.");
+            }
         }
         Ok(())
     }
@@ -298,5 +393,28 @@ mod tests {
                 .is_err()
         );
         assert!(ConnectionKind::Tracker.check_settings(&json!({})).is_err());
+    }
+
+    #[test]
+    fn additional_github_hosts_are_token_free_and_unique() {
+        let check = |settings| {
+            let create: ConnectionCreate = serde_json::from_value(json!({
+                "kind": "github_sources", "settings": settings,
+            }))?;
+            Ok::<_, serde_json::Error>(create.validate())
+        };
+        let public = json!({"api_url": "https://api.github.com", "web_url": "https://github.com"});
+        let enterprise = json!({"api_url": "https://git.example.com/api/v3", "web_url": "https://git.example.com"});
+        let settings = json!({"sources": [public, enterprise]});
+        assert!(check(settings.clone()).is_ok_and(|result| result.is_ok()));
+        let mut duplicate = settings.clone();
+        duplicate["sources"][1]["web_url"] = json!("https://GITHUB.COM:443/");
+        assert!(check(duplicate).is_ok_and(|result| result.is_err()));
+        let mut secret = settings.clone();
+        secret["sources"][1]["token"] = json!("do not share");
+        assert!(check(secret).is_ok_and(|result| result.is_err()));
+        let mut userinfo = settings;
+        userinfo["sources"][1]["api_url"] = json!("https://secret@git.example.com/api/v3");
+        assert!(check(userinfo).is_ok_and(|result| result.is_err()));
     }
 }

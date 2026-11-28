@@ -421,16 +421,13 @@ async fn prs_of(state: &AppState, tasks: &[Task]) -> std::collections::HashMap<S
         let seen = state.prs_seen.lock();
         tasks.iter().filter(|t| t.review.is_none() && !seen.contains_key(&t.id)).map(|t| t.id.clone()).collect()
     };
-    if !missing.is_empty() {
-        if let Ok(connected) = super::github::connected_github(state).await {
-            use futures_util::stream::{self, StreamExt};
-            let connected = &connected;
-            stream::iter(missing)
-                .map(|id| async move { super::github::task_prs(state, connected, &id).await })
-                .buffered(4)
-                .collect::<Vec<_>>()
-                .await;
-        }
+    if !missing.is_empty() && state.config.with(|c| c.github_any_connected()) {
+        use futures_util::stream::{self, StreamExt};
+        stream::iter(missing)
+            .map(|id| async move { super::github::task_prs(state, &id).await })
+            .buffered(4)
+            .collect::<Vec<_>>()
+            .await;
     }
     state.prs_seen.lock().clone()
 }
@@ -510,7 +507,7 @@ async fn overview(app: &AppHandle) -> Result<Value> {
         "tasks": rows.into_iter().map(|(_, _, row)| row).collect::<Vec<_>>(),
         "chats": chats,
         "processes": processes,
-        "github": super::github::github_client(&state).await.is_ok(),
+        "github": state.config.with(|c| c.github_any_connected()),
         "standing_orders": standing.orders,
         "left_alone": standing.left_alone,
     }))

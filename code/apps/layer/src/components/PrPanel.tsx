@@ -280,9 +280,10 @@ function ConnectedPrPanel({ task, onUpdateFromBase }: PrPanelProps) {
 
   async function retarget(row: CheckoutPr) {
     panel.clear();
+    if (!row.pr) return;
     try {
       // The row shows the new base once it is read again (NOTE-7).
-      await api.githubRetargetPr(row.checkout_id);
+      await api.githubRetargetPr(row.checkout_id, row.pr.url);
       await load();
     } catch (e) {
       fail(e);
@@ -292,8 +293,9 @@ function ConnectedPrPanel({ task, onUpdateFromBase }: PrPanelProps) {
   /** Draft to ready for review and back (PR-15); the card shows it once read again. */
   async function markDraft(row: CheckoutPr, draft: boolean) {
     panel.clear();
+    if (!row.pr) return;
     try {
-      await api.githubSetPrDraft(row.checkout_id, row.pr!.number, draft);
+      await api.githubSetPrDraft(row.checkout_id, row.pr.number, draft, row.pr.url);
       await load();
     } catch (e) {
       fail(e);
@@ -325,8 +327,10 @@ function ConnectedPrPanel({ task, onUpdateFromBase }: PrPanelProps) {
         draft,
         skippedIds,
       );
-      const skipped = rows.filter((r) => skippedIds.includes(r.checkout_id)).map((r) => r.repo);
-      const results = [...opened, ...(await description.addImages(task.id, opened, skipped))];
+      const results = [
+        ...opened,
+        ...(await description.addImages(task.id, opened, skippedIds, rows)),
+      ];
       reportRepoResults(dialog.fail, results);
       // A repository that refused keeps the dialog open, its reason in it.
       if (results.length > 0 && results.every((r) => r.ok)) setCreating(false);
@@ -343,7 +347,10 @@ function ConnectedPrPanel({ task, onUpdateFromBase }: PrPanelProps) {
       <div className="empty">
         <h2>GitHub not connected</h2>
         <p>Connect GitHub or GitHub Enterprise to open pull requests and read CI from here.</p>
-        <button className="ui-button ui-button-primary" onClick={() => toggleSettings(true)}>
+        <button
+          className="ui-button ui-button-primary"
+          onClick={() => toggleSettings(true, "github")}
+        >
           Connect GitHub
         </button>
       </div>
@@ -412,6 +419,7 @@ function ConnectedPrPanel({ task, onUpdateFromBase }: PrPanelProps) {
             }}
           >
             {r.repo}
+            {r.source ? ` · ${r.source}` : ""}
           </span>
           <span>
             {r.pr && r.pr.state === "open"
@@ -581,8 +589,11 @@ function ConnectedPrPanel({ task, onUpdateFromBase }: PrPanelProps) {
                 </span>
               )}
               <h3 style={{ margin: 0, overflowWrap: "anywhere" }}>
-                <span style={{ color: "var(--muted)" }}>{row.repo}</span> #{identity.number}{" "}
-                {identity.title}
+                <span style={{ color: "var(--muted)" }}>
+                  {row.repo}
+                  {row.source ? ` · ${row.source}` : ""}
+                </span>{" "}
+                #{identity.number} {identity.title}
               </h3>
               <div className="spacer" />
               {!pr && <span className="muted">Last known pull request</span>}

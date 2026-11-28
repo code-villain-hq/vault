@@ -34,6 +34,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [transition, setTransition] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmedRows] = useState(rows ?? []);
 
   useEffect(() => {
     if (!key) return;
@@ -67,13 +68,23 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
   // before rather than after.
   const uncovered = (rows ?? []).filter((r) => r.changed > 0);
   const landed = Object.fromEntries(
-    (rows ?? [])
+    confirmedRows
       .filter((r) => r.pr?.merged && r.pr.head_sha)
       .map((r) => [r.checkout_id, r.pr!.head_sha]),
   );
   const totals = taskTotals(task);
   const edited = totals.dirty + totals.staged;
-  const repos = task.checkouts.map((c) => c.project_name);
+  const repos = task.checkouts.map((c) => {
+    const source = rows?.find((r) => r.checkout_id === c.id)?.source;
+    return source ? `${c.project_name} · ${source}` : c.project_name;
+  });
+  const unreadable = (rows ?? []).filter((r) => r.error);
+  const proofChanged =
+    Object.keys(landed).length === 0 ||
+    Object.entries(landed).some(
+      ([id, sha]) =>
+        !rows?.some((r) => r.checkout_id === id && r.pr?.merged && r.pr.head_sha === sha),
+    );
 
   async function finish() {
     setBusy(true);
@@ -120,7 +131,7 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
           </button>
           <button
             className="ui-button ui-button-primary"
-            disabled={busy || done === null}
+            disabled={busy || done === null || proofChanged || unreadable.length > 0}
             onClick={() => void finish()}
           >
             {busy ? "Finishing…" : "Finish task"}
@@ -132,7 +143,13 @@ export function FinishTask({ task, onClose }: { task: TaskView; onClose: () => v
         className="muted"
         style={{ marginTop: 0, lineHeight: 1.55, fontSize: "var(--type-ui-small-size)" }}
       >
-        Every pull request for <code>{task.branch}</code> has merged. This puts the task away:
+        {proofChanged || unreadable.length > 0 ? (
+          "Layer could not confirm the pull requests shown when you opened this dialog. Refresh pull requests, then reopen Finish task."
+        ) : (
+          <>
+            Every pull request for <code>{task.branch}</code> has merged. This puts the task away:
+          </>
+        )}
       </p>
       <ul className="finish-list">
         {paneCount > 0 && (

@@ -1090,6 +1090,13 @@ send feedback to an agent, and finish a merged task.
   open Comments; the background PR sweep does not load them. A result for
   another PR or an older request MUST NOT replace the current result.
   GitHub connection handling stays as in PR-12.
+- **PR-19** A task MAY span GitHub.com and GitHub Enterprise Server. Layer
+  MUST route PRs, checks, feedback and images by the checkout's Git origin,
+  not by repository name or the last GitHub source connected. A source that
+  cannot be reached or is not connected is named on the affected row. Other
+  rows still load. An unreadable PR is not evidence that work has landed
+  or a branch is safe to delete. Layer lists sibling PRs on the task, but
+  does not add links to another GitHub host in a PR's description.
 
 Code: `commands/github.rs`, `commands/pr_branches.rs`, `commands/pr_draft.rs`, `integrations/github/ready.rs`, `commands/open_prs.rs`, `commands/pr_images.rs`, `commands/pr_image_offers.rs`, `PrImageOffer.tsx`, `commands/outgoing.rs`, `git/outgoing.rs`, `Outgoing.tsx`, `commands/landed.rs`, `git/landed.rs`, `integrations/github.rs`, `integrations/github/images.rs`, `PrPanel.tsx`, `PrReadErrors.tsx`,
 `PrFeedback.tsx`, `Markdown.tsx`, `lib/markdown.ts`; its connection in `CodeSettings.tsx`.
@@ -1226,7 +1233,7 @@ offers Start work.
   | Done | the "done" category | closed | a state of type Completed or Canceled |
   | An epic (§26) | a type at hierarchy level 1 or above | an issue of the type chosen for epics in Settings; without issue types, an issue with sub-issues | an issue with sub-issues |
   | Filing (TKT-3) | the project's required fields (`createmeta`) | one of the workspace's repositories, a title, a body | a team, a title, a description |
-  | Its account | Tickets (Jira): site, email, token | Code (GitHub)'s token: nothing more to connect | Tickets (Forge): the site, then you sign in to it in the browser, as Forge's own desktop app does |
+  | Its account | Tickets (Jira): site, email, token | The selected GitHub source's token from Settings → Code | Tickets (Forge): the site, then you sign in to it in the browser, as Forge's own desktop app does |
 
   Forge names its states per team, as Jira does its statuses, so a state
   is known by its type, never its name. GitHub's issue types are an
@@ -1237,7 +1244,7 @@ offers Start work.
 - **TKT-18** A GitHub issue or a Forge ticket MUST follow the work the way
   its own tracker moves it, not by the app moving it. The task's branch
   carries its key, and each of its pull requests says "Fixes `<key>`" in
-  its body. GitHub closes the issue when one merges into the repository's
+   its body, subject to the same-source boundary in TKT-22. GitHub closes the issue when one merges into the repository's
   default branch, and only then. A task based on another branch (TASK-3)
   closes nothing that way, so once every pull request of such a task has
   merged, with nothing left unmerged or uncommitted, the app closes the
@@ -1274,6 +1281,14 @@ offers Start work.
   repository, where the app reads a pull request's ticket from its branch
   or title (REV-7, REV-11) it asks GitHub which issues the pull request
   closes instead.
+- **TKT-22** A workspace using GitHub Issues MUST select one of its GitHub
+  sources for tickets. Adding or disconnecting a Code source does not change
+  that selection. If the selected source is unavailable, Layer says which
+  one instead of using a different one. Existing links keep their original
+   URL. Layer adds GitHub issue links and `Fixes` references only to PRs on
+   that source. It also leaves references to that task's issue out of PR
+   descriptions sent to other sources. Changing the selected tracker clears old ticket results;
+   Layer refuses to start work from a card for a different source.
 
 Code: `tickets.rs` (the tracker: `Tracker`; Jira's side in
 `tickets/jira.rs`, GitHub's in `tickets/github.rs`), `commands/tickets.rs`
@@ -1359,10 +1374,10 @@ dot marks it only while something waits on your review.
 - **REV-7** One of your PRs MUST lead to its work: a click opens its task's
   Pull requests tab, and GitHub is a button on the card. One with no task
   offers "Start task", which makes one in the registered repo whose origin
-  is the PR's (`owner/name`), on the PR's own branch (TASK-3) and against
+  is the PR's (`host/owner/name`), on the PR's own branch (TASK-3) and against
   its base, named after its title, with a Jira key in the branch or title
-  linked as the ticket when Jira is connected. A task already on that
-  branch is opened instead, with the repo added if it lacked it. A PR in a
+  linked as the ticket when Jira is connected. A task with a checkout of
+  that repository on the PR's branch is opened instead. A PR in a
   repo that is not registered says so, and makes nothing.
 - **REV-8** "Opened by you" MUST group your PRs by whose move it is, in
   this order: needs you, ready to merge, checks running, waiting on
@@ -1415,6 +1430,11 @@ dot marks it only while something waits on your review.
   PR's current head, not individual legacy commit statuses. An empty,
   unavailable, incomplete or passing list does not make the overall PR
   pass. A failing rollup stays visible even if no check runs are reported.
+- **REV-14** Reviews MUST show requests, team queues and authored PRs from
+  every connected GitHub source. An error or result limit on one source
+  names that source and leaves results from others visible. The same
+  `owner/repo#123` on two hosts is two PRs in the list, repository groups,
+  notification targets and actions.
 
 Code: `commands/github.rs` (`review_queue`, `github_review_queue`),
 `integrations/github/authored.rs`, `integrations/github/requested.rs`,
@@ -1674,7 +1694,7 @@ Known gaps:
 | Tickets: issue tracker | none | Jira or GitHub Issues, one per workspace (TKT-15); Forge, and GitHub Issues' epic type (TKT-17), are not built |
 | Tickets: Jira | — | site URL, email, API token, optional project key and JQL |
 | Tickets follow the work (Jira) | work starts: first in-progress status; review, merged: not chosen | TKT-1, TKT-8, per Jira project |
-| Code: GitHub | — | API URL (`…/api/v3` for Enterprise), token (`repo`; `read:org` for a bare team slug; a fine-grained token also needs Issues, read and write, when GitHub Issues is the tracker), review team |
+| Code: GitHub | none | One source per web host. Each has an API URL (`…/api/v3` for Enterprise), a web URL, an optional review team and this Mac's own token (`repo`; `read:org` for a bare team slug; a fine-grained token also needs Issues, read and write, on the GitHub Issues source) |
 | Messaging: Slack | — | the bot: bot token (`xoxb-`), app-level token (`xapp-`, `connections:write`), the owner's member ID, the agent and its model (BOT-17), on/off, work without asking, personality (BOT-*) |
 | Logs: Grafana | — | site URL, service account token (reads and queries datasources), OBS-1; the Loki datasource for your services' logs, none chosen, OBS-5 |
 | Logs: S3 log sources | none | each a name, AWS profile, region, bucket, prefix and optional Athena table; no AWS keys, OBS-8, OBS-9 |
@@ -1792,6 +1812,13 @@ Known gaps:
   other metadata; item color is independent.
   Validation follows DETAIL-3, including canonical case-insensitive reuse.
   A failed add stays inline and a successful add needs no toast.
+- **SET-16** Settings → Code MUST list every GitHub source on the profile
+  by web host. Each has its own connect, reconnect and disconnect actions.
+  Shared addresses and review teams follow SET-7 to SET-10. A local
+  disconnect removes only that source's credential. A token is usable only
+  by its source and API origin, including after a workspace settings change.
+  A rejected reconnect does not replace a working credential. An upgrade
+  keeps a profile's valid existing connection without asking for its token.
 
 Code: `commands/settings.rs`, `config.rs` (`UiPrefs`), `Settings.tsx`,
 `AppearanceSettings.tsx`, `NotificationSettings.tsx`, `AgentSettings.tsx`

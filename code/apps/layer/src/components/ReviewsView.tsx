@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "r
 import { copyAndSay } from "../lib/clipboard";
 import { authoredGroups, countOf, reviewCounts, taskOfPr } from "../lib/derive";
 import { useEpics } from "../lib/epics";
+import { githubPrRepo, githubRepoLabel } from "../lib/github-source";
 import { goTo } from "../lib/goto";
 import {
   byEpic,
@@ -68,14 +69,18 @@ function ticketOf(pr: { head: string; title: string }, taskKey?: string | null):
 }
 
 /** Grouped by epic or repository: the grouping that is not about whose move it is. */
-function regroup<T extends { repo: string }>(
+function regroup<T extends { source?: string; url: string; repo: string }>(
   prs: T[],
   by: string,
   epicOf: (pr: T) => EpicOf | null | undefined,
 ): Group<T>[] {
   return by === "epic"
     ? byEpic(prs, epicOf)
-    : groupBy(prs, (pr) => ({ id: pr.repo, label: pr.repo || "pull request" }), "No repository");
+    : groupBy(
+        prs,
+        (pr) => ({ id: githubPrRepo(pr), label: githubRepoLabel(pr) || "pull request" }),
+        "No repository",
+      );
 }
 
 function ReviewList({
@@ -84,7 +89,6 @@ function ReviewList({
   tone,
   title,
   count,
-  more,
   open,
   onToggle,
   children,
@@ -95,7 +99,6 @@ function ReviewList({
   tone?: string;
   title?: string;
   count?: string;
-  more?: boolean;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
@@ -110,12 +113,7 @@ function ReviewList({
         {epicKey && <span className="count key">{epicKey}</span>}
         {count !== undefined && <span className="count">{count}</span>}
       </button>
-      {open && (
-        <div className="review-list-body">
-          {children}
-          {more && <p className="review-note">Showing the 100 most recently updated.</p>}
-        </div>
-      )}
+      {open && <div className="review-list-body">{children}</div>}
     </section>
   );
 }
@@ -129,18 +127,19 @@ export function ReviewsView() {
   const githubConnectionRevision = useStore((s) => s.githubConnectionRevision);
   const connection = JSON.stringify([
     settings?.github_connected,
-    settings?.github?.api_url,
-    settings?.github?.web_url,
+    (settings?.github_sources ?? []).map((g) => [g.key, g.api_url, g.web_url, g.revision]),
     githubConnectionRevision,
   ]);
   const readers = useMemo(() => createReviewPrReaders(connection), [connection]);
   useEffect(() => () => readers.prune([]), [readers]);
   useEffect(() => {
-    readers.prune([
-      ...(queue?.mine ?? []),
-      ...(queue?.team?.error ? [] : (queue?.team?.prs ?? [])),
-      ...(queue?.authored?.error ? [] : (queue?.authored?.prs ?? [])),
-    ]);
+    readers.prune(
+      (queue?.sources ?? []).flatMap((source) => [
+        ...(source.mine_error ? [] : source.mine),
+        ...(source.team?.error ? [] : (source.team?.prs ?? [])),
+        ...(source.authored?.error ? [] : (source.authored?.prs ?? [])),
+      ]),
+    );
   }, [queue, readers]);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const fail = useStore((s) => s.fail);
@@ -152,6 +151,7 @@ export function ReviewsView() {
   const focusReview = useStore((s) => s.focusReview);
   const clearFocusReview = useStore((s) => s.clearFocusReview);
   const tasks = useStore((s) => s.tasks);
+  const projects = useStore((s) => s.projects);
   const taskPrs = useStore((s) => s.prs);
   // Two sides of review, one at a time: what waits on you, what you wait on.
   const [side, setSideState] = useState<Side>(() => readOneOf("reviewsSide", SIDES, "review"));
@@ -179,6 +179,12 @@ export function ReviewsView() {
   // Without Jira there is no epic to ask for; the choice is kept for when it is back.
   const by = grouping[side] === "epic" && !trackerInUse ? GROUPS[side][0][0] : grouping[side];
   const sort = sorting[side];
+  const focused =
+    focusReview && focusReview.split("/").length < 3
+      ? settings?.github_legacy_host
+        ? `${settings.github_legacy_host}/${focusReview.toLowerCase()}`
+        : null
+      : focusReview;
 
   // A banner or a message about one pull request: open its list, bring it
   // into view and light it up briefly. It waits for the queue to arrive; one
@@ -187,12 +193,11 @@ export function ReviewsView() {
     if (!focusReview || !queue) return;
     // Banners are only ever about requests of you or your team.
     setSideState("review");
-    const inTeam = queue.team?.prs.some((pr) => identity(pr) === focusReview);
-    const inMine = queue.mine.some((pr) => identity(pr) === focusReview);
-    if (inMine || inTeam) setShut((c) => ({ ...c, [inMine ? "you" : "team"]: false }));
+    if (focused) setShut({});
     const scroll = window.setTimeout(() => {
+      if (!focused) return;
       document
-        .querySelector(`[data-review="${CSS.escape(focusReview)}"]`)
+        .querySelector(`[data-review="${CSS.escape(focused)}"]`)
         ?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 80);
     const clear = window.setTimeout(() => clearFocusReview(), 2200);
@@ -200,7 +205,7 @@ export function ReviewsView() {
       window.clearTimeout(scroll);
       window.clearTimeout(clear);
     };
-  }, [focusReview, queue, clearFocusReview]);
+  }, [focusReview, focused, queue, clearFocusReview]);
 
   function prMenu(pr: ReviewRequest | AuthoredPr, taskId?: string): MenuItem[] {
     const key = identity(pr);
@@ -220,20 +225,25 @@ export function ReviewsView() {
 
   /** The task a pull request of yours belongs to, if one of the app's made it. */
   function taskOf(pr: AuthoredPr): { id: string; name: string } | null {
-    const id = taskOfPr(pr, taskPrs, tasks);
+    const id = taskOfPr(pr, taskPrs, tasks, projects);
     const task = id ? tasks.find((t) => t.id === id) : undefined;
     return task ? { id: task.id, name: task.name } : null;
   }
 
+  const sources = queue?.sources ?? [];
+  const mine = sources.flatMap((source) => (source.mine_error ? [] : source.mine));
+  const mineMore = sources.some((source) => !source.mine_error && source.mine_more);
+  const teams = sources.flatMap(({ source, team }) => (team ? [{ source, team }] : []));
   const requested = [
-    ...(queue?.mine ?? []).map((pr) => ({ pr, asked: "you" })),
-    ...(queue?.team && !queue.team.error
-      ? queue.team.prs.map((pr) => ({ pr, asked: teamLabel(queue.team!) }))
-      : []),
+    ...mine.map((pr) => ({ pr, asked: "you" })),
+    ...teams.flatMap(({ team }) =>
+      team.error ? [] : team.prs.map((pr) => ({ pr, asked: teamLabel(team) })),
+    ),
   ];
-  const ownPrs = queue?.authored?.prs ?? [];
+  const readAuthored = sources.filter((source) => source.authored && !source.authored.error);
+  const ownPrs = readAuthored.flatMap((source) => source.authored?.prs ?? []);
   const keyOf = (pr: AuthoredPr) =>
-    ticketOf(pr, tasks.find((t) => t.id === taskOfPr(pr, taskPrs, tasks))?.issue_key);
+    ticketOf(pr, tasks.find((t) => t.id === taskOfPr(pr, taskPrs, tasks, projects))?.issue_key);
   const epics = useEpics(
     side === "review"
       ? requested.flatMap(({ pr }) => ticketOf(pr) ?? [])
@@ -251,16 +261,13 @@ export function ReviewsView() {
         <button
           type="button"
           className="ui-button ui-button-primary"
-          onClick={() => toggleSettings(true)}
+          onClick={() => toggleSettings(true, "github")}
         >
           Connect GitHub
         </button>
       </div>
     );
   }
-
-  const team = queue?.team ?? null;
-  const authored = queue?.authored ?? null;
 
   const { toReview, yours } = reviewCounts(queue);
 
@@ -343,15 +350,24 @@ export function ReviewsView() {
       </div>
 
       {error && <p className="review-note warn">{error}</p>}
+      {sources.flatMap((source) => {
+        const failures =
+          side === "review"
+            ? [source.mine_error, by !== "who" ? source.team?.error : null]
+            : [source.authored?.error];
+        return [...new Set(failures.filter(Boolean))].map((message) => (
+          <p key={`${source.source}:${message}`} className="review-note warn">
+            {source.source}: {message}
+          </p>
+        ));
+      })}
 
       {side === "authored" && (
         <div>
-          {authored?.error ? (
-            <p className="review-note warn">{authored.error}</p>
-          ) : authored && authored.prs.length === 0 ? (
+          {readAuthored.length > 0 && ownPrs.length === 0 ? (
             <p className="review-note">You have no open pull requests.</p>
-          ) : authored && by !== "move" ? (
-            regroup(sortPrs(authored.prs, sort), by, (pr) => {
+          ) : by !== "move" ? (
+            regroup(sortPrs(ownPrs, sort), by, (pr) => {
               const key = keyOf(pr);
               return key ? epics[key] : null;
             }).map((g) => (
@@ -378,8 +394,7 @@ export function ReviewsView() {
               </ReviewList>
             ))
           ) : (
-            authored &&
-            authoredGroups(sortPrs(authored.prs, sort)).map(({ standing, prs }) => (
+            authoredGroups(sortPrs(ownPrs, sort)).map(({ standing, prs }) => (
               <ReviewList
                 key={standing.label}
                 heading={groupHeading(standing.label)}
@@ -403,16 +418,19 @@ export function ReviewsView() {
               </ReviewList>
             ))
           )}
-          {authored?.more && !authored.error && (
-            <p className="review-note">Showing the 50 most recently updated.</p>
-          )}
+          {readAuthored
+            .filter((source) => source.authored?.more)
+            .map(({ source }) => (
+              <p key={source} className="review-note">
+                {source}: showing the 50 most recently updated.
+              </p>
+            ))}
         </div>
       )}
 
       {side === "review" && by !== "who" && (
         <>
-          {queue?.team?.error && <p className="review-note warn">{queue.team.error}</p>}
-          {queue && requested.length === 0 && (
+          {sources.some((source) => !source.mine_error) && requested.length === 0 && (
             <p className="review-note">Nothing is waiting on you or your team.</p>
           )}
           {regroup(
@@ -439,16 +457,13 @@ export function ReviewsView() {
                   key={identity(pr)}
                   pr={pr}
                   asked={requested.find((r) => r.pr === pr)?.asked}
-                  focused={focusReview === identity(pr)}
+                  focused={focused === identity(pr)}
                   readers={readers}
                   onContextMenu={(e) => openMenu(e, pr)}
                 />
               ))}
             </ReviewList>
           ))}
-          {(queue?.mine_more || (queue?.team?.more && !queue.team.error)) && (
-            <p className="review-note">Showing the 100 most recently updated of each.</p>
-          )}
         </>
       )}
 
@@ -456,64 +471,80 @@ export function ReviewsView() {
         <>
           <ReviewList
             heading="You"
-            count={queue ? countOf(queue.mine.length, queue.mine_more) : undefined}
-            more={queue?.mine_more}
+            count={
+              sources.some((source) => !source.mine_error)
+                ? countOf(mine.length, mineMore)
+                : undefined
+            }
             open={!shut.you}
             onToggle={() => toggle("you")}
           >
-            {queue && queue.mine.length === 0 && (
+            {sources.some((source) => !source.mine_error) && mine.length === 0 && (
               <p className="review-note">Nothing is waiting on you.</p>
             )}
-            {queue &&
-              sortPrs(queue.mine, sort).map((pr) => (
-                <ReviewCard
-                  key={`${pr.repo}#${pr.number}`}
-                  pr={pr}
-                  focused={focusReview === identity(pr)}
-                  readers={readers}
-                  onContextMenu={(e) => openMenu(e, pr)}
-                />
-              ))}
+            {sortPrs(mine, sort).map((pr) => (
+              <ReviewCard
+                key={identity(pr)}
+                pr={pr}
+                focused={focused === identity(pr)}
+                readers={readers}
+                onContextMenu={(e) => openMenu(e, pr)}
+              />
+            ))}
           </ReviewList>
 
-          {team ? (
-            <ReviewList
-              heading={teamLabel(team)}
-              title={team.slug}
-              count={team.error ? undefined : countOf(team.prs.length, team.more)}
-              more={team.more && !team.error}
-              open={!shut.team}
-              onToggle={() => toggle("team")}
-            >
-              {team.error ? (
-                <p className="review-note warn">{team.error}</p>
-              ) : team.prs.length === 0 ? (
-                <p className="review-note">Nothing is waiting on {teamLabel(team)}.</p>
-              ) : (
-                sortPrs(team.prs, sort).map((pr) => (
-                  <ReviewCard
-                    key={`${pr.repo}#${pr.number}`}
-                    pr={pr}
-                    focused={focusReview === identity(pr)}
-                    readers={readers}
-                    onContextMenu={(e) => openMenu(e, pr)}
-                  />
-                ))
-              )}
-            </ReviewList>
+          {teams.length ? (
+            teams.map(({ source, team }) => (
+              <ReviewList
+                key={source}
+                heading={`${teamLabel(team)} · ${source}`}
+                title={team.slug}
+                count={team.error ? undefined : countOf(team.prs.length, team.more)}
+                open={!shut[source]}
+                onToggle={() => toggle(source)}
+              >
+                {team.error ? (
+                  <p className="review-note warn">{team.error}</p>
+                ) : team.prs.length === 0 ? (
+                  <p className="review-note">Nothing is waiting on {teamLabel(team)}.</p>
+                ) : (
+                  sortPrs(team.prs, sort).map((pr) => (
+                    <ReviewCard
+                      key={identity(pr)}
+                      pr={pr}
+                      focused={focused === identity(pr)}
+                      readers={readers}
+                      onContextMenu={(e) => openMenu(e, pr)}
+                    />
+                  ))
+                )}
+              </ReviewList>
+            ))
           ) : (
             <ReviewList heading="Team" open={!shut.team} onToggle={() => toggle("team")}>
               <p className="review-note">
                 Set a review team in Settings → Code — for example @fe — to list pull requests
                 requested of that team.
               </p>
-              <button type="button" className="ui-button" onClick={() => toggleSettings(true)}>
+              <button
+                type="button"
+                className="ui-button"
+                onClick={() => toggleSettings(true, "github")}
+              >
                 Settings
               </button>
             </ReviewList>
           )}
         </>
       )}
+      {side === "review" &&
+        sources
+          .filter((source) => source.mine_more || source.team?.more)
+          .map(({ source }) => (
+            <p key={source} className="review-note">
+              {source}: showing up to 100 of each review list.
+            </p>
+          ))}
 
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />

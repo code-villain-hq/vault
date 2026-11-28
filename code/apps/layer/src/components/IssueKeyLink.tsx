@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react";
 import { goTo } from "../lib/goto";
 import { keyProjects, type IssueKeys } from "../lib/issue-keys";
+import { taskUsesTracker } from "../lib/tracker";
 import type { TaskView, Ticket } from "../lib/types";
 import { useStore } from "../store";
 
@@ -46,7 +47,8 @@ export function IssueKeyLink({ issueKey, tasked }: { issueKey: string; tasked: b
     e.preventDefault();
     e.stopPropagation();
     // Asked at the click, so a task made or deleted since is where it goes.
-    const task = useStore.getState().tasks.find((t) => t.issue_key === issueKey);
+    const { settings, tasks } = useStore.getState();
+    const task = tasks.find((t) => t.issue_key === issueKey && taskUsesTracker(settings, t));
     goTo(task ? `task:${task.id}` : `ticket:${issueKey}`);
   }
   return (

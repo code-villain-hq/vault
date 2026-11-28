@@ -55,7 +55,8 @@ pub(super) enum Action {
     /// A branch in a repository, and the tip it was judged at.
     Branch(PathBuf, String, String),
     /// A branch on the origin of an app's copy, and the tip it was judged at.
-    OriginBranch(PathBuf, String, String),
+    OriginBranch(PathBuf, String, String, git::GithubOrigin),
+    Blocked,
     Records(PathBuf),
     Store(PathBuf),
 }
@@ -355,7 +356,11 @@ fn remove(action: &Action, config_folder: &Path) -> Result<()> {
         }
         Action::Worktree(owner, wt) => git::remove_worktree(owner, &wt.to_string_lossy(), false),
         Action::Branch(repo, branch, tip) => git::delete_branch_at(repo, branch, tip),
-        Action::OriginBranch(store, branch, tip) => git::delete_origin_branch(store, branch, tip),
+        Action::OriginBranch(store, branch, tip, origin) => {
+            git::verify_github_push_origin(store, origin)?;
+            git::delete_origin_branch(store, branch, tip)
+        }
+        Action::Blocked => Err(Error::Other("This cleanup item cannot be removed.".into())),
         Action::Records(store) => {
             let staging = store.join("villain-adopting");
             // Each an empty folder with a `.git` link, never checked out;

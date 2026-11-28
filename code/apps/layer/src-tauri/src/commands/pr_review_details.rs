@@ -6,8 +6,9 @@ use tauri::State;
 use crate::error::{Error, Result};
 use crate::integrations::github::{GitHub, PrChecks, PrComments};
 
+use super::github_sources::client_for;
 use super::pr_comments::{matches_pr_permalink, repo_segment};
-use super::{github_client, AppState};
+use super::AppState;
 
 #[derive(Debug, Serialize)]
 pub struct ReviewPrDetails {
@@ -28,7 +29,11 @@ pub async fn github_review_pr_details(
     number: u64,
     url: String,
 ) -> Result<ReviewPrDetails> {
-    let (client, config) = github_client(&state).await.map_err(review_read_error)?;
+    // The card's link names its GitHub source; the permalink check below
+    // still holds the reply to that source's web address.
+    let key = layer_domain::github_host(&url)
+        .map_err(|_| Error::Other("That pull request link is not valid. Refresh Reviews and try again.".into()))?;
+    let (client, config) = state.config.with(|cfg| client_for(cfg, &key)).map_err(review_read_error)?;
     read_review_pr_details(&client, &config.web_url, &repo, number, &url).await
 }
 

@@ -16,7 +16,7 @@ use crate::config::{FlowStatus, StartTo, Task, TicketFlow};
 use crate::error::{Error, Result};
 use crate::integrations::jira::{Jira, ProjectStatus};
 
-use super::github::{CheckoutPr, ConnectedGitHub};
+use super::github::{CheckoutPr, GitHubGate};
 use super::AppState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -51,7 +51,7 @@ pub fn stage(rows: &[CheckoutPr]) -> Option<Stage> {
     if live.is_empty() {
         return None;
     }
-    if live.iter().all(|p| p.merged) && rows.iter().all(|r| r.changed == 0) {
+    if live.iter().all(|p| p.merged) && rows.iter().all(|r| r.changed == 0 && r.error.is_none()) {
         return Some(Stage::Merged);
     }
     live.iter().any(|p| p.state == "open" && !p.draft).then_some(Stage::Review)
@@ -81,17 +81,21 @@ pub struct TicketMove {
 /// not been moved for. None when there is nothing to say.
 pub(crate) async fn follow(
     state: &AppState,
-    connected: &ConnectedGitHub,
+    gate: &GitHubGate,
     client: &Jira,
     task: &Task,
     rows: &[CheckoutPr],
 ) -> Option<TicketMove> {
+    if !state.config.with(|c| crate::tickets::task_on_tracker(c, task)) {
+        return None;
+    }
     let key = task.issue_key.as_deref()?;
     let reached = stage(rows)?;
+    due(task, Some(reached))?;
     let project = key.split('-').next()?;
     let transition = {
         let mut session = state.github_session.lock().await;
-        if session.generation != connected.generation {
+        if session.generation != gate.generation {
             return None;
         }
         session.ticket_transition(&task.id)
@@ -100,9 +104,18 @@ pub(crate) async fn follow(
     // still owes the first one a reply. Never wait on this lock with the
     // session held. The order below is task, then session, then config.
     let _transition = transition.lock().await;
+    if reached == Stage::Merged {
+        // Only the UI sweep may use cached origins. A merge-driven ticket
+        // move needs a fresh read of every checkout. Not under the session:
+        // the read takes it to publish.
+        let fresh = super::github::read_task_prs(state, &task.id, true).await.ok()?;
+        if stage(&fresh) != Some(Stage::Merged) || !state.config.with(|c| crate::tickets::task_on_tracker(c, task)) {
+            return None;
+        }
+    }
     let (stage, target) = {
         let session = state.github_session.lock().await;
-        if session.generation != connected.generation {
+        if session.generation != gate.generation {
             return None;
         }
         state.config.with(|c| {
@@ -281,6 +294,7 @@ mod tests {
 
     fn row(state: &str, draft: bool, merged: bool, changed: usize) -> CheckoutPr {
         CheckoutPr {
+            source: None,
             checkout_id: "c".into(),
             repo: "api".into(),
             pr: (!state.is_empty()).then(|| PullRequest {
@@ -347,6 +361,13 @@ mod tests {
             "a repo with work and no PR"
         );
         assert_eq!(stage(&[row("closed", false, false, 2)]), None, "closed without merging is given up on");
+    }
+
+    #[test]
+    fn an_unreadable_repository_does_not_prove_the_task_merged() {
+        let mut unreadable = row("", false, false, 0);
+        unreadable.error = Some("Enterprise is unavailable".into());
+        assert_eq!(stage(&[row("closed", false, true, 0), unreadable]), None);
     }
 
     #[test]

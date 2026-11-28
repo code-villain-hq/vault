@@ -174,6 +174,36 @@ pub fn delete(key: &str) -> Result<()> {
     store(bundle)
 }
 
+/// The original binding in config is fixed before workspace settings arrive.
+/// Moving its token within the bundle is atomic and safe to retry.
+pub(crate) fn migrate_github(key: &str) -> Result<Option<String>> {
+    if let Some(token) = get(key)? {
+        return Ok(Some(token));
+    }
+    let _writing = WRITING.lock();
+    let mut bundle = load()?;
+    if let Some(token) = bundle.get(key) {
+        return Ok(Some(token.clone()));
+    }
+    let Some(token) = bundle.remove(GITHUB) else { return Ok(None) };
+    bundle.insert(key.to_string(), token.clone());
+    store(bundle)?;
+    Ok(Some(token))
+}
+
+pub(crate) fn forget_github(key: &str, legacy: bool) -> Result<()> {
+    let _writing = WRITING.lock();
+    let mut bundle = load()?;
+    let mut changed = bundle.remove(key).is_some();
+    if legacy {
+        changed |= bundle.remove(GITHUB).is_some();
+    }
+    if changed {
+        store(bundle)?;
+    }
+    Ok(())
+}
+
 /// Delete every token saved under `service`: another profile's, as it is
 /// deleted (PROF-9).
 pub fn forget_service(service: &str) -> Result<()> {

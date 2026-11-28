@@ -3,6 +3,7 @@
  * shared by the views, the store and the tests. Nothing here holds state or
  * reaches the backend.
  */
+import { githubPrRepo } from "./github-source";
 import type {
   AgentStatus,
   AuthoredPr,
@@ -334,6 +335,7 @@ export function taskReview(rows: CheckoutPr[]): TaskReview {
 
   // Merged is the last word: a "changes requested" left outstanding on a PR
   // that landed anyway is history, not something still to answer.
+  if (rows.some((r) => r.source && r.error)) return "incomplete";
   if (live.every((r) => r.pr!.merged)) return "merged";
   // Verdicts only from the open ones. A merged PR's reviews are not fetched,
   // so its verdict is "none" — and asking every live row to be approved made
@@ -360,8 +362,13 @@ export const TOKEN_NEEDS_SSO = "GitHub needs the saved token authorized for sing
  * refused, since all it knew was that one was saved (PR-12). Rejected wins:
  * a token that needs a new one also needs nothing authorized.
  */
-export function githubRefusal(prs: Record<string, CheckoutPr[]>): "rejected" | "sso" | null {
-  const errors = Object.values(prs).flatMap((rows) => rows.map((r) => r.error));
+export function githubRefusal(
+  prs: Record<string, CheckoutPr[]>,
+  source?: string,
+): "rejected" | "sso" | null {
+  const errors = Object.values(prs).flatMap((rows) =>
+    rows.filter((r) => !source || r.source === source).map((r) => r.error),
+  );
   if (errors.includes(TOKEN_REJECTED)) return "rejected";
   if (errors.includes(TOKEN_NEEDS_SSO)) return "sso";
   return null;
@@ -445,15 +452,24 @@ export function authoredGroups<T extends AuthoredPr>(prs: T[]): { standing: Stan
  * a task just started on it has not been swept yet.
  */
 export function taskOfPr(
-  pr: { url: string; head: string },
+  pr: { source?: string; repo?: string; url: string; head: string },
   prs: Record<string, CheckoutPr[]>,
-  tasks: { id: string; branch: string }[],
+  tasks: { id: string; branch: string; checkouts?: { project_id: string }[] }[],
+  projects: { id: string; remote?: string | null }[] = [],
 ): string | null {
   for (const [taskId, rows] of Object.entries(prs)) {
     if (rows.some((r) => r.pr?.url === pr.url || r.past.some((p) => p.url === pr.url)))
       return taskId;
   }
-  return tasks.find((t) => t.branch === pr.head)?.id ?? null;
+  const repo = githubPrRepo(pr);
+  if (!repo) return null;
+  const matching = new Set(
+    projects.filter((p) => p.remote?.toLowerCase() === repo).map((p) => p.id),
+  );
+  return (
+    tasks.find((t) => t.branch === pr.head && t.checkouts?.some((c) => matching.has(c.project_id)))
+      ?.id ?? null
+  );
 }
 
 /** A count as a list shows it: `50+` when the list was cut there (REV-6). */
@@ -470,10 +486,27 @@ export function countOf(n: number, more: boolean): string {
  */
 export function reviewCounts(q: ReviewQueue | null): { toReview?: string; yours?: string } {
   if (!q) return {};
-  const team = q.team && !q.team.error ? q.team : null;
-  const authored = q.authored && !q.authored.error ? q.authored : null;
+  const readable = q.sources.filter(
+    (source) => !source.mine_error || (source.team && !source.team.error),
+  );
+  const teams = q.sources.flatMap(({ team }) => (team && !team.error ? [team] : []));
+  const authored = q.sources.flatMap(({ authored }) =>
+    authored && !authored.error ? [authored] : [],
+  );
+  const personal = q.sources.filter((source) => !source.mine_error);
   return {
-    toReview: countOf(q.mine.length + (team?.prs.length ?? 0), q.mine_more || !!team?.more),
-    yours: authored ? countOf(authored.prs.length, authored.more) : undefined,
+    toReview: readable.length
+      ? countOf(
+          personal.reduce((sum, source) => sum + source.mine.length, 0) +
+            teams.reduce((sum, team) => sum + team.prs.length, 0),
+          personal.some((source) => source.mine_more) || teams.some((team) => team.more),
+        )
+      : undefined,
+    yours: authored.length
+      ? countOf(
+          authored.reduce((sum, source) => sum + source.prs.length, 0),
+          authored.some((source) => source.more),
+        )
+      : undefined,
   };
 }

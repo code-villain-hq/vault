@@ -4,12 +4,10 @@ use std::time::Instant;
 
 use tokio::sync::Mutex;
 
-use crate::config::GithubConfig;
-use crate::error::{Error, Result};
-use crate::integrations::github::{GhTeam, GitHub};
-use crate::secrets;
+use crate::error::Result;
+use crate::integrations::github::GhTeam;
 
-use super::{off_runtime, AppState};
+use super::AppState;
 
 /// Orders credential changes, client snapshots, and publication of results.
 /// Keychain, config writes, and review publication use the blocking pool;
@@ -20,7 +18,8 @@ pub(crate) struct NativeGitHub {
     pub reviews_generation: u64,
     pub settled: HashMap<String, Instant>,
     pub swept: Option<Instant>,
-    pub resolved_team: Option<GhTeam>,
+    /// Each source's review team as resolved, with the setting it came from.
+    pub resolved_team: HashMap<String, (String, GhTeam)>,
     // Unlike the PR cache, an in-flight Jira move must survive reconnect.
     ticket_transitions: HashMap<String, Weak<Mutex<()>>>,
 }
@@ -36,58 +35,56 @@ impl NativeGitHub {
         lock
     }
 
-    pub(super) fn update<T>(
+    /// Every change to a GitHub source passes here: a connect, a disconnect,
+    /// a URL edit, or the workspace sending its shared sources. A changed
+    /// address or credential on any source is a reconnect for all of them,
+    /// since a read in flight cannot tell which source answered it.
+    pub(crate) fn update<T>(
         &mut self,
         state: &AppState,
         credentials_changed: bool,
         write: impl FnOnce() -> Result<T>,
     ) -> Result<T> {
-        let read = || state.config.with(|c| c.github.clone());
-        let before = read();
+        let read = || {
+            state.config.with(|c| {
+                c.github_source_list()
+                    .into_iter()
+                    .map(|s| ((s.key, s.config.api_url, s.config.web_url, s.status, s.revision), s.config.review_team))
+                    .unzip::<_, _, Vec<_>, Vec<_>>()
+            })
+        };
+        let (before, team_before) = read();
         let result = write();
-        let after = read();
-        let urls = |cfg: Option<GithubConfig>| cfg.map(|c| (c.api_url, c.web_url));
-        let team = |cfg: &Option<GithubConfig>| cfg.as_ref().and_then(|c| c.review_team.clone());
-        let team_changed = team(&before) != team(&after);
-        if credentials_changed || urls(before) != urls(after) {
+        let (after, team_after) = read();
+        if credentials_changed || before != after {
             self.generation += 1;
             self.reviews_generation += 1;
             self.settled.clear();
             self.swept = None;
-            self.resolved_team = None;
+            self.resolved_team.clear();
             state.prs_seen.lock().clear();
             state.news.forget_reviews();
-        } else if team_changed {
+        } else if team_before != team_after {
             // Editing a preference is not a reconnect: existing personal
             // requests still count, and the new team's first list is quiet.
             self.reviews_generation += 1;
-            self.resolved_team = None;
+            self.resolved_team.clear();
             state.news.forget_team();
         }
         result
     }
 }
 
-pub(crate) struct ConnectedGitHub {
-    pub client: GitHub,
-    pub config: GithubConfig,
+/// The session's generations when a read started. A read publishes what it
+/// found (settled tasks, review banners, ticket moves) only if no source
+/// changed in the meantime.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct GitHubGate {
     pub generation: u64,
     pub reviews_generation: u64,
 }
 
-pub(crate) async fn connected_github(state: &AppState) -> Result<ConnectedGitHub> {
-    let session = state.github_session.clone().lock_owned().await;
-    let config = state.config.with(|c| c.github.clone()).ok_or(Error::NotConfigured("GitHub"))?;
-    // Move the guard with the snapshot so reconnect cannot replace the token
-    // between reading the configuration and taking the client.
-    off_runtime(move || {
-        let token = secrets::get(secrets::GITHUB)?.ok_or(Error::NotConfigured("GitHub"))?;
-        Ok(ConnectedGitHub {
-            client: GitHub::new(&config, &token)?,
-            config,
-            generation: session.generation,
-            reviews_generation: session.reviews_generation,
-        })
-    })
-    .await?
+pub(crate) async fn github_gate(state: &AppState) -> GitHubGate {
+    let session = state.github_session.lock().await;
+    GitHubGate { generation: session.generation, reviews_generation: session.reviews_generation }
 }

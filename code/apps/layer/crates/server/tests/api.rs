@@ -178,6 +178,87 @@ async fn a_workspace_has_one_tracker_and_only_admins_choose_it(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_shares_more_github_hosts_without_replacing_the_original(pool: PgPool) {
+    let app = App::new(pool);
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    let grace = app
+        .join("Grace", &app.invite(&ada, &workspace, "member").await)
+        .await;
+    let public = json!({"api_url": "https://api.github.com", "web_url": "https://github.com"});
+    let enterprise =
+        json!({"api_url": "https://git.example.com/api/v3", "web_url": "https://git.example.com"});
+    let legacy = json!({ "kind": "github", "settings": public });
+    let more = json!({ "kind": "github_sources", "settings": { "sources": [enterprise] } });
+
+    let added = create(&app, &ada, &workspace, "Connection", legacy.clone()).await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+    let denied = create(&app, &grace, &workspace, "Connection", more.clone()).await;
+    assert_eq!(denied.status, StatusCode::FORBIDDEN, "{}", denied.body);
+    let duplicate = json!({ "kind": "github_sources", "settings": { "sources": [public] } });
+    let denied = create(&app, &ada, &workspace, "Connection", duplicate).await;
+    assert_ne!(denied.status, StatusCode::OK, "{}", denied.body);
+    let added = create(&app, &ada, &workspace, "Connection", more.clone()).await;
+    assert_eq!(added.status, StatusCode::OK, "{}", added.body);
+    let records = app.records(&grace, &workspace, "Connection").await;
+    assert_eq!(records.len(), 2);
+    for expected in [legacy, more] {
+        assert!(
+            records
+                .iter()
+                .any(|r| r["kind"] == expected["kind"] && r["settings"] == expected["settings"])
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn upgrading_pins_github_issues_before_the_legacy_connection_changes(pool: PgPool) {
+    let app = App::new(pool.clone());
+    let (ada, workspace) = app.signup("Ada", "Code Villain").await;
+    let legacy = json!({ "kind": "github", "settings": {
+        "api_url": "https://git.example.com:8443/api/v3", "web_url": "https://Git.Example.COM:8443"
+    } });
+    let tracker = json!({ "kind": "tracker", "settings": { "uses": "github" } });
+    for connection in [legacy, tracker] {
+        let res = create(&app, &ada, &workspace, "Connection", connection).await;
+        assert_eq!(res.status, StatusCode::OK, "{}", res.body);
+    }
+
+    let workspace_id = Uuid::parse_str(&workspace).unwrap();
+    let before = layer_sync::workspace_epoch(&pool, workspace_id)
+        .await
+        .unwrap();
+    let backfill = layer_sync::MIGRATOR
+        .iter()
+        .find(|migration| migration.version == 9)
+        .expect("pinning migration must be embedded");
+    sqlx::raw_sql(backfill.sql.clone())
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_ne!(
+        layer_sync::workspace_epoch(&pool, workspace_id)
+            .await
+            .unwrap(),
+        before
+    );
+    sqlx::query("UPDATE connections SET settings = $1 WHERE workspace_id = $2 AND kind = 'github'")
+        .bind(json!({"api_url": "https://api.github.com", "web_url": "https://github.com"}))
+        .bind(workspace_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let records = app.records(&ada, &workspace, "Connection").await;
+    let selected = records
+        .iter()
+        .find(|record| record["kind"] == "tracker")
+        .unwrap();
+    assert_eq!(
+        selected["settings"],
+        json!({ "uses": "github", "github_source": "git.example.com" })
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_guest_works_only_in_the_repositories_an_admin_adds_them_to(pool: PgPool) {
     let app = App::new(pool);
     let (ada, workspace) = app.signup("Ada", "Code Villain").await;

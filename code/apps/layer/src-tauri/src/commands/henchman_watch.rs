@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::integrations::github::PullRequest;
 
-use super::github::{CheckoutPr, ConnectedGitHub};
+use super::github::{CheckoutPr, GitHubGate};
 use super::henchman_tools::failed;
 use super::AppState;
 
@@ -77,9 +77,9 @@ pub(crate) fn take_changes() -> Vec<PrChange> {
 }
 
 /// The window's sweep read every task: none is due here for a while.
-pub(crate) async fn swept(state: &AppState, connected: &ConnectedGitHub) {
+pub(crate) async fn swept(state: &AppState, gate: &GitHubGate) {
     let mut session = state.github_session.lock().await;
-    if session.generation == connected.generation {
+    if session.generation == gate.generation {
         session.swept = Some(Instant::now());
     }
 }
@@ -103,18 +103,18 @@ pub fn spawn_henchman_watch(app: AppHandle) {
 
 /// The window's sweep, without following tickets: only the reads count here.
 async fn sweep(state: &AppState) {
-    let Ok(connected) = super::github::connected_github(state).await else {
+    if !state.config.with(|c| c.github_any_connected()) {
         return;
-    };
+    }
+    let gate = super::github::github_gate(state).await;
     use futures_util::stream::{self, StreamExt};
-    let connected = &connected;
-    stream::iter(super::github::sweep_ids(state, connected, None).await)
+    stream::iter(super::github::sweep_ids(state, &gate, None).await)
         .for_each_concurrent(super::github::SWEEP_TASKS, |id| async move {
             // One that can't be read is tried again at the next sweep.
-            let _ = super::github::task_prs(state, connected, &id).await;
+            let _ = super::github::task_prs(state, &id).await;
         })
         .await;
-    swept(state, connected).await;
+    swept(state, &gate).await;
 }
 
 /// Whether a change is news: always, unless it is said once and was.
@@ -206,6 +206,7 @@ mod tests {
 
     fn row(state: &str, sha: &str, merge: &str) -> CheckoutPr {
         CheckoutPr {
+            source: None,
             checkout_id: "c1".into(),
             repo: "api".into(),
             pr: Some(PullRequest {

@@ -93,7 +93,9 @@ const ui: UiPrefs = {
 const disconnected: Settings = {
   ui,
   jira: null,
-  github: null,
+  github_sources: [],
+  github_legacy_host: null,
+  github_issue_source: null,
   slack: null,
   grafana: null,
   slack_bot: null,
@@ -216,6 +218,7 @@ const projects: Project[] = [
   {
     id: "p-api",
     name: "api",
+    remote: "github.com/acme/api",
     path: "/Users/you/code/api",
     default_branch: "main",
     group: "platform",
@@ -225,6 +228,7 @@ const projects: Project[] = [
   {
     id: "p-web",
     name: "web",
+    remote: "github.com/acme/web",
     path: "/Users/you/code/web",
     default_branch: "main",
     group: "platform",
@@ -241,6 +245,15 @@ const projects: Project[] = [
     default_branch: "main",
     group: null,
     store: null,
+  },
+  {
+    id: "p-enterprise-api",
+    name: "api",
+    remote: "git.acme.test/acme/api",
+    path: "/Users/you/enterprise/api",
+    default_branch: "main",
+    group: "platform",
+    store: `${copies}/enterprise-api.git`,
   },
 ];
 
@@ -926,11 +939,6 @@ function busy(): World {
         jql: null,
         flow: {},
       },
-      github: {
-        api_url: "https://api.github.com",
-        web_url: "https://github.com",
-        review_team: null,
-      },
       slack: {
         channel: "#dev",
         enabled: true,
@@ -960,6 +968,27 @@ function busy(): World {
       tracker: "jira",
       tracker_chosen: "jira",
       github_connected: true,
+      github_legacy_host: "github.com",
+      github_sources: [
+        {
+          key: "github.com",
+          api_url: "https://api.github.com",
+          web_url: "https://github.com",
+          review_team: null,
+          shared: true,
+          status: "connected",
+          revision: "mock-public",
+        },
+        {
+          key: "git.acme.test",
+          api_url: "https://git.acme.test/api/v3",
+          web_url: "https://git.acme.test",
+          review_team: "acme/web",
+          shared: true,
+          status: "connected",
+          revision: "mock-enterprise",
+        },
+      ],
       slack_connected: true,
       browser_sites: ["docs.acme.dev"],
       browser_sign_ins: [{ id: "si-1", site: "localhost", username: "ada@acme.test" }],
@@ -980,53 +1009,86 @@ function busy(): World {
     },
     prs,
     reviews: {
-      mine: [
-        requested(88, "web", "Speed up the search box", "bo", ago(5400), {
-          additions: 1240,
-          deletions: 380,
-          changed_files: 27,
-          checks: "pending",
-        }),
-        requested(61, "api", "Retry webhooks with backoff", "ana", ago(7200), {
-          my_review: "changes_requested",
-          new_since_review: true,
-          created_at: ago(9 * 86_400),
-        }),
-        requested(7, "docs", "Fix typos in the setup guide", "outsider", ago(20_000), {
-          cross_repo: true,
-          head: "patch-1",
-          additions: 3,
-          deletions: 3,
-          changed_files: 1,
-          checks: "failing",
-        }),
-        requested(33, "web", "Drop the legacy theme", "bo", ago(50_000), { my_review: "approved" }),
+      sources: [
+        {
+          source: "github.com",
+          mine_error: null,
+          mine: [
+            requested(88, "web", "Speed up the search box", "bo", ago(5400), {
+              additions: 1240,
+              deletions: 380,
+              changed_files: 27,
+              checks: "pending",
+            }),
+            requested(61, "api", "Retry webhooks with backoff", "ana", ago(7200), {
+              my_review: "changes_requested",
+              new_since_review: true,
+              created_at: ago(9 * 86_400),
+            }),
+            requested(7, "docs", "Fix typos in the setup guide", "outsider", ago(20_000), {
+              cross_repo: true,
+              head: "patch-1",
+              additions: 3,
+              deletions: 3,
+              changed_files: 1,
+              checks: "failing",
+            }),
+            requested(33, "web", "Drop the legacy theme", "bo", ago(50_000), {
+              my_review: "approved",
+            }),
+          ],
+          mine_more: false,
+          team: null,
+          authored: {
+            prs: [
+              authored(42, "api", "Fix login race", ago(1800), {
+                checks: "failing",
+                review: "changes_requested",
+                changes_by: ["ana"],
+                unresolved: 1,
+              }),
+              authored(91, "web", "Remember the last workspace", ago(4000), {
+                review: "approved",
+                approved_by: ["bo"],
+              }),
+              authored(12, "docs", "Document the retry settings", ago(9000), {
+                checks: "pending",
+                review: "review_required",
+                waiting_on: ["ana", "@fe"],
+                conflicts: true,
+              }),
+              authored(95, "web", "Try a denser sidebar", ago(90_000), {
+                draft: true,
+                checks: "none",
+              }),
+            ],
+            more: false,
+            error: null,
+          },
+        },
+        {
+          source: "git.acme.test",
+          mine_error: null,
+          mine: [
+            requested(88, "web", "Enterprise review: Speed up the search box", "lee", ago(5600), {
+              source: "git.acme.test",
+              url: "https://git.acme.test/acme/web/pull/88",
+            }),
+          ],
+          mine_more: false,
+          team: { slug: "acme/web", name: "Web", prs: [], more: false, error: null },
+          authored: {
+            prs: [
+              authored(42, "api", "Enterprise work on the same branch", ago(2100), {
+                source: "git.acme.test",
+                url: "https://git.acme.test/acme/api/pull/42",
+              }),
+            ],
+            more: true,
+            error: null,
+          },
+        },
       ],
-      mine_more: false,
-      team: null,
-      authored: {
-        prs: [
-          authored(42, "api", "Fix login race", ago(1800), {
-            checks: "failing",
-            review: "changes_requested",
-            changes_by: ["ana"],
-            unresolved: 1,
-          }),
-          authored(91, "web", "Remember the last workspace", ago(4000), {
-            review: "approved",
-            approved_by: ["bo"],
-          }),
-          authored(12, "docs", "Document the retry settings", ago(9000), {
-            checks: "pending",
-            review: "review_required",
-            waiting_on: ["ana", "@fe"],
-            conflicts: true,
-          }),
-          authored(95, "web", "Try a denser sidebar", ago(90_000), { draft: true, checks: "none" }),
-        ],
-        more: false,
-        error: null,
-      },
     },
     reviewDetails: {
       "acme/api#42": reviewDetail("acme/api", 42, {
@@ -1368,12 +1430,7 @@ function empty(): World {
     agents,
     settings: disconnected,
     prs: [],
-    reviews: {
-      mine: [],
-      mine_more: false,
-      team: null,
-      authored: { prs: [], more: false, error: null },
-    },
+    reviews: { sources: [] },
     reviewDetails: {},
     issues: [],
     elsewhere: [],
@@ -1421,14 +1478,18 @@ function tickets(): World {
 /** Busy, with the login task's second repo in review too: feedback on two PRs. */
 function reviews(): World {
   const w = busy();
-  if (w.settings.github) w.settings.github = { ...w.settings.github, review_team: "acme/api" };
-  w.reviews.team = {
-    slug: "acme/api",
-    name: "API team",
-    prs: [requested(88, "api", "Add retry metrics", "ana", ago(3600))],
-    more: false,
-    error: null,
-  };
+  w.settings.github_sources = w.settings.github_sources.map((g) =>
+    g.key === "github.com" ? { ...g, review_team: "acme/api" } : g,
+  );
+  const github = w.reviews.sources.find((source) => source.source === "github.com");
+  if (github)
+    github.team = {
+      slug: "acme/api",
+      name: "API team",
+      prs: [requested(88, "api", "Add retry metrics", "ana", ago(3600))],
+      more: false,
+      error: null,
+    };
   w.reviewDetails["acme/api#88"] = reviewDetail("acme/api", 88, {
     comments: [
       {

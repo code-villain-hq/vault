@@ -73,7 +73,7 @@ pub enum StartTo {
     Status { id: String, name: String },
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct GithubConfig {
     /// https://api.github.com, or https://ghe.example.com/api/v3 for Enterprise.
     pub api_url: String,

@@ -18,11 +18,19 @@ const mergedRow: TaskPrs = {
 };
 const newSettings = {
   ...priorSettings,
-  github: { ...settings.github!, review_team: "acme/backend" },
+  github_sources: settings.github_sources.map((g) =>
+    g.key === "github.com" ? { ...g, review_team: "acme/backend" } : g,
+  ),
 };
 const newQueue: ReviewQueue = {
-  ...reviews,
-  team: { slug: "acme/backend", name: "Backend", prs: [], more: false, error: null },
+  sources: reviews.sources.map((source) =>
+    source.source === "github.com"
+      ? {
+          ...source,
+          team: { slug: "acme/backend", name: "Backend", prs: [], more: false, error: null },
+        }
+      : source,
+  ),
 };
 
 function ipc(answers: Record<string, () => unknown>) {
@@ -135,7 +143,10 @@ test("a confirmed team save starts a new queue before settings reload and drops 
   const oldManual = get().refreshReviewQueue();
   const oldQueued = get().refreshReviewQueue();
   // Code Settings already got a successful response to the team-only save.
-  const saved = { githubReconnected: false, githubReviewTeam: "acme/backend" };
+  const saved = {
+    githubReconnected: false,
+    githubReviewTeam: { source: "github.com", team: "acme/backend" },
+  };
   const settingsRead = get().refreshSettings(saved);
   const started = get();
   const callsBeforeReload = calls.slice();

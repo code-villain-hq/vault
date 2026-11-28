@@ -6,4 +6,4 @@ import type { TrackerKind } from "./TrackerKind";
  * workspace without one reads as Jira while it has a Jira connection, so
  * those connected before there was a choice keep it.
  */
-export type TrackerSettings = { uses: TrackerKind, };
+export type TrackerSettings = { uses: TrackerKind, github_source?: string, };

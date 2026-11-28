@@ -1,6 +1,6 @@
 import type { TrackerKind } from "@layer/types";
 import { useStore } from "../store";
-import type { Settings } from "./types";
+import type { Settings, TaskView, Ticket } from "./types";
 
 /** A tracker by its own name, for "Open in …" and the like (TKT-17). */
 export function trackerName(kind: TrackerKind | null | undefined): string {
@@ -20,11 +20,38 @@ export function useTrackerName(): string {
 export function ticketLink(settings: Settings | null, key: string): string | null {
   if (settings?.tracker_chosen === "github") {
     const m = /^([\w.-]+\/[\w.-]+)#(\d+)$/.exec(key);
-    const web = settings.github?.web_url.replace(/\/+$/, "");
+    const web = settings.github_sources
+      .find((source) => source.key === settings.github_issue_source)
+      ?.web_url.replace(/\/+$/, "");
     return m && web ? `${web}/${m[1]}/issues/${m[2]}` : null;
   }
   const base = settings?.jira?.base_url.replace(/\/+$/, "");
   return base ? `${base}/browse/${key}` : null;
+}
+
+export function taskUsesTracker(
+  settings: Settings | null,
+  task: Pick<TaskView, "issue_key" | "issue_url">,
+): boolean {
+  if (!task.issue_key) return false;
+  if (!task.issue_key.includes("#")) return settings?.tracker_chosen !== "github";
+  const url = ticketLink(settings, task.issue_key);
+  return (
+    !!url &&
+    !!task.issue_url &&
+    url.toLowerCase() === task.issue_url.replace(/\/$/, "").toLowerCase()
+  );
+}
+
+export function issueForTask(
+  issues: Ticket[],
+  task: Pick<TaskView, "issue_key" | "issue_url">,
+): Ticket | undefined {
+  return issues.find(
+    (issue) =>
+      issue.key === task.issue_key &&
+      (!issue.key.includes("#") || issue.url.toLowerCase() === task.issue_url?.toLowerCase()),
+  );
 }
 
 /**

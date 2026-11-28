@@ -5,7 +5,7 @@ import { SCENARIOS } from "../src/__mock__/world";
 import { AuthoredCard, ReviewCard } from "../src/components/ReviewCards";
 import { createReviewPrReaders } from "../src/lib/review-pr-readers";
 
-const queue = SCENARIOS.reviews().reviews;
+const queue = SCENARIOS.reviews().reviews.sources[0];
 const onContextMenu = () => {};
 const readers = createReviewPrReaders("mock");
 

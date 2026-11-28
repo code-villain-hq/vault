@@ -185,7 +185,7 @@ pub(crate) async fn tickets_under(app: &AppHandle, epic: &Task) -> Result<Ticket
     let Some(key) = epic.issue_key.as_deref() else {
         return Ok(TicketPage { issues: Vec::new(), more: false });
     };
-    let mut page = tracker(&app.state::<AppState>())?.children(key).await?;
+    let mut page = super::tickets::linked_tracker(&app.state::<AppState>(), epic)?.children(key).await?;
     page.issues.retain(|t| t.status_category != "done");
     Ok(page)
 }
@@ -308,10 +308,10 @@ pub async fn file_sub_tasks(
     if !planned {
         return Err(Error::Other("write the epic's tasks first: they say what its sub-tasks are".into()));
     }
-    let tracker = match (&epic.issue_key, tracker(&state)) {
-        (_, Ok(tracker)) => Some(tracker),
-        (Some(_), Err(e)) => return Err(e),
-        (None, Err(_)) => None,
+    let tracker = if epic.issue_key.is_some() {
+        Some(super::tickets::linked_tracker(&state, &epic)?)
+    } else {
+        tracker(&state).ok()
     };
     let issue_type = match (&tracker, epic.issue_key.is_some(), issue_type.filter(|t| !t.trim().is_empty())) {
         (Some(_), true, Some(t)) => t,
@@ -510,16 +510,16 @@ pub(crate) async fn waiting_for(app: &AppHandle, task: &Task) -> Result<Vec<Stri
         Ok((waits, filed_of(state, &of.epic)))
     })
     .await?;
-    let github = super::github::connected_github(&state).await.ok();
+    let github = state.config.with(|c| c.github_any_connected());
     let mut open = Vec::new();
     for title in waits {
         let merged = match (filed.iter().find(|t| is(t, &title)), &github) {
-            (Some(t), Some(connected)) => super::github::task_prs(&state, connected, &t.id)
+            (Some(t), true) => super::github::task_prs(&state, &t.id)
                 .await
                 .map(|rows| {
                     let live: Vec<_> =
                         rows.iter().filter_map(|r| r.pr.as_ref()).filter(|p| p.merged || p.state == "open").collect();
-                    !live.is_empty() && live.iter().all(|p| p.merged)
+                    !live.is_empty() && live.iter().all(|p| p.merged) && rows.iter().all(|r| r.error.is_none())
                 })
                 .unwrap_or(false),
             _ => false,
@@ -573,9 +573,10 @@ pub(crate) async fn start_sub_task_inner(
         Some(key) => super::ticket_flow::started(&state, key).await,
         None => None,
     };
-    if let (Some(key), Ok(tracker)) = (state.config.task(&of.epic)?.issue_key, tracker(&state)) {
-        if tracker.ticket(&key).await.is_ok_and(|i| i.status_category == "new") {
-            super::ticket_flow::started(&state, &key).await;
+    let parent = state.config.task(&of.epic)?;
+    if let (Some(key), Ok(tracker)) = (parent.issue_key.as_deref(), super::tickets::linked_tracker(&state, &parent)) {
+        if tracker.ticket(key).await.is_ok_and(|i| i.status_category == "new") {
+            super::ticket_flow::started(&state, key).await;
         }
     }
     Ok(StartedSubTask { pane, moved })

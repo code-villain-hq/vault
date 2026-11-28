@@ -9,7 +9,7 @@ use serde::Serialize;
 use tauri::Emitter;
 use tauri::{AppHandle, Runtime, State};
 
-use crate::config::{GithubConfig, GrafanaConfig, JiraConfig, SlackBotConfig, SlackConfig, TrackerKind, UiPrefs};
+use crate::config::{GrafanaConfig, JiraConfig, SlackBotConfig, SlackConfig, TrackerKind, UiPrefs};
 use crate::error::{Error, Result};
 use crate::secrets;
 use crate::shellenv;
@@ -28,7 +28,9 @@ pub(crate) type SubmitBanner = Arc<dyn Fn(BannerPost) -> tauri::async_runtime::J
 pub struct Settings {
     pub ui: UiPrefs,
     pub jira: Option<JiraConfig>,
-    pub github: Option<GithubConfig>,
+    pub github_sources: Vec<crate::config::github::GithubSource>,
+    pub github_legacy_host: Option<String>,
+    pub github_issue_source: Option<String>,
     pub slack: Option<SlackConfig>,
     pub grafana: Option<GrafanaConfig>,
     pub slack_bot: Option<SlackBotConfig>,
@@ -92,10 +94,16 @@ pub fn get_settings(state: State<AppState>) -> Settings {
         jira_connected: c.jira.is_some(),
         tracker: c.tracker_in_use().filter(|t| match t {
             TrackerKind::Jira => c.jira.is_some(),
-            TrackerKind::Github => c.github.is_some(),
+            TrackerKind::Github => c
+                .github_issue_host()
+                .and_then(|host| c.github_source(host))
+                .is_some_and(|source| source.status == "connected"),
         }),
         tracker_chosen: c.tracker_in_use(),
-        github_connected: c.github.is_some(),
+        github_connected: c.github_any_connected(),
+        github_sources: c.github_source_list(),
+        github_legacy_host: c.github_sources.legacy_host.clone(),
+        github_issue_source: c.github_issue_host().map(str::to_string),
         slack_connected: super::notifications(&c).is_some(),
         grafana_connected: c.grafana.is_some(),
         log_sources: c.log_sources.clone(),
@@ -115,7 +123,6 @@ pub fn get_settings(state: State<AppState>) -> Settings {
             connections: c.shared.held.iter().map(|(kind, h)| (kind.clone(), h.settings.clone())).collect(),
         }),
         jira: c.jira,
-        github: c.github,
         slack: c.slack,
         grafana: c.grafana,
         slack_bot: c.slack_bot,
@@ -275,16 +282,15 @@ pub fn set_worktree_root(state: State<AppState>, path: Option<String>) -> Result
 /// Off the command thread: deleting the token goes through the keychain,
 /// which can stop and ask — and the window froze behind the prompt.
 #[tauri::command]
-pub async fn disconnect(app: AppHandle, which: String) -> Result<()> {
-    super::blocking(app, move |state| disconnect_inner(state, &which)).await
+pub async fn disconnect(app: AppHandle, which: String, source: Option<String>) -> Result<()> {
+    super::blocking(app, move |state| disconnect_inner(state, &which, source.as_deref())).await
 }
 
-fn disconnect_inner(state: &AppState, which: &str) -> Result<()> {
-    if which == "github" {
-        return super::github::disconnect_github(state);
-    }
+fn disconnect_inner(state: &AppState, which: &str, source: Option<&str>) -> Result<()> {
     // What was seen on that site says nothing about the next one.
-    state.news.forget();
+    if which != "github" {
+        state.news.forget();
+    }
     match which {
         "jira" => {
             secrets::delete(secrets::JIRA)?;
@@ -293,6 +299,10 @@ fn disconnect_inner(state: &AppState, which: &str) -> Result<()> {
             *state.ticket_types.lock() = None;
             *state.epic_field_missing.lock() = None;
             state.config.update(|c| c.jira = None)
+        }
+        "github" => {
+            let key = source.ok_or_else(|| Error::Other("Choose a GitHub source to disconnect.".into()))?;
+            super::github_sources::disconnect(state, key)
         }
         "grafana" => {
             secrets::delete(secrets::GRAFANA)?;
