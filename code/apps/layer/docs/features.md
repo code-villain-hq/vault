@@ -347,8 +347,20 @@ count, running agents, uncommitted changes and the review verdict.
   title defaults, generated context and run history keep their source names.
   Details stay while the task record exists and go when it is removed,
   including when removing its last repository drops it.
+- **TASK-21** In Work, the header of a regular task with no ticket MUST
+  offer a quiet **Link ticket…** action when a tracker is connected. It
+  searches existing tickets, including ones outside Mine, as the Tickets
+  search does with Anyone and Include done. The picker shows the key and
+  title before linking. A search answered for one tracker connection
+  cannot link a ticket after the connection changes. A failure stays
+  inline. An agent can link by task ID and ticket key with
+  `task_link_ticket`, after the user agrees. Both keep the same task, with
+  its name, branch, worktrees, spec and running agents unchanged (TKT-23).
+  Work does not offer to file a ticket, or replace or remove a link. A task
+  started without its ticket could only get one by Start work, which made
+  a second task.
 
-Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `commands/finish_tool.rs` (TASK-18), `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17), `lib/task-search.ts` (TASK-19).
+Code: `commands/tasks.rs`, `commands/worktree_status.rs` (TASK-10), `sidebar/`, `FinishTask.tsx`, `commands/finish_tool.rs` (TASK-18), `lib/drag.ts` (TASK-16), `lib/grouping.ts`, `lib/epics.ts` (TASK-17), `lib/task-search.ts` (TASK-19), `App.tsx`, `tickets/LinkTaskTicket.tsx`, `commands/ticket_link.rs` (TASK-21).
 
 Known gaps:
 - A folder cut off before its last commit was recorded, or whose last
@@ -480,12 +492,15 @@ Each of them can also run as a conversation the app draws, over ACP (§20).
   until the CLI compacts it. An agent started with a prompt of its own,
   or brought back at launch, had only the link, and spent its first calls
   fetching what the app already had. The ticket is saved as `TICKET.md`
-  in the task folder whenever the app fetches it for the task (Start
-  work, the launch dialog's opening
-  prompt), and the context file is built from that. The description is
+  in the task folder when the app fetches it to start work, writes the
+  launch dialog's opening prompt, or links it (TKT-23), and the context
+  file is built from that. The description is
   quoted line by line and introduced as written by whoever filed it: the
   context file is read as instructions, and a ticket's text is someone
-  else's. A description past 8 KB is cut, and says so.
+  else's. A description past 8 KB is cut, and says so. The context of a
+  regular task with no ticket says how to link one (TASK-21): find the
+  task ID with `list_tasks`, call `task_link_ticket` with `confirm: true`
+  only after the user agrees, and do not create another task.
 - **PANE-14** An agent pane MUST restart in place on its own
   conversation, for a CLI that can resume (Claude Code): Restart, on its
   tab and its entry in the chat list, stops it as closing does (PANE-5,
@@ -1182,7 +1197,8 @@ offers Start work.
   once the task is gone. An epic is removed from the list instead, its ticket
   untouched (EPIC-15).
 - **TKT-10** The task header MUST show its ticket's status, from your ticket
-  list, so a ticket out of step with the work is seen where the work is.
+  list or from a ticket linked this run (TKT-23), so a ticket out of step
+  with the work is seen where the work is.
 - **TKT-11** Every ticket card MUST say how long ago the ticket was created,
   in its largest whole unit ("5m", "3h", "2d", "1w", "4mo", "2y"), with the
   full date on hover.
@@ -1289,10 +1305,22 @@ offers Start work.
    that source. It also leaves references to that task's issue out of PR
    descriptions sent to other sources. Changing the selected tracker clears old ticket results;
    Layer refuses to start work from a card for a different source.
+- **TKT-23** Linking an existing ticket to a task (TASK-21) MUST save the
+  connected tracker's canonical key and URL. The task shows the ticket,
+  even outside Mine, and its link names the tracker and goes to that
+  ticket. If the tracker cannot find the ticket, the task already has a
+  ticket, or another task has it, Layer refuses the link with the reason
+  and changes neither task. A successful link writes `TICKET.md` and the
+  agent context in the task folder (PANE-13); a write failure there is a
+  warning in the task header, not a failed link. Linking does not start
+  work, assign or move the ticket, comment on it, rename a branch or edit
+  an existing PR. The ticket follows the work from the next PR sweep on
+  (TKT-8, TKT-18).
 
 Code: `tickets.rs` (the tracker: `Tracker`; Jira's side in
 `tickets/jira.rs`, GitHub's in `tickets/github.rs`), `commands/tickets.rs`
-(`set_tracker`), `commands/jira.rs`, `commands/ticket_flow.rs`,
+(`set_tracker`), `commands/ticket_link.rs`, `lib/refresh-tickets.ts`
+(TKT-23), `commands/jira.rs`, `commands/ticket_flow.rs`,
 `integrations/jira.rs`, `integrations/jira/flow.rs`,
 `integrations/github/issues.rs`, `components/tickets/`, `TicketsSettings.tsx`,
 `TrackerChoice.tsx` (TKT-15, TKT-16), `lib/tracker.ts`, `TicketFlow.tsx`,
@@ -1337,8 +1365,9 @@ Known gaps:
 - Tickets follow the work only while the app runs with its window in
   front, since that is when the PR sweep runs. A PR merged overnight moves
   its ticket the next morning.
-- The task header shows a ticket's status only when it is in your ticket
-  list (assigned to you, not done).
+- Except for a ticket linked this run (TKT-23), the task header shows a
+  ticket's status only when it is in your ticket list (assigned to you,
+  not done).
 - A move that needs two transitions (a workflow with no direct way from
   In Progress to the after-merge status) is reported, not made.
 - Sorting by priority takes the order Jira's priority search lists them
@@ -1577,6 +1606,7 @@ never hold credentials themselves.
 | `set_base` | change the branch a task's repo is measured against and opens its next PR into (TASK-6) | |
 | `forget_repo` | unregister a repo (never deletes files) | yes |
 | `create_task` | a task with no ticket | |
+| `task_link_ticket` | link an existing ticket to a regular task by ID and key (TASK-21, TKT-23) | yes |
 | `task_rename` | set or clear a local Work task or caller Chat display name (MCP-6) | |
 | `task_set_tag` | add or remove one local text tag (MCP-6) | |
 | `task_set_color` | set or clear a local item color (MCP-6) | |

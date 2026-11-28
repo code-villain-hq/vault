@@ -29,6 +29,24 @@ export function ticketLink(settings: Settings | null, key: string): string | nul
   return base ? `${base}/browse/${key}` : null;
 }
 
+/**
+ * The site and account tickets are read from now, as the backend's
+ * `tracker_identity` sees it: the Link ticket dialog (TASK-21) closes when it
+ * changes. The backend checks again when linking.
+ */
+export function ticketConnectionScope(settings: Settings | null): string | null {
+  switch (settings?.tracker) {
+    case "jira":
+      return JSON.stringify(["jira", settings.jira?.base_url, settings.jira?.email]);
+    case "github": {
+      const source = settings.github_sources.find((g) => g.key === settings.github_issue_source);
+      return JSON.stringify(["github", source?.key, source?.api_url, source?.revision]);
+    }
+    default:
+      return null;
+  }
+}
+
 export function taskUsesTracker(
   settings: Settings | null,
   task: Pick<TaskView, "issue_key" | "issue_url">,

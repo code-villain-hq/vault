@@ -324,6 +324,7 @@ const DANGER: &[&str] = &[
     "slack_cleanup",
     "forget_repo",
     "open_prs",
+    "task_link_ticket",
     "remember",
     "forget_note",
     "finish_task",
@@ -1072,6 +1073,22 @@ mod tests {
         assert!(tool_needs_confirm("slack_cleanup", &json!({})));
         assert!(!tool_needs_confirm("list_tasks", &json!({})));
         assert!(!tool_needs_confirm("slack_post", &json!({})));
+    }
+
+    #[test]
+    fn linking_a_ticket_is_listed_and_refuses_missing_or_false_confirmation() {
+        let name = "task_link_ticket";
+        for args in [json!({}), json!({ "confirm": false }), json!({ "confirm": "true" })] {
+            assert!(tool_needs_confirm(name, &args), "the dispatch gate must check {name}");
+            assert!(require_confirm(&args, name).is_err());
+        }
+        assert!(require_confirm(&json!({ "confirm": true }), name).is_ok());
+        for uses in [TrackerKind::Jira, TrackerKind::Github] {
+            let listed = commands::tracker_tools(Some(uses));
+            let tool = listed.into_iter().find(|t| t["name"] == name).expect("listed for either tracker");
+            assert_eq!(tool["inputSchema"]["required"], json!(["task_id", "key", "confirm"]));
+        }
+        assert!(commands::tracker_tools(None).is_empty());
     }
 
     #[test]

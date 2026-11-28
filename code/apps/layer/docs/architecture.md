@@ -296,6 +296,7 @@ for, and the reverse, and that each is in this table.
 | `pr:draft` | `{ task_id, text }` | a chunk of a drafted PR description | `PrPanel.tsx` |
 | `pr:images-offered` | task id | an agent offered screenshots for a PR with `pr_images` (PR-13) | `PrImageOffer.tsx` |
 | `issue:draft` | `{ request_id, text }` | a chunk of an improved ticket description | `tickets/OptimizeDescription.tsx` |
+| `task:ticket-linked` | `{ task_id, key, url, status, status_category, context_warning }` | Work or an agent linked a ticket to a task, even if writing its context failed (TASK-21, TKT-23) | `Watchers.tsx` → `taskTicketLinked`: read the tasks again, then keep the ticket's status for the Work header |
 | `spec:draft` | `{ request_id, path, text }` | one file's draft so far, whole each time, `path` being its file in the spec folder: Kiro's requirements, design or tasks (Draft, SPEC-5), or the requirements as Apply answers rewrites them (SPEC-20); the backend writes the file when the run is done | `Watchers.tsx` → `useSpecs.chunk`, into that file's editor |
 | `spec:changed` | task id | an agent ticked a step of the task's spec (`spec_task`) or wrote a file of it (`spec_write`), SPEC-13; or anything changed in `<task>/spec/` of the task whose Spec tab is on screen, once it has been quiet for 200 ms (`spec_watch.rs`, a `notify` watcher that `watch_spec` points at one task at a time, SPEC-36) | `Watchers.tsx` → `useSpecs.changed`, which reads it again if it has been read; `pty:activity` for an agent that stopped does the same, to show a spec file it wrote |
 | `spec:install` | `{ taskId, state }`, the `InstallState` | a task's spec toolset install started, finished or failed (`spec_install_run.rs`, SPEC-30, SPEC-31: run when the task is made, when a repository is added to a task with a folder and no install on record, or on Retry through `install_spec_toolset`) | `Watchers.tsx` → `useSpecs.installed`, kept per task for the Spec tab's install line; a finished install also reads the spec again, as it may have written files into it |
@@ -643,6 +644,20 @@ push.
   and assign). Admins choose it with `set_tracker`. What a tracker does
   its own way, like Jira's transitions, stays with its client, behind
   `commands::jira_client`, which refuses when Jira is not the tracker.
+- **Linking a ticket to a task** (TASK-21, TKT-23) is one operation in
+  `commands/ticket_link.rs`, for Work (`link_task_ticket`) and agents
+  (`task_link_ticket`, in `commands/tracker_tools.rs`). Work's picker
+  searches with `tickets_find` and `forLink`, which also returns a
+  `tracker_scope`: a hash of the connection it was asked of (Jira's site
+  and account, or the GitHub issue source and its revision), no
+  credentials. A link sent with a scope that no longer matches is refused.
+  The ticket is read from the tracker before the config is locked; one
+  `config.update` then checks the task can take it and no other task has
+  it, and saves `issue_key` and `issue_url`. `TICKET.md` and the context
+  files are written after that, and a failure there comes back as
+  `context_warning`, not as an error. The window keeps the linked ticket's
+  status in `linkedTickets` (`lib/refresh-tickets.ts`), read by key on each
+  ticket refresh when it is not in Mine.
 - **Jira** is REST v3 with Basic auth. JQL strings go through `jql_string`,
   path segments through `segment()`. Search pages by `nextPageToken`, and
   `createmeta` pages too. Names are never assumed (TKT-2). Where a ticket

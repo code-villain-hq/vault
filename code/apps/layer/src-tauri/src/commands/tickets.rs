@@ -2,7 +2,7 @@
 //! filing, and starting work on one. Whatever the tracker, through `Tracker`.
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::config::{Task, TrackerKind};
 use crate::error::{Error, Result};
@@ -12,6 +12,7 @@ use super::jira::{learn_epic_field, task_repos, ticket_prompt};
 use super::panes::{start_agent, Resume};
 use super::task_context::keep_ticket;
 use super::tasks::{new_task, NewTask};
+use super::ticket_link::{find_for_link, TicketSearch};
 use super::AppState;
 
 pub(crate) fn tracker(state: &AppState) -> Result<Tracker> {
@@ -104,13 +105,14 @@ pub(crate) async fn my_tickets(state: &AppState) -> Result<TicketPage> {
 /// Look past your own queue: unassigned work, or anyone else's.
 #[tauri::command]
 pub async fn tickets_find(
-    state: State<'_, AppState>,
+    app: AppHandle,
     text: Option<String>,
     whose: String,
     include_done: Option<bool>,
     types: Option<Vec<String>>,
     order: Option<String>,
-) -> Result<TicketPage> {
+    for_link: Option<bool>,
+) -> Result<TicketSearch> {
     let find = Find {
         text,
         whose,
@@ -118,7 +120,12 @@ pub async fn tickets_find(
         types: types.unwrap_or_default(),
         order: order.unwrap_or_default(),
     };
-    tracker(&state)?.find(find).await
+    // The Link ticket picker (TASK-21) gets the tracker its results came from.
+    if for_link == Some(true) {
+        return find_for_link(app, find, Tracker::connect).await;
+    }
+    let page = tracker(&app.state::<AppState>())?.find(find).await?;
+    Ok(TicketSearch { page, tracker_scope: None })
 }
 
 /// These tickets, wherever they are, for the epic each belongs to (TASK-17,

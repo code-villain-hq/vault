@@ -11,6 +11,7 @@ import {
   type ItemDetailsState,
 } from "./lib/item-details-store";
 import { forgetAllBut, read, readOneOf, write } from "./lib/persist";
+import { issueRefresher, ticketLinker } from "./lib/refresh-tickets";
 import { keep, only, reuse, sameJson } from "./lib/same";
 import { useSpecs } from "./lib/specs";
 import { acceptTaskPrReads, type TaskPrSnapshots } from "./lib/task-pr-snapshots";
@@ -26,6 +27,7 @@ import type {
   ReviewQueue,
   Settings,
   Target,
+  TaskTicketLinked,
   TaskView,
   TicketMove,
   WaitingPane,
@@ -102,6 +104,8 @@ export interface State extends ItemDetailsState, TaskPrSnapshots {
   /** Replacing a token may leave the visible GitHub settings unchanged. */
   githubConnectionRevision: number;
   issues: Ticket[];
+  /** Tickets linked to a task this run (TASK-21), by task: often not on your list. */
+  linkedTickets: Record<string, TaskTicketLinked>;
   issueTypes: TicketType[];
   /** The site's priorities, highest first, for sorting by them (TKT-13). */
   priorities: string[];
@@ -178,6 +182,7 @@ export interface State extends ItemDetailsState, TaskPrSnapshots {
    * changed, and the call already in flight was asked before it did.
    */
   refreshTasks: (opts?: { poll?: boolean }) => Promise<void>;
+  taskTicketLinked: (link: TaskTicketLinked) => Promise<void>;
   refreshPanes: (opts?: { poll?: boolean }) => Promise<void>;
   refreshWaiting: () => Promise<void>;
   refreshPrs: () => Promise<void>;
@@ -338,6 +343,7 @@ export const useStore = create<State>((set, get) => {
     settings: null,
     githubConnectionRevision: 0,
     issues: [],
+    linkedTickets: {},
     issueTypes: [],
     priorities: [],
     issuesLoading: false,
@@ -495,6 +501,7 @@ export const useStore = create<State>((set, get) => {
               prs: only(s.prs, live),
               prReadRevision: only(s.prReadRevision, live),
               notes: only(s.notes, live),
+              linkedTickets: only(s.linkedTickets, live),
             };
           });
           for (const id of latestTaskPrRequest.keys()) {
@@ -716,37 +723,8 @@ export const useStore = create<State>((set, get) => {
         if (!sameMessages(get().messages, messages)) set({ messages });
       }),
 
-    refreshIssues: async (opts) => {
-      if (get().settings?.tracker == null) return;
-      const epoch = issueEpoch;
-      // A timer tick should not flash the spinner over a list already on screen.
-      const spin = !opts?.quiet || !get().issuesLoaded;
-      if (spin) set({ issuesLoading: true });
-      try {
-        const [page, issueTypes, priorities] = await Promise.all([
-          api.ticketsMine(),
-          // Types rarely change and are cached in the backend; a failure here
-          // must not stop the issues themselves from showing.
-          api.ticketTypes().catch(() => get().issueTypes),
-          // Asked once per connection, as rarely changed. Without them a sort
-          // by priority keeps the order it had.
-          get().priorities.length > 0 ? get().priorities : api.ticketPriorities().catch(() => []),
-        ]);
-        // As for reviews: an answer from a site disconnected meanwhile is not kept.
-        if (epoch !== issueEpoch || get().settings?.tracker == null) return;
-        set((s) => ({
-          issues: reuse(s.issues, page.issues, (i) => i.key),
-          issuesTruncated: page.more,
-          issueTypes: keep(s.issueTypes, issueTypes),
-          priorities: keep(s.priorities, priorities),
-          issuesLoaded: true,
-        }));
-      } catch (e) {
-        if (epoch === issueEpoch && !opts?.quiet) get().fail(e);
-      } finally {
-        if (epoch === issueEpoch && spin) set({ issuesLoading: false });
-      }
-    },
+    refreshIssues: issueRefresher(set, get, () => issueEpoch),
+    taskTicketLinked: ticketLinker(set, get),
   };
 });
 

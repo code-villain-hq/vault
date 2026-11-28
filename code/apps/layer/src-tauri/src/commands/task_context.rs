@@ -85,15 +85,24 @@ pub(crate) fn write_task_context(state: &AppState, task: &Task) -> Result<()> {
     Ok(())
 }
 
+/// Save `issue` as `task`'s ticket and rewrite the context file with it.
+/// Unlike `keep_ticket`, a failure is the caller's to report: a ticket just
+/// linked (TASK-21) says when its agents could not be told.
+pub(crate) fn write_ticket_context(state: &AppState, task: &Task, issue: &Ticket) -> Result<()> {
+    let dir = agent_file_dir(state, task)
+        .ok_or_else(|| crate::error::Error::Other("the task has no folder for agent files".into()))?;
+    std::fs::write(dir.join(TICKET_FILE), ticket_markdown(issue))?;
+    write_task_context(state, task)
+}
+
 /// Keep `issue` as `task`'s ticket, and rewrite the context file with it.
 ///
 /// Best effort: a ticket that cannot be saved is not a reason to fail
 /// whatever fetched it.
 pub(crate) async fn keep_ticket(app: AppHandle, task: Task, issue: Ticket) {
     let _ = super::blocking(app, move |state| {
-        if let Some(dir) = agent_file_dir(state, &task) {
-            std::fs::write(dir.join(TICKET_FILE), ticket_markdown(&issue))?;
-            write_task_context(state, &task)?;
+        if agent_file_dir(state, &task).is_some() {
+            write_ticket_context(state, &task, &issue)?;
         }
         Ok(())
     })
@@ -277,6 +286,19 @@ This task reviews pull request {}#{}{}, at commit `{}`: {}.              `{}` is
     }
     if task.epic {
         md.push_str(EPIC);
+    } else if task.review.is_none() && task.sub_task.is_none() && task.issue_key.is_none() {
+        // An agent asked to "link this to ACME-12" started Start work over
+        // again and made a second task (TASK-21).
+        md.push_str(&format!(
+            "## Link existing work\n\n\
+             On `villain-layer`, use `list_tasks` to verify this task's ID (`{}`) and folder. \
+             Link to this task. Do not create another task.\n\n\
+             - `task_link_ticket`: pass this `task_id` and the existing tracker ticket key as `key`. \
+             No checkout ID is needed. This is for a task without a ticket.\n\n\
+             Call it with `confirm: true` only after the user agrees to that link. \
+             The read tools do not need confirmation.\n\n",
+            task.id
+        ));
     }
     if let Some(spec) = spec {
         md.push_str(spec);
@@ -563,6 +585,27 @@ mod tests {
             epic: false,
             sub_task: None,
             browser: None,
+        }
+    }
+
+    #[test]
+    fn only_a_regular_task_without_a_ticket_is_told_to_link_one_after_agreement() {
+        let unlinked = Task { issue_key: None, issue_url: None, ..task() };
+        let md = task_context(&unlinked, &[], None, None, None);
+        let (_, guidance) = md.split_once("## Link existing work").unwrap();
+        let guidance = guidance.split("\n## ").next().unwrap();
+        assert!(guidance.contains("`t1`") && guidance.contains("`list_tasks`"));
+        assert!(guidance.contains("Do not create another task"));
+        assert!(guidance.contains("`task_link_ticket`") && guidance.contains("No checkout ID is needed"));
+        assert!(guidance.contains("only after the user agrees") && guidance.contains("`confirm: true`"));
+
+        let epic = Task { epic: true, ..unlinked.clone() };
+        let sub = Task {
+            sub_task: Some(crate::config::SubTaskOf { epic: "e".into(), title: "Part".into() }),
+            ..unlinked.clone()
+        };
+        for other in [task(), epic, sub] {
+            assert!(!task_context(&other, &[], None, None, None).contains("task_link_ticket"));
         }
     }
 

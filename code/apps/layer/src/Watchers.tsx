@@ -11,7 +11,7 @@ import { useItemDetails } from "./lib/item-details-watcher";
 import { useRoutines } from "./lib/routines";
 import { useSpecs } from "./lib/specs";
 import { useTheme } from "./lib/theme";
-import type { InstallState, Target } from "./lib/types";
+import type { InstallState, Target, TaskTicketLinked } from "./lib/types";
 import type { HenchmanLair } from "./lib/types-henchman";
 import type { Routines } from "./lib/types-routines";
 import { startWorkspaceSync, useSession } from "./lib/workspace-sync";
@@ -587,6 +587,17 @@ export function Watchers() {
       .refresh()
       .catch(() => {});
     const p = listen<Routines>("routines:changed", (e) => useRoutines.getState().set(e.payload));
+    return () => {
+      void p.then((un) => un());
+    };
+  }, []);
+
+  // A ticket linked to a task, from Work or by an agent (TASK-21).
+  useEffect(() => {
+    const p = listen<TaskTicketLinked>("task:ticket-linked", (e) => {
+      const s = useStore.getState();
+      void s.taskTicketLinked(e.payload).catch(s.fail);
+    });
     return () => {
       void p.then((un) => un());
     };

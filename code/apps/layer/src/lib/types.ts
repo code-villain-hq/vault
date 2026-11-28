@@ -181,6 +181,21 @@ export interface TaskView extends Task {
   pane_count: number;
 }
 
+export interface LinkedTaskTicket {
+  task: Task;
+  ticket: Ticket;
+  context_warning: string | null;
+}
+
+/** A ticket just linked to a task (TASK-21): what the Work header shows of it. */
+export interface TaskTicketLinked extends Pick<
+  Ticket,
+  "key" | "url" | "status" | "status_category"
+> {
+  task_id: string;
+  context_warning: string | null;
+}
+
 export type PaneKind = "agent" | "shell";
 
 /**
@@ -383,6 +398,11 @@ export interface Started extends Task {
 export interface TicketPage {
   issues: Ticket[];
   more: boolean;
+}
+
+export interface TicketSearch extends TicketPage {
+  /** Only for the Link ticket picker; the backend checks it when linking. */
+  tracker_scope?: string;
 }
 
 export interface TicketType {

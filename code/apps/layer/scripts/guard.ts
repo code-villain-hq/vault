@@ -746,7 +746,11 @@ const CEILINGS: Record<string, number> = {
   // no new code: TicketsView 637, types 613.
   "src/components/tickets/TicketsView.tsx": 660,
   // Settings gained spec_first (SPEC-38), the one line that is the mirror of the backend.
-  "src/lib/types.ts": 645,
+  // Linking a ticket to a task (TASK-21) mirrors its result, event and search: 664.
+  "src/lib/types.ts": 670,
+  // Every event listener lives here (push, don't poll); a linked ticket's
+  // event (TASK-21) took it to 607.
+  "src/Watchers.tsx": 620,
   // Every command's wrapper must live here (api-only); the routines' six
   // (§29) took it to 607.
   "src/lib/api.ts": 640,

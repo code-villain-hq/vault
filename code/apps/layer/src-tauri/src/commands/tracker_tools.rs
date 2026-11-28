@@ -19,11 +19,29 @@ use super::AppState;
 
 /// The tools of the tracker in use, or none without one.
 pub fn tracker_tools(uses: Option<TrackerKind>) -> Vec<Value> {
-    match uses {
+    let mut tools = match uses {
         Some(TrackerKind::Jira) => jira_tools(),
         Some(TrackerKind::Github) => github_tools(),
-        None => Vec::new(),
-    }
+        None => return Vec::new(),
+    };
+    tools.push(link_tool());
+    tools
+}
+
+/// Either tracker's: an existing ticket for a task that has none (TASK-21).
+fn link_tool() -> Value {
+    tool(
+        "task_link_ticket",
+        "Link an existing ticket from the workspace tracker to an unlinked Work task. \
+         This does not start work again or change the ticket. Returns the task, ticket, \
+         and any context-write warning. Call only after the user agrees.",
+        json!({
+            "task_id": str_prop("Task id from list_tasks"),
+            "key": str_prop("Existing ticket key from the active tracker"),
+            "confirm": confirm_prop()
+        }),
+        vec!["task_id", "key", "confirm"],
+    )
 }
 
 fn jira_tools() -> Vec<Value> {
@@ -157,12 +175,17 @@ fn github_tools() -> Vec<Value> {
 }
 
 pub fn tracker_owns(name: &str) -> bool {
-    name.starts_with("jira_") || name.starts_with("github_")
+    name.starts_with("jira_") || name.starts_with("github_") || name == "task_link_ticket"
 }
 
 /// The confirm gate is `mcp.rs`'s: `jira_transition` and `github_close_issue`
 /// are in its `DANGER` list.
 pub async fn tracker_call(app: &AppHandle, name: &str, args: Value) -> Result<Value> {
+    if name == "task_link_ticket" {
+        let task_id = required(&args, "task_id")?.to_string();
+        let key = required(&args, "key")?.to_string();
+        return Ok(serde_json::to_value(commands::link_task_ticket_inner(app.clone(), task_id, key).await?)?);
+    }
     let state = app.state::<AppState>();
     let uses = state.config.read().tracker_in_use();
     let wants = if name.starts_with("github_") { TrackerKind::Github } else { TrackerKind::Jira };
@@ -326,8 +349,12 @@ mod tests {
     fn an_agent_is_offered_only_the_workspace_trackers_tools() {
         let jira = names(tracker_tools(Some(TrackerKind::Jira)));
         let github = names(tracker_tools(Some(TrackerKind::Github)));
-        assert!(jira.iter().all(|n| n.starts_with("jira_")) && jira.contains(&"jira_transition".into()));
-        assert!(github.iter().all(|n| n.starts_with("github_")) && github.contains(&"github_close_issue".into()));
+        // Linking a ticket (TASK-21) works the same on either tracker, so it is the one unprefixed tool.
+        let own =
+            |names: &[String], prefix: &str| names.iter().all(|n| n.starts_with(prefix) || n == "task_link_ticket");
+        assert!(own(&jira, "jira_") && jira.contains(&"jira_transition".into()));
+        assert!(own(&github, "github_") && github.contains(&"github_close_issue".into()));
+        assert!(jira.contains(&"task_link_ticket".into()) && github.contains(&"task_link_ticket".into()));
         assert!(tracker_tools(None).is_empty());
         assert!(jira.iter().chain(&github).all(|n| tracker_owns(n)));
     }

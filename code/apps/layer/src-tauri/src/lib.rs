@@ -392,6 +392,7 @@ pub fn run() {
             commands::set_ticket_start,
             commands::ticket_required_fields,
             commands::file_ticket,
+            commands::link_task_ticket,
             commands::start_work_on_ticket,
             commands::task_prompt,
             commands::handoff_prompt,

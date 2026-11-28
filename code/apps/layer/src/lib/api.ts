@@ -26,6 +26,8 @@ import type {
   Ticket,
   TicketType,
   TicketPage,
+  TicketSearch,
+  LinkedTaskTicket,
   JiraTransition,
   LoopView,
   PaneInfo,
@@ -347,7 +349,19 @@ export const api = {
     includeDone: boolean,
     types: string[],
     order: string,
-  ) => invoke<TicketPage>("tickets_find", { text: text || null, whose, includeDone, types, order }),
+    /** The Link ticket picker's search (TASK-21), which returns its tracker_scope. */
+    forLink?: boolean,
+  ) =>
+    invoke<TicketSearch>("tickets_find", {
+      text: text || null,
+      whose,
+      includeDone,
+      types,
+      order,
+      forLink,
+    }),
+  linkTaskTicket: (taskId: string, key: string, trackerScope: string) =>
+    invoke<LinkedTaskTicket>("link_task_ticket", { taskId, key, trackerScope }),
   ticketPriorities: () => invoke<string[]>("ticket_priorities"),
   setTracker: (uses: TrackerKind, githubSource?: string) =>
     invoke<void>("set_tracker", { uses, githubSource }),

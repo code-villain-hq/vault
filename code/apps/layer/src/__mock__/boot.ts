@@ -38,7 +38,9 @@ import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { prPermalinkIdentity } from "../lib/pr-permalink";
 import { sortTickets, type TicketSort } from "../lib/ticket-sort";
+import { ticketConnectionScope } from "../lib/tracker";
 import type {
+  TaskTicketLinked,
   BrowserView,
   Catchup,
   CheckoutPrComments,
@@ -1168,10 +1170,42 @@ const answer: Record<string, Answer> = {
   },
   ticket_required_fields: () => world.requiredFields,
   // Jira orders a search (TKT-13); here the list is sorted as Jira would.
-  tickets_find: (a) => ({
-    issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES),
-    more: false,
-  }),
+  tickets_find: (a) => {
+    if (!a.forLink)
+      return { issues: sortTickets(world.issues, a.order as TicketSort, PRIORITIES), more: false };
+    // The Link ticket picker (TASK-21) searches anyone's tickets, done ones too.
+    const text = (a.text as string).toLowerCase();
+    const issues = [...world.issues, ...world.elsewhere].filter(
+      (i) => i.key.toLowerCase().includes(text) || i.summary.toLowerCase().includes(text),
+    );
+    return {
+      issues,
+      more: false,
+      tracker_scope: ticketConnectionScope(world.settings) ?? undefined,
+    };
+  },
+  link_task_ticket: (a) => {
+    const task = world.tasks.find((t) => t.id === a.taskId);
+    const ticket = [...world.issues, ...world.elsewhere].find((i) => i.key === a.key);
+    if (!task || !ticket) throw "The task or ticket is gone.";
+    if (a.trackerScope !== ticketConnectionScope(world.settings))
+      throw "The tracker connection changed. Search for the ticket again.";
+    if (task.issue_key) throw "This task already has a ticket. Open its linked ticket instead.";
+    const holder = world.tasks.find((t) => t.issue_key?.toLowerCase() === ticket.key.toLowerCase());
+    if (holder) throw `${ticket.key} is already linked to the task "${holder.name}".`;
+    task.issue_key = ticket.key;
+    task.issue_url = ticket.url;
+    const linked: TaskTicketLinked = {
+      task_id: task.id,
+      key: ticket.key,
+      url: ticket.url,
+      status: ticket.status,
+      status_category: ticket.status_category,
+      context_warning: null,
+    };
+    void emit("task:ticket-linked", linked);
+    return { task, ticket, context_warning: null };
+  },
   ticket_priorities: () => (world.settings.tracker === "github" ? [] : PRIORITIES),
   set_tracker: (a) => {
     world.settings.tracker_chosen = a.uses as typeof world.settings.tracker;
