@@ -33,6 +33,12 @@ function teamLabel(team: TeamReviews): string {
 
 const TONE = { good: "add", bad: "del", wait: "warn", draft: "" } as const;
 
+/** Your own queue, by what it asks of you (REV-9): a second look first. */
+const YOUR_MOVES = [
+  { id: "you:again", heading: "Review again", again: true },
+  { id: "you:new", heading: "Review", again: false },
+];
+
 /** A group's heading (REV-8): its standing, as a title. */
 function groupHeading(label: string): string {
   return label === "draft" ? "Drafts" : label[0].toUpperCase() + label.slice(1);
@@ -469,29 +475,45 @@ export function ReviewsView() {
 
       {side === "review" && by === "who" && (
         <>
-          <ReviewList
-            heading="You"
-            count={
-              sources.some((source) => !source.mine_error)
-                ? countOf(mine.length, mineMore)
-                : undefined
-            }
-            open={!shut.you}
-            onToggle={() => toggle("you")}
-          >
-            {sources.some((source) => !source.mine_error) && mine.length === 0 && (
-              <p className="review-note">Nothing is waiting on you.</p>
-            )}
-            {sortPrs(mine, sort).map((pr) => (
-              <ReviewCard
-                key={identity(pr)}
-                pr={pr}
-                focused={focused === identity(pr)}
-                readers={readers}
-                onContextMenu={(e) => openMenu(e, pr)}
-              />
-            ))}
-          </ReviewList>
+          {mine.length === 0 ? (
+            <ReviewList
+              heading="You"
+              count={sources.some((source) => !source.mine_error) ? "0" : undefined}
+              open={!shut.you}
+              onToggle={() => toggle("you")}
+            >
+              {sources.some((source) => !source.mine_error) && (
+                <p className="review-note">Nothing is waiting on you.</p>
+              )}
+            </ReviewList>
+          ) : (
+            // Asked again after you reviewed it first: its author is waiting
+            // on a second look, usually a short one (REV-9).
+            YOUR_MOVES.map(({ id, heading, again }) => {
+              const prs = mine.filter((pr) => (pr.my_review !== "none") === again);
+              return (
+                prs.length > 0 && (
+                  <ReviewList
+                    key={id}
+                    heading={heading}
+                    count={countOf(prs.length, mineMore && !again)}
+                    open={!shut[id]}
+                    onToggle={() => toggle(id)}
+                  >
+                    {sortPrs(prs, sort).map((pr) => (
+                      <ReviewCard
+                        key={identity(pr)}
+                        pr={pr}
+                        focused={focused === identity(pr)}
+                        readers={readers}
+                        onContextMenu={(e) => openMenu(e, pr)}
+                      />
+                    ))}
+                  </ReviewList>
+                )
+              );
+            })
+          )}
 
           {teams.length ? (
             teams.map(({ source, team }) => (

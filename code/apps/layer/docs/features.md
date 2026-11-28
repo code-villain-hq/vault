@@ -1363,10 +1363,13 @@ dot marks it only while something waits on your review.
 - **REV-4** "Opened by you" MUST list every open PR you authored, in any
   repo, whether or not a task made it, and say for each: draft, its checks
   as GitHub rolls them up (check runs and commit statuses), the review
-  decision (or, where the repo requires none, the latest reviews), who is
-  still asked to review, how many threads are unresolved, and a conflict
-  with its base. One that belongs to a task links to that task's Pull
-  requests tab.
+  decision (or, where the repo requires none, the latest reviews), how
+  many threads are unresolved, and a conflict with its base. It names
+  each reviewer and where they stand: still asked, and since when (the
+  latest request; a wait of two days or more is marked), approved, or
+  asked for changes. One still asked of no one, where a review is
+  required, says it needs a reviewer. One that belongs to a task links to
+  that task's Pull requests tab.
 - **REV-5** A failed lookup of your PRs MUST NOT hide the review lists, nor
   they it. It shows as an error on its own section.
 - **REV-6** It reads the 50 most recently updated and the first 100
@@ -1386,11 +1389,14 @@ dot marks it only while something waits on your review.
   dozen PRs hid the two that needed you among the drafts.
 - **REV-9** Every PR in "To review" MUST say what it asks of you: its size
   (lines added and removed, files), its checks as GitHub rolls them up,
-  whether it comes from a fork, and your own standing: not reviewed yet,
-  your latest review (approved, changes asked for, commented, dismissed),
-  or new commits since your review, when its head has moved past the
-  commit your latest review was of. A pending review of yours is a draft,
-  not a review given. The list is the 100 most recently updated, and says
+  whether it comes from a fork, how long ago it was last asked of you or
+  your team (a wait of two days or more is marked), and your own
+  standing: your latest review (approved, changes asked for, commented,
+  dismissed), or new commits since your review, when its head has moved
+  past the commit your latest review was of. Your own requests are two
+  lists, "Review again" (you reviewed before) and "Review" (not yet), so
+  the group says what the card no longer has to. A pending review of
+  yours is a draft, not a review given. The list is the 100 most recently updated, and says
   so when there are more. Before this, every card was a title and an
   author: a one-line fix looked like a rewrite, and a PR you had approved
   before its author pushed again looked like one you had already done.
@@ -1420,8 +1426,13 @@ dot marks it only while something waits on your review.
   fork PRs, and PRs with no Layer task or registered repository. Open a
   section to read that PR in place, without navigating, starting a task,
   checking out a branch, writing to GitHub or sending to an agent.
-  The two are tabs under the card: one open at a time, read below them,
-  and choosing the open tab again closes it, so neither tab moves.
+  The card's checks rollup and its comments (or unresolved count) are the
+  two buttons that open them, at the end of the card's standing line:
+  nothing is open until one is asked for, one is open at a time, read
+  below the card, and pressing the open one again closes it, so neither
+  button moves. An open check list folds the runs that passed or were
+  skipped behind "N passed" while any other run is listed. Tabs with
+  nothing chosen read as broken.
   **Refresh** reloads open details; grouping and sorting do not load them.
   Each section reports loading, empty, failed and incomplete reads
   independently (PR-18). Card clicks, **GitHub**, **Start task**, grouping

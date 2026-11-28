@@ -403,7 +403,7 @@ async fn source_reviews(
             None
         }
     };
-    let (mine, team, authored) = tokio::join!(client.requested_prs(github::mine_review_query()), team, authored);
+    let (mine, team, authored) = tokio::join!(client.requested_prs(github::mine_review_query(), None), team, authored);
     match mine {
         Ok((mut prs, more)) => {
             for pr in &mut prs {
@@ -468,7 +468,7 @@ async fn load_team_reviews(
         },
     };
     let slug = format!("{}/{}", team.org, team.slug);
-    match client.requested_prs(&github::team_review_query(&team.org, &team.slug)).await {
+    match client.requested_prs(&github::team_review_query(&team.org, &team.slug), Some(&team.slug)).await {
         Ok((prs, more)) => TeamReviews { slug, name: team.name, prs, more, error: None },
         Err(e) => TeamReviews { slug, name: team.name, prs: Vec::new(), more: false, error: Some(e.to_string()) },
     }

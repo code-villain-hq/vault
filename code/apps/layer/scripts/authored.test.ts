@@ -10,6 +10,7 @@ function pr(extra: Partial<AuthoredPr> = {}): AuthoredPr {
     url: "https://github.com/acme/api/pull/7",
     draft: false,
     updated_at: "",
+    created_at: "",
     head: "feature",
     base: "main",
     head_sha: "a".repeat(40),
@@ -21,6 +22,7 @@ function pr(extra: Partial<AuthoredPr> = {}): AuthoredPr {
     unresolved: 0,
     unresolved_more: false,
     conflicts: false,
+    reviewers: [],
     ...extra,
   };
 }

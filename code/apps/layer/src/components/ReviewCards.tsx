@@ -5,8 +5,8 @@ import { githubPrKey, githubPrRepo, githubRepoLabel } from "../lib/github-source
 import { goTo } from "../lib/goto";
 import { menuKeys, pressKeys } from "../lib/press";
 import type { ReviewPrReaders } from "../lib/review-pr-readers";
-import { ago } from "../lib/time";
-import type { AuthoredPr, ReviewRequest } from "../lib/types";
+import { age, ago } from "../lib/time";
+import type { AuthoredPr, ReviewRequest, Reviewer } from "../lib/types";
 import { useStore } from "../store";
 import { ReviewPrDetails } from "./ReviewPrDetails";
 import { BusyLabel, ErrorMessage, useFailure } from "./ui";
@@ -18,7 +18,8 @@ function useCardActivation(open: () => void) {
   return {
     onPointerDownCapture: (e: PointerEvent) => {
       if (e.isPrimary && e.button === 0) {
-        fromReader.current = (e.target as Element).closest(".review-pr-details") !== null;
+        fromReader.current =
+          (e.target as Element).closest(".review-pr-details, .review-toggles") !== null;
       }
     },
     // A selection drag ending on padding sends the click to the card itself.
@@ -33,6 +34,39 @@ function useCardActivation(open: () => void) {
 }
 
 export const identity = githubPrKey;
+
+/** A wait this long is called out: the author has been blocked for days. */
+const LONG_WAIT_MS = 2 * 86_400_000;
+
+function waitedLong(at: string): boolean {
+  const t = Date.parse(at);
+  return !Number.isNaN(t) && Date.now() - t >= LONG_WAIT_MS;
+}
+
+/** The repository's own name; its owner and host are on hover, and in its group. */
+function RepoNumber({ pr }: { pr: ReviewRequest | AuthoredPr }) {
+  return (
+    <span className="repo" title={githubRepoLabel(pr)}>
+      {pr.repo.split("/").pop()} #{pr.number}
+    </span>
+  );
+}
+
+function GitHubLink({ url, open }: { url: string; open: () => void }) {
+  return (
+    <button
+      type="button"
+      className="ui-link"
+      title={url}
+      onClick={(e) => {
+        e.stopPropagation();
+        open();
+      }}
+    >
+      GitHub ↗
+    </button>
+  );
+}
 
 /**
  * A pull request waiting on your review, and what it asks of you (REV-9).
@@ -56,6 +90,7 @@ export function ReviewCard({
   const fail = useStore((s) => s.fail);
   const open = () => void openUrl(pr.url).catch(() => fail(NO_BROWSER));
   const activation = useCardActivation(open);
+  const when = pr.asked_at || pr.updated_at;
 
   return (
     // A div, not a button: it holds buttons of its own.
@@ -68,76 +103,96 @@ export function ReviewCard({
       onContextMenu={onContextMenu}
       title={pr.url}
     >
-      <div className="top">
-        <span className="repo">{githubRepoLabel(pr) || "pull request"}</span>
-        <span className="num">#{pr.number}</span>
-        {pr.draft && <span className="ui-chip">draft</span>}
-        <span className="spacer" />
-        <span className="when">{ago(pr.updated_at)}</span>
-        <button
-          type="button"
-          className="ui-link"
-          title={pr.url}
-          onClick={(e) => {
-            e.stopPropagation();
-            open();
-          }}
-        >
-          GitHub ↗
-        </button>
-      </div>
-      <div className="title">{pr.title}</div>
-      <div className="chips standing">
-        {pr.author && <span className="by">{pr.author}</span>}
-        {asked && <span className="ui-chip">{asked}</span>}
+      <div className="head">
+        <span className="title">{pr.title}</span>
         <span
-          className="ui-chip size"
-          title={`${pr.changed_files} files, opened ${ago(pr.created_at)}`}
+          className={`when${pr.asked_at && waitedLong(pr.asked_at) ? " long" : ""}`}
+          title={`${pr.asked_at ? "Asked" : "Updated"} ${ago(when)}; opened ${ago(pr.created_at)}`}
         >
+          {pr.asked_at ? "asked " : ""}
+          {age(when)}
+        </span>
+      </div>
+      <div className="meta">
+        <RepoNumber pr={pr} />
+        {pr.author && <span>{pr.author}</span>}
+        <span>
           <span className="add">+{pr.additions}</span> <span className="del">−{pr.deletions}</span>
           {" · "}
           {pr.changed_files} {pr.changed_files === 1 ? "file" : "files"}
         </span>
-        {pr.cross_repo && (
-          <span className="ui-chip" title="Its branch is on a fork">
-            fork
-          </span>
-        )}
-        {pr.checks === "failing" && (
-          <span className="ui-status ui-status-danger">checks failing</span>
-        )}
-        {pr.checks === "pending" && (
-          <span className="ui-status ui-status-warn">checks running</span>
-        )}
-        {pr.checks === "passing" && <span className="ui-status">checks pass</span>}
-        <MyReview pr={pr} />
+        {pr.cross_repo && <span title="Its branch is on a fork">fork</span>}
+        {pr.draft && <span>draft</span>}
+        {asked && <span>for {asked}</span>}
+        <span className="spacer" />
+        <GitHubLink url={pr.url} open={open} />
       </div>
-      <ReviewPrDetails pr={pr} readers={readers} />
+      <ReviewPrDetails pr={pr} readers={readers} checks={pr.checks}>
+        <MyReview pr={pr} />
+      </ReviewPrDetails>
     </div>
   );
 }
 
-/** Where your own review of it stands (REV-9): what this request asks of you. */
+/**
+ * Where your own review of it stands (REV-9). Not reviewed yet says
+ * nothing: that is what its group, Review, already says.
+ */
 function MyReview({ pr }: { pr: ReviewRequest }) {
   if (pr.new_since_review) {
     return (
-      <span className="ui-status ui-status-warn" title="Its author pushed after your last review">
-        new commits since your review
+      <span className="said warn" title="Its author pushed after your last review">
+        New commits since your review
       </span>
     );
   }
   switch (pr.my_review) {
     case "approved":
-      return <span className="ui-status ui-status-ok">you approved</span>;
+      return <span className="said ok">You approved</span>;
     case "changes_requested":
-      return <span className="ui-status ui-status-danger">you asked for changes</span>;
+      return <span className="said">You asked for changes</span>;
     case "commented":
-      return <span className="ui-chip">you commented</span>;
+      return <span className="said">You commented</span>;
     case "dismissed":
-      return <span className="ui-chip">your review was dismissed</span>;
+      return <span className="said">Your review was dismissed</span>;
     default:
-      return <span className="ui-status ui-status-warn">not reviewed yet</span>;
+      return null;
   }
+}
+
+const MARK: Record<Reviewer["state"], { mark: string; tone: string; says: string }> = {
+  waiting: { mark: "◷", tone: "warn", says: "asked" },
+  approved: { mark: "✓", tone: "ok", says: "approved" },
+  changes_requested: { mark: "✕", tone: "danger", says: "asked for changes" },
+};
+
+/**
+ * Who it waits on and who has answered (REV-4): a wait of days stands out,
+ * and an answer says what it was.
+ */
+function Reviewers({ pr }: { pr: AuthoredPr }) {
+  return (
+    <>
+      {pr.reviewers.map((r) => {
+        const { mark, tone, says } = MARK[r.state];
+        const long = r.state === "waiting" && waitedLong(r.at);
+        return (
+          <span
+            key={r.who}
+            className="reviewer"
+            title={`${r.who} ${says}${r.at ? ` ${ago(r.at)}` : ""}`}
+          >
+            <span className={`mark ${tone}`}>{mark}</span>
+            <span className="who">{r.who}</span>
+            {r.state === "waiting" && r.at && (
+              <span className={long ? "said warn" : "said"}>{age(r.at)}</span>
+            )}
+            {r.state === "changes_requested" && <span className="said">asked for changes</span>}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 /**
@@ -158,13 +213,12 @@ export function AuthoredCard({
   onContextMenu: (e: MouseEvent) => void;
 }) {
   // Opening GitHub fails in the top bar, like the review card; Start task
-  // under the card's chips, by its button (NOTE-6).
+  // under the card, by its link (NOTE-6).
   const fail = useStore((s) => s.fail);
   const failure = useFailure();
   const refreshTasks = useStore((s) => s.refreshTasks);
   const refreshPrs = useStore((s) => s.refreshPrs);
   const [starting, setStarting] = useState(false);
-  const who = (names: string[]) => (names.length ? ` by ${names.join(", ")}` : "");
   const openGitHub = () => void openUrl(pr.url).catch(() => fail(NO_BROWSER));
   const open = () => (task ? goTo(`pr:${task.id}`) : openGitHub());
   const activation = useCardActivation(open);
@@ -186,6 +240,11 @@ export function AuthoredCard({
     }
   }
 
+  const unresolved =
+    pr.unresolved > 0 ? `${pr.unresolved}${pr.unresolved_more ? "+" : ""}` : undefined;
+  const asksNobody =
+    pr.review === "review_required" && !pr.reviewers.some((r) => r.state === "waiting");
+
   return (
     // A div, not a button: it holds buttons of its own.
     <div
@@ -197,56 +256,27 @@ export function AuthoredCard({
       onContextMenu={onContextMenu}
       title={task ? `Open ${task.name}` : pr.url}
     >
-      <div className="top">
-        <span className="repo">{githubRepoLabel(pr)}</span>
-        <span className="num">#{pr.number}</span>
-        <span className="spacer" />
-        <span className="when">{ago(pr.updated_at)}</span>
-        <button
-          type="button"
-          className="ui-link"
-          title={pr.url}
-          onClick={(e) => {
-            e.stopPropagation();
-            openGitHub();
-          }}
+      <div className="head">
+        <span className="title">{pr.title}</span>
+        <span
+          className="when"
+          title={`Updated ${ago(pr.updated_at)}; opened ${ago(pr.created_at)}`}
         >
-          GitHub ↗
-        </button>
+          {age(pr.updated_at)}
+        </span>
       </div>
-      <div className="title">{pr.title}</div>
-      <div className="chips standing">
-        {pr.checks === "failing" && (
-          <span className="ui-status ui-status-danger">checks failing</span>
-        )}
-        {pr.checks === "pending" && (
-          <span className="ui-status ui-status-warn">checks running</span>
-        )}
-        {pr.checks === "passing" && <span className="ui-status">checks pass</span>}
-        {pr.review === "changes_requested" && (
-          <span className="ui-status ui-status-danger">changes requested{who(pr.changes_by)}</span>
-        )}
-        {pr.review === "approved" && (
-          <span className="ui-status ui-status-ok">approved{who(pr.approved_by)}</span>
-        )}
-        {pr.review === "review_required" && pr.waiting_on.length === 0 && (
-          <span className="ui-status ui-status-warn">needs a review</span>
-        )}
-        {pr.waiting_on.length > 0 && (
-          <span className="ui-chip">waiting on {pr.waiting_on.join(", ")}</span>
-        )}
-        {pr.unresolved > 0 && (
-          <span className="ui-status ui-status-warn">
-            {pr.unresolved}
-            {pr.unresolved_more ? "+" : ""} unresolved
+      <div className="meta">
+        <RepoNumber pr={pr} />
+        {task && (
+          <span className="task" title={`Task: ${task.name}`}>
+            {task.name}
           </span>
         )}
-        {pr.conflicts && <span className="ui-status ui-status-danger">conflicts</span>}
-        {task && <span className="ui-status ui-status-info">{task.name}</span>}
+        <span className="spacer" />
         {!task && (
           <button
             type="button"
-            className="ui-button start"
+            className="ui-link"
             disabled={starting}
             title={`A task on ${pr.head}, to work on it here`}
             onClick={(e) => {
@@ -257,9 +287,14 @@ export function AuthoredCard({
             <BusyLabel busy={starting} idle="Start task" working="Starting…" />
           </button>
         )}
+        <GitHubLink url={pr.url} open={openGitHub} />
       </div>
       <ErrorMessage>{failure.error}</ErrorMessage>
-      <ReviewPrDetails pr={pr} readers={readers} />
+      <ReviewPrDetails pr={pr} readers={readers} checks={pr.checks} unresolved={unresolved}>
+        {pr.conflicts && <span className="said danger">Conflicts</span>}
+        {asksNobody && <span className="said warn">Needs a reviewer</span>}
+        <Reviewers pr={pr} />
+      </ReviewPrDetails>
     </div>
   );
 }

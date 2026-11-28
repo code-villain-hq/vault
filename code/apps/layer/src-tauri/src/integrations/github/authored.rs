@@ -25,6 +25,7 @@ pub struct AuthoredPr {
     pub title: String,
     pub url: String,
     pub draft: bool,
+    pub created_at: String,
     pub updated_at: String,
     /// Its branch, and the one it merges into: what a task for it is on.
     pub head: String,
@@ -38,12 +39,28 @@ pub struct AuthoredPr {
     pub changes_by: Vec<String>,
     /// Asked to review and not yet done so: logins, and teams as `@slug`.
     pub waiting_on: Vec<String>,
+    /// Everyone asked or reviewing, and since when: what the card shows of
+    /// who it waits on and who has answered (REV-4).
+    pub reviewers: Vec<Reviewer>,
     pub unresolved: u32,
     /// More threads than were counted, so `unresolved` is a floor.
     pub unresolved_more: bool,
     /// GitHub found a conflict with the base. Unknown, while it is still
     /// working that out, is not one.
     pub conflicts: bool,
+}
+
+/// One reviewer of a pull request you opened. The names alone said who, not
+/// for how long: a request three days old read the same as one an hour old.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Reviewer {
+    /// A login, or a team as `@slug`.
+    pub who: String,
+    /// "waiting", "approved" or "changes_requested".
+    pub state: String,
+    /// When they were asked, while waiting; when they reviewed, after.
+    /// Empty when GitHub does not say.
+    pub at: String,
 }
 
 impl GitHub {
@@ -58,13 +75,16 @@ impl GitHub {
             issueCount
             nodes {
               ... on PullRequest {
-                number title url isDraft updatedAt mergeable reviewDecision headRefName baseRefName headRefOid
+                number title url isDraft createdAt updatedAt mergeable reviewDecision headRefName baseRefName headRefOid
                 repository { nameWithOwner }
                 commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
                 reviewRequests(first: 20) {
                   nodes { requestedReviewer { ... on User { login } ... on Team { slug } } }
                 }
-                latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
+                latestOpinionatedReviews(first: 20) { nodes { state submittedAt author { login } } }
+                timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) {
+                  nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { login } ... on Team { slug } } } }
+                }
                 reviewThreads(first: $threads) { pageInfo { hasNextPage } nodes { isResolved } }
               }
             }
@@ -112,6 +132,25 @@ pub(super) fn rollup(v: &Value) -> &'static str {
     }
 }
 
+/// Review requests in a pull request's timeline, oldest first: who was
+/// asked (a login, or `@slug`) and when.
+pub(super) fn asked(v: &Value) -> Vec<(String, String)> {
+    v.pointer("/timelineItems/nodes")
+        .and_then(|n| n.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|e| {
+            let who = e.get("requestedReviewer")?;
+            let name = who
+                .get("login")
+                .and_then(|l| l.as_str())
+                .map(str::to_string)
+                .or_else(|| who.get("slug").and_then(|s| s.as_str()).map(|s| format!("@{s}")))?;
+            Some((name, e.get("createdAt").and_then(|c| c.as_str()).unwrap_or_default().to_string()))
+        })
+        .collect()
+}
+
 fn to_authored(v: &Value) -> Option<AuthoredPr> {
     let number = v.get("number").and_then(|n| n.as_u64()).filter(|n| *n > 0)?;
     let text = |p: &str| v.pointer(p).and_then(|x| x.as_str()).unwrap_or_default().to_string();
@@ -147,7 +186,29 @@ fn to_authored(v: &Value) -> Option<AuthoredPr> {
                 .map(str::to_string)
                 .or_else(|| who.get("slug").and_then(|s| s.as_str()).map(|s| format!("@{s}")))
         })
+        .collect::<Vec<String>>();
+
+    // Still asked first, then who answered. A re-request after a review puts
+    // someone back to waiting, so the latest request is the one that counts.
+    let requests = asked(v);
+    let since = |who: &str| requests.iter().rev().find(|(name, _)| name == who).map(|(_, at)| at.clone());
+    let mut reviewers: Vec<Reviewer> = waiting_on
+        .iter()
+        .map(|who| Reviewer { who: who.clone(), state: "waiting".into(), at: since(who).unwrap_or_default() })
         .collect();
+    for r in list("/latestOpinionatedReviews/nodes") {
+        let state = match r.get("state").and_then(|s| s.as_str()) {
+            Some("APPROVED") => "approved",
+            Some("CHANGES_REQUESTED") => "changes_requested",
+            _ => continue,
+        };
+        let Some(who) = r.pointer("/author/login").and_then(|l| l.as_str()) else { continue };
+        if waiting_on.iter().any(|w| w == who) {
+            continue;
+        }
+        let at = r.get("submittedAt").and_then(|s| s.as_str()).unwrap_or_default();
+        reviewers.push(Reviewer { who: who.into(), state: state.into(), at: at.into() });
+    }
 
     let unresolved = list("/reviewThreads/nodes")
         .iter()
@@ -161,6 +222,7 @@ fn to_authored(v: &Value) -> Option<AuthoredPr> {
         title: text("/title"),
         url: text("/url"),
         draft: v.get("isDraft").and_then(|d| d.as_bool()).unwrap_or(false),
+        created_at: text("/createdAt"),
         updated_at: text("/updatedAt"),
         head: text("/headRefName"),
         base: text("/baseRefName"),
@@ -170,6 +232,7 @@ fn to_authored(v: &Value) -> Option<AuthoredPr> {
         approved_by,
         changes_by,
         waiting_on,
+        reviewers,
         unresolved,
         unresolved_more: v.pointer("/reviewThreads/pageInfo/hasNextPage").and_then(|m| m.as_bool()).unwrap_or(false),
         conflicts: v.get("mergeable").and_then(|m| m.as_str()) == Some("CONFLICTING"),
@@ -224,6 +287,42 @@ mod tests {
         assert_eq!(pr.unresolved, 2);
         assert!(!pr.unresolved_more);
         assert!(pr.conflicts);
+    }
+
+    #[test]
+    fn each_reviewer_says_since_when_they_were_asked_or_when_they_answered() {
+        let pr = one(json!({
+            "reviewRequests": { "nodes": [
+                { "requestedReviewer": { "login": "cy" } },
+                { "requestedReviewer": { "slug": "fe" } },
+                { "requestedReviewer": { "login": "bo" } },
+            ] },
+            "timelineItems": { "nodes": [
+                { "createdAt": "2026-09-20T09:00:00Z", "requestedReviewer": { "login": "cy" } },
+                { "createdAt": "2026-09-20T09:00:00Z", "requestedReviewer": { "slug": "fe" } },
+                { "createdAt": "2026-09-20T09:00:00Z", "requestedReviewer": { "login": "bo" } },
+                { "createdAt": "2026-09-24T09:00:00Z", "requestedReviewer": { "login": "bo" } },
+            ] },
+            "latestOpinionatedReviews": { "nodes": [
+                { "state": "APPROVED", "submittedAt": "2026-09-22T09:00:00Z", "author": { "login": "ana" } },
+                { "state": "CHANGES_REQUESTED", "submittedAt": "2026-09-23T09:00:00Z", "author": { "login": "bo" } },
+            ] },
+        }));
+        let seen: Vec<_> = pr.reviewers.iter().map(|r| (r.who.as_str(), r.state.as_str(), r.at.as_str())).collect();
+        assert_eq!(
+            seen,
+            vec![
+                ("cy", "waiting", "2026-09-20T09:00:00Z"),
+                ("@fe", "waiting", "2026-09-20T09:00:00Z"),
+                // Asked again after asking for changes: waiting since the re-request.
+                ("bo", "waiting", "2026-09-24T09:00:00Z"),
+                ("ana", "approved", "2026-09-22T09:00:00Z"),
+            ]
+        );
+        assert_eq!(
+            one(json!({ "reviewRequests": { "nodes": [{ "requestedReviewer": { "login": "cy" } }] } })).reviewers[0].at,
+            ""
+        );
     }
 
     #[test]

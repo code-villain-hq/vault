@@ -10,7 +10,7 @@
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use super::authored::rollup;
+use super::authored::{asked, rollup};
 use super::GitHub;
 use crate::error::{Error, Result};
 
@@ -51,15 +51,20 @@ pub struct ReviewRequest {
     pub my_review: String,
     /// Its head has moved past the commit your latest review was of.
     pub new_since_review: bool,
+    /// When it was last asked of you, or of the team whose queue this is;
+    /// empty when GitHub's timeline does not say.
+    pub asked_at: String,
 }
 
 impl GitHub {
     /// Open pull requests matching a review search, most recently updated
     /// first, and whether GitHub had more than were read.
-    pub async fn requested_prs(&self, query: &str) -> Result<(Vec<ReviewRequest>, bool)> {
+    /// `team` is the slug the search asks for; `None` is you.
+    pub async fn requested_prs(&self, query: &str, team: Option<&str>) -> Result<(Vec<ReviewRequest>, bool)> {
         // Only fields every GitHub Enterprise Server this app talks to has:
         // one unknown field fails the whole query, not just that field.
         const QUERY: &str = "query($q: String!, $first: Int!) {
+          viewer { login }
           search(query: $q, type: ISSUE, first: $first) {
             issueCount
             nodes {
@@ -71,6 +76,9 @@ impl GitHub {
                 repository { nameWithOwner }
                 commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
                 viewerLatestReview { state commit { oid } }
+                timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) {
+                  nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { login } ... on Team { slug } } } }
+                }
               }
             }
           }
@@ -81,7 +89,7 @@ impl GitHub {
                 json!({ "q": format!("{query} archived:false sort:updated-desc"), "first": REQUESTED_LIMIT }),
             )
             .await?;
-        parse_requested(&v)
+        parse_requested(&v, team)
     }
 }
 
@@ -114,7 +122,7 @@ fn same_pr(a: &ReviewRequest, b: &ReviewRequest) -> bool {
     a.url == b.url
 }
 
-pub(crate) fn parse_requested(v: &Value) -> Result<(Vec<ReviewRequest>, bool)> {
+pub(crate) fn parse_requested(v: &Value, team: Option<&str>) -> Result<(Vec<ReviewRequest>, bool)> {
     // GraphQL answers 200 with the failure inside.
     if let Some(msg) = v.pointer("/errors/0/message").and_then(|m| m.as_str()) {
         return Err(Error::Other(format!("GitHub: {msg}")));
@@ -124,14 +132,19 @@ pub(crate) fn parse_requested(v: &Value) -> Result<(Vec<ReviewRequest>, bool)> {
         .filter(|s| !s.is_null())
         .ok_or_else(|| Error::Other("GitHub did not answer the search".into()))?;
     let nodes = search.get("nodes").and_then(|n| n.as_array()).cloned().unwrap_or_default();
-    let prs = nodes.iter().filter_map(to_requested).collect();
+    // Asked of whom, as the timeline names reviewers: a login, or `@slug`.
+    let who = match team {
+        Some(slug) => format!("@{slug}"),
+        None => v.pointer("/data/viewer/login").and_then(|l| l.as_str()).unwrap_or_default().to_string(),
+    };
+    let prs = nodes.iter().filter_map(|n| to_requested(n, &who)).collect();
     // Against what came back, not what parsed: a node dropped for having no
     // number is not a further page.
     let total = search.get("issueCount").and_then(|n| n.as_u64()).unwrap_or(0);
     Ok((prs, total > nodes.len() as u64))
 }
 
-fn to_requested(v: &Value) -> Option<ReviewRequest> {
+fn to_requested(v: &Value, who: &str) -> Option<ReviewRequest> {
     let number = v.get("number").and_then(|n| n.as_u64()).filter(|n| *n > 0)?;
     let url = v.get("url").and_then(|u| u.as_str()).filter(|u| !u.is_empty())?;
     let text = |p: &str| v.pointer(p).and_then(|x| x.as_str()).unwrap_or_default().to_string();
@@ -172,6 +185,13 @@ fn to_requested(v: &Value) -> Option<ReviewRequest> {
         checks: rollup(v).into(),
         my_review: my_review.into(),
         new_since_review,
+        // The latest request: a re-request after a review is the one waiting.
+        asked_at: asked(v)
+            .into_iter()
+            .rev()
+            .find(|(name, _)| !who.is_empty() && name == who)
+            .map(|(_, at)| at)
+            .unwrap_or_default(),
     })
 }
 
@@ -196,7 +216,7 @@ mod tests {
 
     fn one(extra: Value) -> ReviewRequest {
         let v = json!({ "data": { "search": { "issueCount": 1, "nodes": [node(extra)] } } });
-        parse_requested(&v).unwrap().0.remove(0)
+        parse_requested(&v, None).unwrap().0.remove(0)
     }
 
     #[test]
@@ -237,11 +257,30 @@ mod tests {
     }
 
     #[test]
+    fn a_request_says_when_it_was_last_asked_of_you_or_of_the_team() {
+        let events = json!({ "timelineItems": { "nodes": [
+            { "createdAt": "2026-09-20T09:00:00Z", "requestedReviewer": { "login": "me" } },
+            { "createdAt": "2026-09-21T09:00:00Z", "requestedReviewer": { "slug": "fe" } },
+            { "createdAt": "2026-09-22T09:00:00Z", "requestedReviewer": { "login": "ana" } },
+            { "createdAt": "2026-09-23T09:00:00Z", "requestedReviewer": { "login": "me" } },
+            {},
+        ] } });
+        let read = |team: Option<&str>| {
+            let v = json!({ "data": { "viewer": { "login": "me" }, "search": { "issueCount": 1, "nodes": [node(events.clone())] } } });
+            parse_requested(&v, team).unwrap().0.remove(0).asked_at
+        };
+        assert_eq!(read(None), "2026-09-23T09:00:00Z", "a re-request is the one waiting");
+        assert_eq!(read(Some("fe")), "2026-09-21T09:00:00Z");
+        assert_eq!(read(Some("be")), "", "no event, no time");
+        assert_eq!(one(events.clone()).asked_at, "", "without the viewer's login nothing is yours");
+    }
+
+    #[test]
     fn more_is_said_when_github_had_more_than_was_read() {
         let v = json!({ "data": { "search": { "issueCount": 300, "nodes": [node(json!({}))] } } });
-        assert!(parse_requested(&v).unwrap().1);
+        assert!(parse_requested(&v, None).unwrap().1);
         let v = json!({ "data": { "search": { "issueCount": 2, "nodes": [node(json!({})), json!({})] } } });
-        let (prs, more) = parse_requested(&v).unwrap();
+        let (prs, more) = parse_requested(&v, None).unwrap();
         assert_eq!(prs.len(), 1, "a node that is not a pull request is skipped");
         assert!(!more, "and is not a further page");
     }
@@ -249,7 +288,7 @@ mod tests {
     #[test]
     fn a_graphql_error_is_an_error_not_an_empty_queue() {
         let v = json!({ "data": null, "errors": [{ "message": "Field 'viewerLatestReview' doesn't exist" }] });
-        assert!(parse_requested(&v).unwrap_err().to_string().contains("viewerLatestReview"));
+        assert!(parse_requested(&v, None).unwrap_err().to_string().contains("viewerLatestReview"));
     }
 
     #[test]

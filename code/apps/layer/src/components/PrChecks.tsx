@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CheckRunsView } from "../lib/pr-checks";
 import { ExternalIcon } from "./icons";
 
@@ -51,10 +52,23 @@ export function PrCheckStatus({
 export function PrCheckList({
   view,
   onOpen,
+  fold = false,
 }: {
   view: CheckRunsView;
   onOpen: (url: string) => void;
+  /**
+   * Fold the runs that passed or were skipped into one line while another
+   * needs a look (REV-12): one failure among fourteen names was hard to find.
+   */
+  fold?: boolean;
 }) {
+  const [unfolded, setUnfolded] = useState(false);
+  const quiet = (outcome: string) => outcome === "passing" || outcome === "skipped";
+  const folded =
+    fold && !unfolded && view.runs.some((r) => !quiet(r.outcome))
+      ? view.runs.filter((r) => quiet(r.outcome)).length
+      : 0;
+  const runs = folded ? view.runs.filter((r) => !quiet(r.outcome)) : view.runs;
   return (
     <>
       {view.state === "unavailable" && (
@@ -68,9 +82,9 @@ export function PrCheckList({
         </p>
       )}
       {view.summary === "empty" && <p className="muted">No checks reported.</p>}
-      {view.runs.length > 0 && (
+      {runs.length > 0 && (
         <ul aria-label="Check runs" style={{ padding: 0, margin: 0 }}>
-          {view.runs.map(({ name, label, outcome, url }) => (
+          {runs.map(({ name, label, outcome, url }) => (
             <li key={name} className="check">
               <span className="name" style={{ overflowWrap: "anywhere" }}>
                 {name}
@@ -93,6 +107,11 @@ export function PrCheckList({
             </li>
           ))}
         </ul>
+      )}
+      {folded > 0 && (
+        <button type="button" className="ui-link check-fold" onClick={() => setUnfolded(true)}>
+          {folded} passed
+        </button>
       )}
     </>
   );

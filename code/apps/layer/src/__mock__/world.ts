@@ -605,6 +605,7 @@ function authored(
     title,
     url: `https://github.com/acme/${repo}/pull/${number}`,
     draft: false,
+    created_at: ago(4 * 86_400),
     updated_at: updated,
     head: `ACME-${number}`,
     head_sha: reviewHeadSha(number),
@@ -614,6 +615,7 @@ function authored(
     approved_by: [],
     changes_by: [],
     waiting_on: [],
+    reviewers: [],
     unresolved: 0,
     unresolved_more: false,
     conflicts: false,
@@ -648,6 +650,7 @@ function requested(
     checks: "passing",
     my_review: "none",
     new_since_review: false,
+    asked_at: ago(2 * 86_400),
     ...extra,
   };
 }
@@ -1019,11 +1022,13 @@ function busy(): World {
               deletions: 380,
               changed_files: 27,
               checks: "pending",
+              asked_at: ago(3600),
             }),
             requested(61, "api", "Retry webhooks with backoff", "ana", ago(7200), {
               my_review: "changes_requested",
               new_since_review: true,
               created_at: ago(9 * 86_400),
+              asked_at: ago(7200),
             }),
             requested(7, "docs", "Fix typos in the setup guide", "outsider", ago(20_000), {
               cross_repo: true,
@@ -1032,6 +1037,7 @@ function busy(): World {
               deletions: 3,
               changed_files: 1,
               checks: "failing",
+              asked_at: ago(4 * 86_400),
             }),
             requested(33, "web", "Drop the legacy theme", "bo", ago(50_000), {
               my_review: "approved",
@@ -1045,16 +1051,26 @@ function busy(): World {
                 checks: "failing",
                 review: "changes_requested",
                 changes_by: ["ana"],
+                approved_by: ["bo"],
+                reviewers: [
+                  { who: "ana", state: "changes_requested", at: ago(5 * 3600) },
+                  { who: "bo", state: "approved", at: ago(86_400) },
+                ],
                 unresolved: 1,
               }),
               authored(91, "web", "Remember the last workspace", ago(4000), {
                 review: "approved",
                 approved_by: ["bo"],
+                reviewers: [{ who: "bo", state: "approved", at: ago(3 * 3600) }],
               }),
               authored(12, "docs", "Document the retry settings", ago(9000), {
                 checks: "pending",
                 review: "review_required",
                 waiting_on: ["ana", "@fe"],
+                reviewers: [
+                  { who: "ana", state: "waiting", at: ago(3 * 86_400) },
+                  { who: "@fe", state: "waiting", at: ago(3 * 86_400) },
+                ],
                 conflicts: true,
               }),
               authored(95, "web", "Try a denser sidebar", ago(90_000), {

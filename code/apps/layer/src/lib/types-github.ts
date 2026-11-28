@@ -224,6 +224,8 @@ export interface ReviewRequest {
   my_review: "approved" | "changes_requested" | "commented" | "dismissed" | "none";
   /** Its head moved past the commit your latest review was of. */
   new_since_review: boolean;
+  /** When it was last asked of you, or of the team whose queue it is in; "" when GitHub does not say. */
+  asked_at: string;
 }
 
 export interface TeamReviews {
@@ -256,6 +258,15 @@ export interface AuthoredPrs {
   error: string | null;
 }
 
+/** A reviewer of a pull request you opened, and since when. */
+export interface Reviewer {
+  /** A login, or a team as `@slug`. */
+  who: string;
+  state: "waiting" | "approved" | "changes_requested";
+  /** When they were asked, while waiting; when they reviewed, after. "" when GitHub does not say. */
+  at: string;
+}
+
 export interface AuthoredPr {
   source?: string;
   /** `owner/name`. */
@@ -264,6 +275,7 @@ export interface AuthoredPr {
   title: string;
   url: string;
   draft: boolean;
+  created_at: string;
   updated_at: string;
   /** Its branch, and the one it merges into. */
   head: string;
@@ -277,6 +289,8 @@ export interface AuthoredPr {
   changes_by: string[];
   /** Asked and not yet reviewed: logins, and teams as `@slug`. */
   waiting_on: string[];
+  /** Everyone asked or reviewing: still asked first, then who answered. */
+  reviewers: Reviewer[];
   unresolved: number;
   /** More threads than were counted: `unresolved` is a floor. */
   unresolved_more: boolean;

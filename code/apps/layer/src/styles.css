@@ -2112,45 +2112,59 @@ body.dragging * {
 .review-card.focused {
   background: var(--selected);
 }
-.review-card .top {
+/* Title first; the facts under it, quiet; then where it stands. */
+.review-card .head {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 5px;
-}
-.review-card .repo,
-.review-card .num {
-  font-family: var(--font-mono);
-  font-size: var(--type-ui-small-size);
-  color: var(--muted);
-}
-.review-card .num {
-  color: var(--faint);
-}
-.review-card .when {
-  color: var(--faint);
-  font-size: var(--type-ui-small-size);
+  align-items: baseline;
+  gap: 10px;
 }
 .review-card .title {
-  font-size: var(--type-ui-small-size);
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
   line-height: 1.45;
 }
-.review-card .by {
+.review-card .when {
+  flex-shrink: 0;
+  color: var(--faint);
+  font-size: var(--type-ui-small-size);
+}
+.review-card .when.long {
+  color: var(--status-warn-ink);
+}
+.review-card .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 2px;
+  margin-top: 2px;
   color: var(--muted);
   font-size: var(--type-ui-small-size);
 }
-.review-card .ui-chip.size .add {
+.review-card .meta .repo {
+  font-family: var(--font-mono);
+}
+.review-card .meta .task {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--status-info-ink);
+}
+.review-card .meta .add {
   color: var(--status-ok-ink);
 }
-.review-card .ui-chip.size .del {
+.review-card .meta .del {
   color: var(--status-danger-ink);
 }
-.review-card .chips.standing {
-  flex-wrap: wrap;
-  margin-top: 6px;
+.review-card .meta .ui-link {
+  font-size: var(--type-ui-small-size);
+  font-weight: 500;
+  color: var(--muted);
 }
-.review-card .chips .start {
-  margin-left: auto;
+.review-card .spacer {
+  flex: 1;
 }
 .review-note {
   margin: 0 0 10px;
