@@ -8,11 +8,13 @@
 //! its own while the window is away, and says what is new.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
-use crate::commands::{banner, AppState, ReviewQueue};
+use crate::commands::{banner, blocking, guarded_banner, AppState, ReviewQueue, SubmitBanner};
+use crate::error::Result;
 use crate::messages::{self, Kind, Level, New};
 use crate::target::Target;
 
@@ -98,30 +100,84 @@ impl Seen {
     /// center keeps these either way (MSG-2), and a snapshot every three
     /// minutes made nearly every new ticket part of one.
     pub fn forget(&self) {
+        self.forget_reviews();
+        self.forget_tickets();
+    }
+
+    pub(crate) fn forget_reviews(&self) {
         *self.reviews.lock() = None;
+        self.forget_team();
+    }
+
+    pub(crate) fn forget_team(&self) {
         *self.team_primed.lock() = false;
+    }
+
+    pub(crate) fn forget_tickets(&self) {
         *self.tickets.lock() = None;
     }
 }
 
 /// Banners are on, and nobody is looking at the window.
-fn announce_now(app: &AppHandle) -> bool {
+fn announce_now<R: Runtime>(app: &AppHandle<R>) -> bool {
     let state = app.state::<AppState>();
     state.config.with(|c| c.ui.system_notifications)
         && app.get_webview_window("main").is_some_and(|w| !w.is_focused().unwrap_or(false))
 }
 
 /// A review queue has come in, from wherever it was asked for.
-pub fn saw_reviews(app: &AppHandle, queue: &ReviewQueue) {
-    let fresh = app.state::<AppState>().news.reviews(queue);
-    let news = review_news(&fresh);
-    messages::record_all(app, news.clone());
-    if news.is_empty() || !announce_now(app) {
-        return;
-    }
-    for (title, body, target) in banners(news, "Reviews", "pull requests are waiting on a review", Target::Reviews) {
-        let _ = banner(app, title, body, target);
-    }
+pub(crate) async fn saw_reviews<R: Runtime>(
+    app: AppHandle<R>,
+    generation: u64,
+    queue: ReviewQueue,
+) -> Result<ReviewQueue> {
+    saw_reviews_with(app, generation, queue, |handle, submit, news| {
+        if announce_now(handle) {
+            for (title, body, target) in
+                banners(news, "Reviews", "pull requests are waiting on a review", Target::Reviews)
+            {
+                let _ = guarded_banner(handle, title, body, target, submit.clone());
+            }
+        }
+    })
+    .await
+}
+
+pub(crate) async fn saw_reviews_with<R: Runtime>(
+    app: AppHandle<R>,
+    generation: u64,
+    queue: ReviewQueue,
+    notify: impl FnOnce(&AppHandle<R>, SubmitBanner, Vec<New>) + Send + 'static,
+) -> Result<ReviewQueue> {
+    let handle = app.clone();
+    blocking(app, move |state| {
+        let session = state.github_session.blocking_lock();
+        if session.reviews_generation != generation {
+            return Err(crate::error::Error::Other(
+                "The GitHub review connection changed. Refresh Reviews and try again.".into(),
+            ));
+        }
+        let news = review_news(&state.news.reviews(&queue));
+        messages::record_all(&handle, news.clone());
+        // Authorization can call back inline. Do not keep the state gate
+        // while asking for delivery; take it again only for the actual post.
+        drop(session);
+        if !news.is_empty() {
+            let session = state.github_session.clone();
+            let submit: SubmitBanner = Arc::new(move |post| {
+                let session = session.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    let session = session.blocking_lock();
+                    if session.reviews_generation == generation {
+                        post();
+                    }
+                })
+            });
+            notify(&handle, submit, news);
+        }
+        Ok(queue)
+    })
+    .await
 }
 
 /// Your ticket list has come in, from wherever it was asked for.
@@ -193,8 +249,10 @@ pub fn spawn(app: AppHandle) {
                 (cfg.github.is_some(), cfg.tracker_in_use().is_some())
             };
             if github {
-                if let Ok(queue) = crate::commands::review_queue(&state).await {
-                    saw_reviews(&app, &queue);
+                if let Ok(connected) = crate::commands::connected_github(&state).await {
+                    if let Ok(queue) = crate::commands::review_queue(&state, &connected).await {
+                        let _ = saw_reviews(app.clone(), connected.reviews_generation, queue).await;
+                    }
                 }
             }
             if tickets {

@@ -28,6 +28,7 @@ pub struct AuthoredPr {
     /// Its branch, and the one it merges into: what a task for it is on.
     pub head: String,
     pub base: String,
+    pub head_sha: String,
     /// "passing", "failing", "pending", or "none" when nothing reports.
     pub checks: String,
     /// "approved", "changes_requested", "review_required", or "none".
@@ -56,7 +57,7 @@ impl GitHub {
             issueCount
             nodes {
               ... on PullRequest {
-                number title url isDraft updatedAt mergeable reviewDecision headRefName baseRefName
+                number title url isDraft updatedAt mergeable reviewDecision headRefName baseRefName headRefOid
                 repository { nameWithOwner }
                 commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
                 reviewRequests(first: 20) {
@@ -161,6 +162,7 @@ fn to_authored(v: &Value) -> Option<AuthoredPr> {
         updated_at: text("/updatedAt"),
         head: text("/headRefName"),
         base: text("/baseRefName"),
+        head_sha: text("/headRefOid"),
         checks: rollup(v).into(),
         review: review.into(),
         approved_by,
@@ -220,6 +222,19 @@ mod tests {
         assert_eq!(pr.unresolved, 2);
         assert!(!pr.unresolved_more);
         assert!(pr.conflicts);
+    }
+
+    #[test]
+    fn authored_rows_carry_the_pull_request_head_oid_with_the_rollup() {
+        let sha = "ABCDEF0123456789abcdef0123456789abcdef01";
+        let pr = one(json!({
+            "headRefOid": sha,
+            "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": "FAILURE" } } }] },
+        }));
+        let row = serde_json::to_value(pr).unwrap();
+        assert_eq!(row["head_sha"], sha);
+        assert_eq!(row["checks"], "failing");
+        assert_eq!(serde_json::to_value(one(json!({}))).unwrap()["head_sha"], "");
     }
 
     #[test]

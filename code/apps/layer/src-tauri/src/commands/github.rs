@@ -1,32 +1,34 @@
 //! GitHub connect, PR listing, retarget. Opening PRs is in `open_prs.rs`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, Runtime, State};
 
 use crate::config::GithubConfig;
 use crate::error::{Error, Result};
 use crate::git;
-use crate::integrations::github::{self, CodeLine, GitHub};
+use crate::integrations::github::{self, CodeLine, GitHub, ReadState};
 use crate::secrets;
 
 use super::jira::stored_or;
 use super::panes::agent_file_dir;
-use super::{off_runtime, AppState};
+use super::{blocking, off_runtime, AppState};
+
+mod session;
+pub(crate) use session::{connected_github, ConnectedGitHub, NativeGitHub};
 
 // ------------------------------------------------------------------ github
 
-pub(crate) fn github_client(state: &AppState) -> Result<(GitHub, GithubConfig)> {
-    let cfg = state.config.with(|c| c.github.clone()).ok_or(Error::NotConfigured("GitHub"))?;
-    let token = secrets::get(secrets::GITHUB)?.ok_or(Error::NotConfigured("GitHub"))?;
-    Ok((GitHub::new(&cfg, &token)?, cfg))
+pub(crate) async fn github_client(state: &AppState) -> Result<(GitHub, GithubConfig)> {
+    let connected = connected_github(state).await?;
+    Ok((connected.client, connected.config))
 }
 
 #[tauri::command]
-pub async fn github_connect(
-    state: State<'_, AppState>,
+pub async fn github_connect<R: Runtime>(
+    app: AppHandle<R>,
     api_url: String,
     web_url: String,
     token: String,
@@ -37,17 +39,42 @@ pub async fn github_connect(
         web_url: web_url.trim_end_matches('/').to_string(),
         review_team: review_team.as_deref().and_then(github::normalize_review_team),
     };
-    let was = state.config.read().github.as_ref().map(|g| g.api_url.clone());
     let typed = !token.trim().is_empty();
-    let token = stored_or(secrets::GITHUB, &token, "GitHub", was.as_deref(), &cfg.api_url)?;
+    let url = cfg.api_url.clone();
+    let (token, generation) = blocking(app.clone(), move |state| {
+        let session = state.github_session.blocking_lock();
+        let was = state.config.with(|c| c.github.as_ref().map(|g| g.api_url.clone()));
+        Ok((stored_or(secrets::GITHUB, &token, "GitHub", was.as_deref(), &url)?, session.generation))
+    })
+    .await?;
     let login = match GitHub::new(&cfg, &token)?.login().await {
         // A token just typed in is not the saved one yet.
         Err(Error::TokenRejected(_)) if typed => Err(Error::Other("GitHub did not accept this token".into())),
         other => other,
     }?;
-    secrets::set(secrets::GITHUB, &token)?;
-    state.config.update(|c| c.github = Some(cfg))?;
+    blocking(app, move |state| {
+        let mut session = state.github_session.blocking_lock();
+        if typed {
+            secrets::set(secrets::GITHUB, &token)?;
+        } else if session.generation != generation {
+            return Err(Error::Other("The GitHub connection changed. Try again.".into()));
+        }
+        session.update(state, typed, || state.config.update(|c| c.github = Some(cfg)))
+    })
+    .await?;
     Ok(login)
+}
+
+pub(super) fn disconnect_github(state: &AppState) -> Result<()> {
+    let mut session = state.github_session.blocking_lock();
+    secrets::delete(secrets::GITHUB)?;
+    // Disconnect already resets the ticket baseline as well.
+    state.news.forget_tickets();
+    session.update(state, true, || state.config.update(|c| c.github = None))
+}
+
+pub(crate) fn apply_github_settings<T>(state: &AppState, write: impl FnOnce() -> Result<T>) -> Result<T> {
+    state.github_session.blocking_lock().update(state, false, write)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -56,6 +83,7 @@ pub struct CheckoutPr {
     pub repo: String,
     pub pr: Option<crate::integrations::github::PullRequest>,
     pub checks: Vec<crate::integrations::github::CheckRun>,
+    pub checks_state: ReadState,
     /// Every review submitted on `pr`, so the panel can name who said what.
     pub reviews: Vec<crate::integrations::github::Review>,
     /// Earlier pull requests from this same branch, newest first. A branch
@@ -162,7 +190,7 @@ pub async fn checkout_branches(app: AppHandle, checkout_id: String) -> Result<Ve
 pub async fn github_retarget_pr(state: State<'_, AppState>, checkout_id: String) -> Result<String> {
     let checkout = state.config.checkout(&checkout_id)?;
     let task = state.config.task(&checkout.task_id)?;
-    let (client, _) = github_client(&state)?;
+    let (client, _) = github_client(&state).await?;
 
     let dir = PathBuf::from(&checkout.path);
     let (owner, name) = off_runtime(move || git::origin_slug(&dir)).await??;
@@ -187,8 +215,8 @@ pub struct TaskPrs {
 /// PR state for every repository in the task, one row each.
 #[tauri::command]
 pub async fn github_task_prs(state: State<'_, AppState>, task_id: String) -> Result<Vec<CheckoutPr>> {
-    let (client, _) = github_client(&state)?;
-    task_prs(&state, &client, &task_id).await
+    let connected = connected_github(&state).await?;
+    task_prs(&state, &connected, &task_id).await
 }
 
 /// The same for every task, over one client.
@@ -196,12 +224,12 @@ pub async fn github_task_prs(state: State<'_, AppState>, task_id: String) -> Res
 /// A task whose rows cannot be read is left out rather than failing the sweep:
 /// the watch runs unattended, and one unreadable repo must not blind the rest.
 ///
-/// A task whose pull requests were all closed or merged is left out until
-/// it is due again (`SETTLED_SWEEP`); the window keeps its last rows.
+/// A recently settled task can be left out only when the window has rows for
+/// it. The Henchman may have read it before a new window or after a reconnect.
 #[tauri::command]
-pub async fn github_all_prs(state: State<'_, AppState>) -> Result<Vec<TaskPrs>> {
-    let (client, _) = github_client(&state)?;
-    let ids = sweep_ids(&state);
+pub async fn github_all_prs(state: State<'_, AppState>, known_task_ids: HashSet<String>) -> Result<Vec<TaskPrs>> {
+    let connected = connected_github(&state).await?;
+    let ids = sweep_ids(&state, &connected, Some(&known_task_ids)).await;
 
     // A few tasks at a time rather than one after another: with every task's
     // repos in series a sweep of a dozen tasks took longer than the interval
@@ -209,15 +237,16 @@ pub async fn github_all_prs(state: State<'_, AppState>) -> Result<Vec<TaskPrs>> 
     // opens dozens of requests together.
     use futures_util::stream::{self, StreamExt};
     let state = &*state;
-    let client = &client;
+    let connected = &connected;
     // Tickets follow only with Jira connected; the sweep runs without it.
     let jira = super::jira_client(state).ok().map(|(j, _)| j);
     let jira = &jira;
     let out = stream::iter(ids)
         .map(|task_id| async move {
-            let rows = task_prs(state, client, &task_id).await.ok()?;
-            let ticket = match (jira, state.config.task(&task_id)) {
-                (Some(j), Ok(task)) => super::ticket_flow::follow(state, j, &task, &rows).await,
+            let task = jira.as_ref().and_then(|_| state.config.task(&task_id).ok());
+            let rows = task_prs(state, connected, &task_id).await.ok()?;
+            let ticket = match (jira, task) {
+                (Some(j), Some(task)) => super::ticket_flow::follow(state, connected, j, &task, &rows).await,
                 _ => None,
             };
             Some(TaskPrs { task_id, rows, ticket })
@@ -227,19 +256,26 @@ pub async fn github_all_prs(state: State<'_, AppState>) -> Result<Vec<TaskPrs>> 
         .collect::<Vec<_>>()
         .await;
     // The Henchman's own sweep waits while the window's runs (HEN-12).
-    super::henchman_watch::swept();
+    super::henchman_watch::swept(state, connected).await;
     Ok(out)
 }
 
 /// The tasks a sweep reads: every one but a review task left from 0.5.0,
 /// which has no pull request of its own on its branch and whose ticket is
-/// someone else's to move, and a settled one only when it is due.
-pub(crate) fn sweep_ids(state: &AppState) -> Vec<String> {
+/// someone else's to move. Only the window needs rows it has not seen yet.
+pub(crate) async fn sweep_ids(
+    state: &AppState,
+    connected: &ConnectedGitHub,
+    known_task_ids: Option<&HashSet<String>>,
+) -> Vec<String> {
+    let mut session = state.github_session.lock().await;
+    if session.generation != connected.generation {
+        return Vec::new();
+    }
     let ids: Vec<String> =
         state.config.with(|c| c.tasks.iter().filter(|t| t.review.is_none()).map(|t| t.id.clone()).collect());
-    let mut settled = state.prs_settled.lock();
-    settled.retain(|id, _| ids.contains(id));
-    due(ids, &settled, std::time::Instant::now())
+    session.settled.retain(|id, _| ids.contains(id));
+    due(ids, &session.settled, std::time::Instant::now(), known_task_ids)
 }
 
 /// How many tasks the PR sweep asks GitHub about at once.
@@ -252,10 +288,19 @@ pub(crate) const SWEEP_TASKS: usize = 4;
 /// kept. A finished PR is reopened rarely, and the PR tab still asks at once.
 const SETTLED_SWEEP: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 
-/// The tasks a sweep asks about: every one, but a settled one only once
-/// `SETTLED_SWEEP` has passed since it was last read.
-fn due(ids: Vec<String>, settled: &HashMap<String, std::time::Instant>, now: std::time::Instant) -> Vec<String> {
-    ids.into_iter().filter(|id| settled.get(id).is_none_or(|at| now.duration_since(*at) >= SETTLED_SWEEP)).collect()
+/// A settled task is read only when due, unless the window lacks its rows.
+fn due(
+    ids: Vec<String>,
+    settled: &HashMap<String, std::time::Instant>,
+    now: std::time::Instant,
+    known_task_ids: Option<&HashSet<String>>,
+) -> Vec<String> {
+    ids.into_iter()
+        .filter(|id| {
+            known_task_ids.is_some_and(|known| !known.contains(id))
+                || settled.get(id).is_none_or(|at| now.duration_since(*at) >= SETTLED_SWEEP)
+        })
+        .collect()
 }
 
 /// Whether a task's rows are settled: some pull request, and every repo's
@@ -306,38 +351,34 @@ pub struct TeamReviews {
 }
 
 #[tauri::command]
-pub async fn github_review_queue(app: AppHandle, state: State<'_, AppState>) -> Result<ReviewQueue> {
-    let (queue, authored) = tokio::join!(review_queue(&state), authored_prs(&state));
+pub async fn github_review_queue(app: AppHandle) -> Result<ReviewQueue> {
+    let state = app.state::<AppState>();
+    let connected = connected_github(&state).await?;
+    let (queue, authored) = tokio::join!(review_queue(&state, &connected), authored_prs(&connected.client));
     let mut queue = queue?;
-    crate::news::saw_reviews(&app, &queue);
     queue.authored = Some(authored);
-    Ok(queue)
+    crate::news::saw_reviews(app, connected.reviews_generation, queue).await
 }
 
 /// A failure here is a note on its own section (REV-5), never the queue's.
-async fn authored_prs(state: &AppState) -> AuthoredPrs {
-    let got = match github_client(state) {
-        Ok((client, _)) => client.authored_prs().await,
-        Err(e) => Err(e),
-    };
-    match got {
+async fn authored_prs(client: &GitHub) -> AuthoredPrs {
+    match client.authored_prs().await {
         Ok((prs, more)) => AuthoredPrs { prs, more, error: None },
         Err(e) => AuthoredPrs { prs: Vec::new(), more: false, error: Some(e.to_string()) },
     }
 }
 
 /// The queue itself, for the UI and for the watch that banners what is new.
-pub(crate) async fn review_queue(state: &AppState) -> Result<ReviewQueue> {
-    let (client, cfg) = github_client(state)?;
+pub(crate) async fn review_queue(state: &AppState, connected: &ConnectedGitHub) -> Result<ReviewQueue> {
     // The two searches need nothing from each other, so they go together;
     // only the de-duplication waits for both.
     let team = async {
-        match cfg.review_team.as_deref() {
-            Some(raw) => Some(load_team_reviews(&client, &cfg.api_url, raw).await),
+        match connected.config.review_team.as_deref() {
+            Some(raw) => Some(load_team_reviews(state, connected, raw).await),
             None => None,
         }
     };
-    let (mine, team) = tokio::join!(client.requested_prs(github::mine_review_query()), team);
+    let (mine, team) = tokio::join!(connected.client.requested_prs(github::mine_review_query()), team);
     let (mine, mine_more) = mine?;
     let team = team.map(|mut t| {
         github::drop_already_listed(&mut t.prs, &mine);
@@ -346,29 +387,26 @@ pub(crate) async fn review_queue(state: &AppState) -> Result<ReviewQueue> {
     Ok(ReviewQueue { mine, mine_more, team, authored: None })
 }
 
-/// The last review team resolved, keyed by the API and the setting it came
-/// from.
-///
-/// A team given without its org is found by walking `/user/teams`, up to ten
-/// pages, and that walk was repeated on every poll of the review queue for an
-/// answer that changes when the setting does.
-static RESOLVED_TEAM: parking_lot::Mutex<Option<(String, String, github::GhTeam)>> = parking_lot::Mutex::new(None);
-
 /// The team column must not take the personal one down with it: a missing
 /// `read:org` scope, or a slug that matches nothing, is a problem with that
 /// column alone.
-async fn load_team_reviews(client: &GitHub, api_url: &str, raw: &str) -> TeamReviews {
+async fn load_team_reviews(state: &AppState, connected: &ConnectedGitHub, raw: &str) -> TeamReviews {
+    let client = &connected.client;
     let fallback = raw.trim_start_matches('@').to_string();
-    let cached = RESOLVED_TEAM
-        .lock()
-        .as_ref()
-        .filter(|(api, setting, _)| api == api_url && setting == raw)
-        .map(|(_, _, team)| team.clone());
+    // A bare slug may walk up to ten pages of /user/teams; reuse it only
+    // for the connection and team preference it was resolved for.
+    let cached = {
+        let session = state.github_session.lock().await;
+        (session.reviews_generation == connected.reviews_generation).then(|| session.resolved_team.clone()).flatten()
+    };
     let team = match cached {
         Some(team) => team,
         None => match client.resolve_team(raw).await {
             Ok(team) => {
-                *RESOLVED_TEAM.lock() = Some((api_url.to_string(), raw.to_string(), team.clone()));
+                let mut session = state.github_session.lock().await;
+                if session.reviews_generation == connected.reviews_generation {
+                    session.resolved_team = Some(team.clone());
+                }
                 team
             }
             Err(e) => {
@@ -389,7 +427,8 @@ async fn load_team_reviews(client: &GitHub, api_url: &str, raw: &str) -> TeamRev
     }
 }
 
-pub(crate) async fn task_prs(state: &AppState, client: &GitHub, task_id: &str) -> Result<Vec<CheckoutPr>> {
+pub(crate) async fn task_prs(state: &AppState, connected: &ConnectedGitHub, task_id: &str) -> Result<Vec<CheckoutPr>> {
+    let client = &connected.client;
     let task = state.config.task(task_id)?;
     let checkouts = state.config.checkouts_of(task_id);
 
@@ -418,7 +457,6 @@ pub(crate) async fn task_prs(state: &AppState, client: &GitHub, task_id: &str) -
 
     // Then GitHub, for every repo at once.
     let rows = checkouts.into_iter().zip(local).map(|(checkout, (changed, slug, branches))| {
-        let task = &task;
         async move {
             let repo =
                 state.config.project(&checkout.project_id).map(|p| p.name).unwrap_or_else(|_| "(unknown)".into());
@@ -428,6 +466,7 @@ pub(crate) async fn task_prs(state: &AppState, client: &GitHub, task_id: &str) -
                 repo,
                 pr: None,
                 checks: Vec::new(),
+                checks_state: ReadState::Unavailable,
                 reviews: Vec::new(),
                 past: Vec::new(),
                 verdict: "none".into(),
@@ -465,33 +504,38 @@ pub(crate) async fn task_prs(state: &AppState, client: &GitHub, task_id: &str) -
                             let found = all.remove(at);
 
                             if found.state == "open" {
-                                // None of these needs anything from the
-                                // others, and this runs for every repository of
-                                // every task on a timer — so they go together
-                                // rather than in turn.
-                                //
-                                // The listing carries no comment counts, which is
-                                // why the one being shown in full is fetched
-                                // again rather than reported with those silently
-                                // zeroed.
-                                let (checks, reviews, full, to_reply) = tokio::join!(
-                                    // The commit, not the branch name: a name is
-                                    // read by the URL, a sha is not.
-                                    client.checks(
-                                        &owner,
-                                        &name,
-                                        if found.head_sha.is_empty() { &task.branch } else { &found.head_sha },
-                                    ),
-                                    client.reviews(&owner, &name, found.number),
-                                    client.pull(&owner, &name, found.number),
-                                    client.pr_to_reply(&owner, &name, found.number),
+                                let number = found.number;
+                                let details = async {
+                                    // The listing has no comment counts. The
+                                    // fuller read may also see a push, so only
+                                    // ask about the head we will display.
+                                    let pr = client
+                                        .pull(&owner, &name, number)
+                                        .await
+                                        .ok()
+                                        .filter(|pr| {
+                                            pr.number == number && matches!(pr.state.as_str(), "open" | "closed")
+                                        })
+                                        .unwrap_or(found);
+                                    let checks = if pr.state == "open" {
+                                        client.pr_checks(&owner, &name, &pr.head_sha).await
+                                    } else {
+                                        github::PrChecks::default()
+                                    };
+                                    (pr, checks)
+                                };
+                                let ((pr, checks), reviews, to_reply) = tokio::join!(
+                                    details,
+                                    client.reviews(&owner, &name, number),
+                                    client.pr_to_reply(&owner, &name, number),
                                 );
 
-                                row.checks = checks.unwrap_or_default();
+                                row.checks = checks.checks;
+                                row.checks_state = checks.checks_state;
                                 row.reviews = reviews.unwrap_or_default();
                                 row.verdict = github::verdict(&row.reviews).to_string();
                                 row.to_reply = to_reply.unwrap_or(0);
-                                row.pr = Some(full.ok().unwrap_or(found));
+                                row.pr = Some(pr);
                             } else {
                                 // Closed is final: its checks and reviews will not
                                 // change, and nothing on screen reads them. Three
@@ -513,11 +557,16 @@ pub(crate) async fn task_prs(state: &AppState, client: &GitHub, task_id: &str) -
         }
     });
     let rows = futures_util::future::join_all(rows).await;
-    // Whoever asked, the sweep or the PR tab, this is the newest read.
+    let mut session = state.github_session.lock().await;
+    // An old sweep can finish after reconnect, even if this was its first
+    // read of the task. It cannot set the new session's pace or baseline.
+    if session.generation != connected.generation {
+        return Ok(rows);
+    }
     if settled(&rows) {
-        state.prs_settled.lock().insert(task_id.to_string(), std::time::Instant::now());
+        session.settled.insert(task_id.to_string(), std::time::Instant::now());
     } else {
-        state.prs_settled.lock().remove(task_id);
+        session.settled.remove(task_id);
     }
     let before = state.prs_seen.lock().insert(task_id.to_string(), rows.clone());
     // The Henchman hears what changed since the read before (HEN-12).
@@ -550,7 +599,7 @@ const LOGS_PER_REPO: usize = 6;
 #[tauri::command]
 pub async fn github_pr_feedback(state: State<'_, AppState>, task_id: String) -> Result<Vec<RepoFeedback>> {
     let task = state.config.task(&task_id)?;
-    let (client, _) = github_client(&state)?;
+    let (client, _) = github_client(&state).await?;
     let checkouts = state.config.checkouts_of(&task_id);
 
     let slugs = {
@@ -900,6 +949,16 @@ pub(crate) const FEEDBACK_FILE: &str = "PR_FEEDBACK.md";
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{
+        extract::{Path, Query},
+        http::StatusCode,
+        routing::{get, post},
+        Json, Router,
+    };
+    use serde_json::{json, Value};
+    use std::sync::{Arc, Mutex};
+
+    mod reconnect;
 
     fn thread(checkout: &str, path: &str, line: Option<u64>) -> FeedbackItem {
         FeedbackItem::Thread {
@@ -947,6 +1006,7 @@ mod tests {
             repo: "api".into(),
             pr,
             checks: Vec::new(),
+            checks_state: ReadState::Unavailable,
             reviews: Vec::new(),
             past: Vec::new(),
             verdict: "none".into(),
@@ -975,7 +1035,7 @@ mod tests {
         let mut settled = HashMap::new();
         settled.insert("done".to_string(), now - std::time::Duration::from_secs(60));
         settled.insert("done-long-ago".to_string(), now - SETTLED_SWEEP);
-        assert_eq!(due(ids(), &settled, now), vec!["open".to_string(), "done-long-ago".to_string()]);
+        assert_eq!(due(ids(), &settled, now, None), vec!["open".to_string(), "done-long-ago".to_string()]);
     }
 
     fn name(id: &str) -> String {
@@ -1057,5 +1117,268 @@ mod tests {
         .unwrap();
         assert!(matches!(items[0], FeedbackItem::Comment { .. }));
         assert!(matches!(items[1], FeedbackItem::Check { .. }));
+    }
+
+    const LIST_HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const FULL_HEAD: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    fn check_run(id: u64, sha: &str, name: &str, conclusion: &str) -> Value {
+        json!({
+            "id": id, "head_sha": sha, "name": name, "status": "completed", "conclusion": conclusion,
+            "html_url": format!("https://gh.example/acme/api/runs/{id}")
+        })
+    }
+
+    fn check_page(total: u64, runs: Vec<Value>) -> (StatusCode, Json<Value>) {
+        (StatusCode::OK, Json(json!({ "total_count": total, "check_runs": runs })))
+    }
+
+    fn check_page_of_passing(start: u64) -> Vec<Value> {
+        (start..start + 100).map(|i| check_run(i, LIST_HEAD, "build", "success")).collect()
+    }
+
+    async fn read_task_pr_checks(
+        listing_head: &str,
+        detail_head: &str,
+        page: impl Fn(&str, u32) -> (StatusCode, Json<Value>) + Send + Sync + 'static,
+    ) -> (Value, Vec<(String, u32)>) {
+        let dir = std::env::temp_dir().join(format!("vl-task-pr-checks-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        git::run_for_tests(&dir, &["init", "-q", "-b", "task"]).unwrap();
+        git::run_for_tests(&dir, &["remote", "add", "origin", "git@gh.example:acme/api.git"]).unwrap();
+        let cfg = serde_json::from_value(json!({
+            "projects": [{"id": "p", "name": "api", "path": dir, "default_branch": "main"}],
+            "tasks": [{"id": "t", "name": "task", "root": dir, "branch": "task", "created_at": "2026-11-01T12:00:00Z"}],
+            "checkouts": [{"id": "c", "task_id": "t", "project_id": "p", "path": dir, "base": "main"}]
+        }))
+        .unwrap();
+        let state = AppState {
+            config: crate::config::ConfigStore::for_tests(dir.join("config.json"), cfg),
+            ptys: Default::default(),
+            ticket_types: Default::default(),
+            epic_field_missing: Default::default(),
+            pending_notices: Default::default(),
+            status_cache: Default::default(),
+            github_session: Default::default(),
+            prs_seen: Default::default(),
+            news: Default::default(),
+            messages: crate::messages::Messages::for_tests(dir.join("messages.json")),
+            notes: crate::notes::Notes::load(&dir),
+            browser: Default::default(),
+            loops: Default::default(),
+            runs: crate::runs::Runs::for_tests(dir.join("runs.json")),
+            slack_bot: Default::default(),
+        };
+        let pr = |sha| {
+            json!({
+                "number": 42, "title": "CI read", "state": "open", "draft": false, "user": {"login": "ana"},
+                "head": {"ref": "task", "sha": sha}, "base": {"ref": "main"},
+                "html_url": "https://gh.example/acme/api/pull/42"
+            })
+        };
+        let listed = json!([pr(listing_head)]);
+        let detail = pr(detail_head);
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let recorded = Arc::clone(&calls);
+        let page = Arc::new(page);
+        let app = Router::new()
+            .route("/repos/acme/api/pulls", get(move || async { Json(listed) }))
+            .route("/repos/acme/api/pulls/42", get(move || async { Json(detail) }))
+            .route(
+                "/repos/acme/api/pulls/42/reviews",
+                get(|| async {
+                    Json(json!([{"id": 1, "user": {"login": "sam"}, "state": "APPROVED",
+                        "submitted_at": "2026-11-01T12:00:00Z", "html_url": "https://gh.example/acme/api/pull/42#review"}]))
+                }),
+            )
+            .route("/graphql", post(|| async { StatusCode::FORBIDDEN }))
+            .route(
+                "/repos/acme/api/commits/{sha}/check-runs",
+                get(move |Path(sha): Path<String>, Query(query): Query<HashMap<String, String>>| {
+                    let recorded = Arc::clone(&recorded);
+                    let page = Arc::clone(&page);
+                    async move {
+                        assert_eq!(query["per_page"], "100");
+                        assert!(query.get("filter").is_none_or(|v| v == "latest"));
+                        let n = query.get("page").map_or(1, |v| v.parse().unwrap());
+                        recorded.lock().unwrap().push((sha.clone(), n));
+                        page(&sha, n)
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let gh = GitHub::new(
+            &GithubConfig {
+                api_url: format!("http://{}", listener.local_addr().unwrap()),
+                web_url: "https://gh.example".into(),
+                review_team: None,
+            },
+            "test-token",
+        )
+        .unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let connected =
+            ConnectedGitHub { client: gh, config: GithubConfig::default(), generation: 0, reviews_generation: 0 };
+        let rows = task_prs(&state, &connected, "t").await.unwrap();
+        server.abort();
+        std::fs::remove_dir_all(dir).unwrap();
+        let calls = calls.lock().unwrap().clone();
+        (json!(rows[0]), calls)
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_a_successful_empty_page_is_complete_even_when_feedback_count_fails() {
+        let (row, calls) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, |_, _| check_page(0, vec![])).await;
+        assert_eq!(row["checks"], json!([]));
+        assert_eq!(row["checks_state"], "complete");
+        assert_eq!(calls, [(LIST_HEAD.to_string(), 1)]);
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_a_passing_duplicate_does_not_hide_a_failure_on_the_next_page() {
+        let (row, calls) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, |sha, n| match n {
+            1 => check_page(101, check_page_of_passing(1)),
+            2 => check_page(101, vec![check_run(101, sha, "build", "failure")]),
+            _ => panic!("unexpected page {n}"),
+        })
+        .await;
+        let checks = row["checks"].as_array().unwrap();
+        assert_eq!(checks.len(), 101);
+        assert_eq!(checks[0]["conclusion"], "success");
+        assert_eq!(
+            checks[100],
+            json!({ "name": "build", "status": "completed", "conclusion": "failure",
+                "url": "https://gh.example/acme/api/runs/101" })
+        );
+        assert_eq!(row["checks_state"], "complete");
+        assert_eq!(calls, [(LIST_HEAD.to_string(), 1), (LIST_HEAD.to_string(), 2)]);
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_a_late_page_failure_keeps_the_checks_and_the_review_verdict() {
+        for bad_page in [
+            (StatusCode::FORBIDDEN, json!({ "message": "not allowed" })),
+            (StatusCode::OK, json!({ "total_count": 101, "check_runs": null })),
+        ] {
+            let (row, calls) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, move |_, n| match n {
+                1 => check_page(101, check_page_of_passing(1)),
+                2 => (bad_page.0, Json(bad_page.1.clone())),
+                _ => panic!("unexpected page {n}"),
+            })
+            .await;
+            assert_eq!(row["checks"].as_array().unwrap().len(), 100);
+            assert_eq!(row["checks_state"], "incomplete");
+            assert_eq!(row["verdict"], "approved");
+            assert!(row["error"].is_null());
+            assert_eq!(calls.len(), 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_an_unreadable_first_page_is_not_complete_empty() {
+        for (status, body) in [
+            (StatusCode::NOT_FOUND, json!({ "message": "commit not found" })),
+            (StatusCode::OK, json!({ "total_count": 0 })),
+            (StatusCode::OK, json!({ "check_runs": [] })),
+            (StatusCode::OK, json!({ "total_count": "0", "check_runs": [] })),
+            (StatusCode::OK, json!({ "total_count": 1, "check_runs": [] })),
+        ] {
+            let (row, _) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, move |_, _| (status, Json(body.clone()))).await;
+            assert_eq!(row["checks"], json!([]));
+            assert_eq!(row["checks_state"], "unavailable", "first page: {status}");
+        }
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_malformed_runs_do_not_hide_readable_ones_or_certify_the_page() {
+        let (row, _) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, |sha, _| {
+            let mut malformed = check_run(2, sha, "missing conclusion", "success");
+            malformed["conclusion"] = Value::Null;
+            check_page(
+                3,
+                vec![check_run(1, sha, "kept", "success"), malformed, check_run(3, FULL_HEAD, "wrong SHA", "failure")],
+            )
+        })
+        .await;
+        assert_eq!(row["checks_state"], "incomplete");
+        assert_eq!(row["checks"].as_array().unwrap().len(), 1);
+        assert_eq!(row["checks"][0]["name"], "kept");
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_a_malformed_link_does_not_hide_a_failure_with_a_passing_peer() {
+        let (row, _) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, |sha, _| {
+            let mut failure = check_run(2, sha, "build", "failure");
+            failure["html_url"] = json!(42);
+            check_page(2, vec![check_run(1, sha, "build", "success"), failure])
+        })
+        .await;
+        assert_eq!(
+            row["checks"],
+            json!([
+                {"name": "build", "status": "completed", "conclusion": "success",
+                    "url": "https://gh.example/acme/api/runs/1"},
+                {"name": "build", "status": "completed", "conclusion": "failure", "url": null}
+            ])
+        );
+        assert_eq!(row["checks_state"], "incomplete");
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_missing_and_null_links_do_not_make_a_read_incomplete() {
+        let (row, _) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, |sha, _| {
+            let mut missing = check_run(1, sha, "lint", "success");
+            missing.as_object_mut().unwrap().remove("html_url");
+            let mut null = check_run(2, sha, "build", "failure");
+            null["html_url"] = Value::Null;
+            check_page(2, vec![missing, null])
+        })
+        .await;
+        assert_eq!(
+            row["checks"],
+            json!([
+                {"name": "lint", "status": "completed", "conclusion": "success", "url": null},
+                {"name": "build", "status": "completed", "conclusion": "failure", "url": null}
+            ])
+        );
+        assert_eq!(row["checks_state"], "complete");
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_only_the_head_on_the_displayed_pr_is_checked_after_a_push() {
+        let (row, calls) = read_task_pr_checks(LIST_HEAD, FULL_HEAD, |sha, _| {
+            let (name, conclusion) = if sha == FULL_HEAD { ("new head", "success") } else { ("old head", "failure") };
+            check_page(1, vec![check_run(1, sha, name, conclusion)])
+        })
+        .await;
+        assert_eq!(row["pr"]["head_sha"], FULL_HEAD);
+        assert_eq!(row["checks"][0]["name"], "new head");
+        assert_eq!(row["checks_state"], "complete");
+        assert_eq!(calls, [(FULL_HEAD.to_string(), 1)]);
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_a_missing_displayed_head_does_not_read_old_head_or_a_branch() {
+        for listed in [LIST_HEAD, ""] {
+            let (row, calls) = read_task_pr_checks(listed, "", |sha, _| {
+                check_page(1, vec![check_run(1, sha, "not tied to displayed head", "success")])
+            })
+            .await;
+            assert_eq!(row["pr"]["head_sha"], "");
+            assert_eq!(row["checks"], json!([]));
+            assert_eq!(row["checks_state"], "unavailable");
+            assert!(calls.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn task_pr_checks_the_page_cap_keeps_available_rows_without_certifying_them() {
+        let (row, calls) = read_task_pr_checks(LIST_HEAD, LIST_HEAD, |_, n| {
+            check_page(1100, check_page_of_passing(u64::from(n - 1) * 100 + 1))
+        })
+        .await;
+        assert_eq!(row["checks"].as_array().unwrap().len(), 1000);
+        assert_eq!(row["checks_state"], "incomplete");
+        assert_eq!(calls.len(), 10);
     }
 }

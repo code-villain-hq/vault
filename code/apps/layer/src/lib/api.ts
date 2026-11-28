@@ -12,6 +12,7 @@ import type {
   Catchup,
   ChangedFile,
   CheckoutPr,
+  CheckoutPrComments,
   Cleaned,
   CleanupItem,
   RequiredField,
@@ -43,6 +44,7 @@ import type {
   Resumable,
   WaitingPane,
   ReviewComment,
+  ReviewPrDetails,
   ReviewQueue,
   RepoOutgoing,
   Settings,
@@ -403,8 +405,12 @@ export const api = {
   githubConnect: (apiUrl: string, webUrl: string, token: string, reviewTeam: string | null) =>
     invoke<string>("github_connect", { apiUrl, webUrl, token, reviewTeam }),
   githubReviewQueue: () => invoke<ReviewQueue>("github_review_queue"),
+  githubReviewPrDetails: (repo: string, number: number, url: string) =>
+    invoke<ReviewPrDetails>("github_review_pr_details", { repo, number, url }),
   githubTaskPrs: (taskId: string) => invoke<CheckoutPr[]>("github_task_prs", { taskId }),
-  githubAllPrs: () => invoke<TaskPrs[]>("github_all_prs"),
+  githubPrComments: (taskId: string, checkoutId: string, number: number) =>
+    invoke<CheckoutPrComments>("github_pr_comments", { taskId, checkoutId, number }),
+  githubAllPrs: (knownTaskIds: string[]) => invoke<TaskPrs[]>("github_all_prs", { knownTaskIds }),
   setCheckoutBase: (checkoutId: string, base: string) =>
     invoke<void>("set_checkout_base", { checkoutId, base }),
   taskBranchFacts: (taskId: string) => invoke<RepoBranchFacts[]>("task_branch_facts", { taskId }),

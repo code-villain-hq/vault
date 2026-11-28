@@ -12,6 +12,7 @@ function pr(extra: Partial<AuthoredPr> = {}): AuthoredPr {
     updated_at: "",
     head: "feature",
     base: "main",
+    head_sha: "a".repeat(40),
     checks: "passing",
     review: "approved",
     approved_by: ["ana"],

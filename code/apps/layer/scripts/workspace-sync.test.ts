@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import * as kit from "@code-villain/sync-client";
 import type { Operation } from "@layer/types";
+import * as tauriEvents from "@tauri-apps/api/event";
 import { FakeServer } from "../../../kit/sync/client/src/fake-server";
 import * as real from "../src/lib/api";
 
@@ -27,6 +28,7 @@ void mock.module("@code-villain/sync-client", () => ({
   },
 }));
 void mock.module("@tauri-apps/api/event", () => ({
+  ...tauriEvents,
   listen: async (_event: string, handler: () => void) => {
     written = handler;
     return () => {};

@@ -113,14 +113,16 @@ struct NoteRecord {
 pub fn apply(state: &AppState, snapshot: Snapshot) -> Result<Option<(bool, bool)>> {
     let Snapshot { repositories, connections, log_sources, agent_models, notes, users } = snapshot;
     let mut waiting = false;
-    let setup = state.config.mirror(|c| {
-        if c.shared.workspace.is_none() || !c.shared.outbox.is_empty() {
-            waiting = true;
-            return false;
-        }
-        let before = shared_view(c);
-        merge(c, repositories, &users, connections, log_sources, agent_models);
-        shared_view(c) != before
+    let setup = crate::commands::apply_github_settings(state, || {
+        state.config.mirror(|c| {
+            if c.shared.workspace.is_none() || !c.shared.outbox.is_empty() {
+                waiting = true;
+                return false;
+            }
+            let before = shared_view(c);
+            merge(c, repositories, &users, connections, log_sources, agent_models);
+            shared_view(c) != before
+        })
     })?;
     if waiting {
         return Ok(None);

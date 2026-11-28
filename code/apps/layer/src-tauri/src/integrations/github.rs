@@ -13,6 +13,8 @@ mod branches;
 mod hunk;
 mod images;
 mod issues;
+mod pr_checks;
+mod pr_comments;
 mod ready;
 mod requested;
 mod siblings;
@@ -21,6 +23,8 @@ pub use branches::{BranchPr, PrState, MY_PULLS_LIMIT};
 pub use hunk::CodeLine;
 pub use images::{kind_of, Image, MAX_BYTES, MAX_IMAGES};
 pub use issues::IssueRef;
+pub use pr_checks::PrChecks;
+pub use pr_comments::PrComments;
 pub use requested::ReviewRequest;
 pub(crate) use requested::{drop_already_listed, mine_review_query, team_review_query};
 pub use siblings::Sibling;
@@ -69,6 +73,15 @@ pub struct CheckRun {
     pub status: String,
     pub conclusion: Option<String>,
     pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadState {
+    Complete,
+    Incomplete,
+    #[default]
+    Unavailable,
 }
 
 impl GitHub {
@@ -242,31 +255,6 @@ impl GitHub {
                 url: str_at(r, "html_url"),
             })
             .collect())
-    }
-
-    pub async fn checks(&self, owner: &str, repo: &str, git_ref: &str) -> Result<Vec<CheckRun>> {
-        let v = self
-            .json(self.req(
-                reqwest::Method::GET,
-                // The default page is thirty. A matrix build past that could
-                // hide the failing run, and the panel went green.
-                &format!("/repos/{owner}/{repo}/commits/{}/check-runs?per_page=100", path_segment(git_ref)),
-            ))
-            .await?;
-
-        Ok(v.get("check_runs")
-            .and_then(|c| c.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .map(|c| CheckRun {
-                        name: str_at(c, "name"),
-                        status: str_at(c, "status"),
-                        conclusion: c.get("conclusion").and_then(|x| x.as_str()).map(str::to_string),
-                        url: c.get("html_url").and_then(|x| x.as_str()).map(str::to_string),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default())
     }
 
     /// What reviewers have said on a pull request: its review threads, the
@@ -753,6 +741,28 @@ fn parse_note(v: &Value) -> Note {
     }
 }
 
+fn parse_thread(t: &Value, comments: Vec<Note>) -> ReviewThread {
+    let num = |k: &str| t.get(k).and_then(|x| x.as_u64());
+    let (line, start_line) = match num("line") {
+        Some(n) => (Some(n), num("startLine")),
+        None => (num("originalLine"), num("originalStartLine")),
+    };
+    let code = match (t.pointer("/hunk/nodes/0/diffHunk").and_then(|h| h.as_str()), num("originalLine")) {
+        (Some(h), Some(end)) => hunk::excerpt(h, num("originalStartLine"), end, str_at(t, "diffSide") == "LEFT"),
+        _ => Vec::new(),
+    };
+    ReviewThread {
+        path: str_at(t, "path"),
+        line,
+        start_line,
+        code,
+        resolved: t.get("isResolved").and_then(|x| x.as_bool()).unwrap_or(false),
+        outdated: t.get("isOutdated").and_then(|x| x.as_bool()).unwrap_or(false),
+        url: comments.first().map(|c| c.url.clone()).unwrap_or_default(),
+        comments,
+    }
+}
+
 /// A ref as one path segment. A branch may hold `#`, `?`, `%` or a space,
 /// which in a URL end the path or mean something else; its `/` is left alone,
 /// since GitHub reads a ref across them.
@@ -787,27 +797,7 @@ pub(crate) fn parse_feedback(v: &Value) -> Result<PrFeedback> {
                 .and_then(|n| n.as_array())
                 .map(|a| a.iter().map(parse_note).collect())
                 .unwrap_or_default();
-            let num = |k: &str| t.get(k).and_then(|x| x.as_u64());
-            let (line, start_line) = match num("line") {
-                Some(n) => (Some(n), num("startLine")),
-                None => (num("originalLine"), num("originalStartLine")),
-            };
-            let code = match (t.pointer("/hunk/nodes/0/diffHunk").and_then(|h| h.as_str()), num("originalLine")) {
-                (Some(h), Some(end)) => {
-                    hunk::excerpt(h, num("originalStartLine"), end, str_at(t, "diffSide") == "LEFT")
-                }
-                _ => Vec::new(),
-            };
-            ReviewThread {
-                path: str_at(t, "path"),
-                line,
-                start_line,
-                code,
-                resolved: t.get("isResolved").and_then(|x| x.as_bool()).unwrap_or(false),
-                outdated: t.get("isOutdated").and_then(|x| x.as_bool()).unwrap_or(false),
-                url: comments.first().map(|c| c.url.clone()).unwrap_or_default(),
-                comments,
-            }
+            parse_thread(t, comments)
         })
         .filter(|t| !t.comments.is_empty())
         .collect();

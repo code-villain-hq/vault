@@ -16,7 +16,7 @@ use crate::config::{FlowStatus, StartTo, Task, TicketFlow};
 use crate::error::{Error, Result};
 use crate::integrations::jira::{Jira, ProjectStatus};
 
-use super::github::CheckoutPr;
+use super::github::{CheckoutPr, ConnectedGitHub};
 use super::AppState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -79,23 +79,53 @@ pub struct TicketMove {
 
 /// Move `task`'s ticket if its pull requests have reached a stage it has
 /// not been moved for. None when there is nothing to say.
-pub(crate) async fn follow(state: &AppState, client: &Jira, task: &Task, rows: &[CheckoutPr]) -> Option<TicketMove> {
-    let key = task.issue_key.clone()?;
-    let stage = due(task, stage(rows))?;
-    let project = key.split('-').next()?.to_string();
-    let target = state.config.read().jira.and_then(|j| j.flow.get(&project).cloned()).and_then(|f| {
-        if stage == Stage::Review {
-            f.review
-        } else {
-            f.merged
+pub(crate) async fn follow(
+    state: &AppState,
+    connected: &ConnectedGitHub,
+    client: &Jira,
+    task: &Task,
+    rows: &[CheckoutPr],
+) -> Option<TicketMove> {
+    let key = task.issue_key.as_deref()?;
+    let reached = stage(rows)?;
+    let project = key.split('-').next()?;
+    let transition = {
+        let mut session = state.github_session.lock().await;
+        if session.generation != connected.generation {
+            return None;
         }
-    });
-    let mut out = TicketMove { key: key.clone(), stage: stage.key(), moved_to: None, unchosen: false, error: None };
+        session.ticket_transition(&task.id)
+    };
+    // A reconnect can let a second sweep reach the same task while Jira
+    // still owes the first one a reply. Never wait on this lock with the
+    // session held. The order below is task, then session, then config.
+    let _transition = transition.lock().await;
+    let (stage, target) = {
+        let session = state.github_session.lock().await;
+        if session.generation != connected.generation {
+            return None;
+        }
+        state.config.with(|c| {
+            let current = c.tasks.iter().find(|t| t.id == task.id && t.issue_key.as_deref() == Some(key))?;
+            let stage = due(current, Some(reached))?;
+            let target = c
+                .jira
+                .as_ref()
+                .and_then(|j| j.flow.get(project))
+                .and_then(|f| match stage {
+                    Stage::Review => f.review.as_ref(),
+                    Stage::Merged => f.merged.as_ref(),
+                })
+                .cloned();
+            Some((stage, target))
+        })
+    }?;
+    let mut out = TicketMove { key: key.into(), stage: stage.key(), moved_to: None, unchosen: false, error: None };
     let Some(target) = target else {
         out.unchosen = true;
         return Some(out);
     };
-    match move_to(client, &key, &target, stage == Stage::Review).await {
+    match move_to(client, key, &target, stage == Stage::Review).await {
         Ok(moved) => out.moved_to = moved,
         // The network: tried again next sweep.
         Err(e @ Error::Http(_)) => {
@@ -106,10 +136,14 @@ pub(crate) async fn follow(state: &AppState, client: &Jira, task: &Task, rows: &
     }
     // Once, whatever Jira said: a workflow that will not make the move is
     // said once, not every ninety seconds, and a ticket moved on by hand
-    // after this stays where it was put.
-    let id = task.id.clone();
+    // after this stays where it was put. Keep the marker even across a
+    // GitHub reconnect: Jira may already have applied the move.
     let _ = state.config.update(|c| {
-        if let Some(t) = c.tasks.iter_mut().find(|t| t.id == id) {
+        if let Some(t) = c
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == task.id && t.issue_key.as_deref() == Some(key) && due(t, Some(stage)).is_some())
+        {
             t.ticket_stage = Some(stage.key().into());
         }
     });
@@ -222,6 +256,8 @@ mod tests {
     use super::*;
     use crate::integrations::github::PullRequest;
 
+    mod reconnect;
+
     #[test]
     fn work_starting_goes_where_the_project_says_and_else_as_the_old_switch_did() {
         let status = StartTo::Status { id: "3".into(), name: "In Progress".into() };
@@ -263,6 +299,7 @@ mod tests {
                 review_comments: 0,
             }),
             checks: Vec::new(),
+            checks_state: Default::default(),
             reviews: Vec::new(),
             past: Vec::new(),
             verdict: "none".into(),

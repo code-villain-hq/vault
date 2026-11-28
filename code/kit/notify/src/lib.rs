@@ -26,6 +26,30 @@ pub fn show_opening(title: &str, body: &str, opens: &str) -> bool {
     shown(title, body, Some(opens))
 }
 
+/// Like `show_opening`, but hands the actual post to `submit` once authorized.
+/// The caller can order that post with changes to its own state, or drop it.
+/// `submit` may be called inline or later; it does not wait for a click.
+pub fn show_opening_guarded(
+    title: &str,
+    body: &str,
+    opens: &str,
+    submit: impl Fn(Box<dyn FnOnce() + Send>) + Send + Sync + 'static,
+) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let (title, body, opens) = (title.to_owned(), body.to_owned(), opens.to_owned());
+        mac::allowed(move || {
+            let (title, body, opens) = (title.clone(), body.clone(), opens.clone());
+            submit(Box::new(move || mac::post(&title, &body, Some(&opens))));
+        })
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (title, body, opens, submit);
+        false
+    }
+}
+
 fn shown(title: &str, body: &str, opens: Option<&str>) -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -208,6 +232,14 @@ mod tests {
             "Layer",
             "Claude is waiting",
             "reviews"
+        ));
+        assert!(!super::show_opening_guarded(
+            "Layer",
+            "Review requested",
+            "reviews",
+            |_| {
+                panic!("outside a bundle, the caller must choose the fallback");
+            }
         ));
     }
 }

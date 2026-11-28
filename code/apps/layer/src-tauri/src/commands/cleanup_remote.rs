@@ -75,7 +75,7 @@ struct Candidate {
 /// blocked row for each repo GitHub could not be asked about. Nothing
 /// without a GitHub connection: there is nobody to ask.
 pub(super) async fn plan(app: &AppHandle) -> Remote {
-    let Ok((client, cfg)) = github_client(&app.state::<AppState>()) else { return Remote::default() };
+    let Ok((client, cfg)) = github_client(&app.state::<AppState>()).await else { return Remote::default() };
     let host = |url: &str| git::remote_key(url).split('/').next().unwrap_or_default().to_string();
     let ours = host(&cfg.web_url);
 

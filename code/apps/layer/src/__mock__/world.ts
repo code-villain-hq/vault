@@ -23,6 +23,7 @@ import type {
   RepoFeedback,
   RepoHealth,
   RepoNote,
+  ReviewPrDetails,
   ReviewQueue,
   ReviewRequest,
   Settings,
@@ -49,6 +50,7 @@ export interface World {
   settings: Settings;
   prs: TaskPrs[];
   reviews: ReviewQueue;
+  reviewDetails: Partial<Record<string, ReviewPrDetails>>;
   issues: Ticket[];
   /** Tickets not on your list, which grouping by epic asks Jira for (TASK-17, REV-11). */
   elsewhere: Ticket[];
@@ -592,6 +594,7 @@ function authored(
     draft: false,
     updated_at: updated,
     head: `ACME-${number}`,
+    head_sha: reviewHeadSha(number),
     base: "main",
     checks: "passing",
     review: "none",
@@ -624,7 +627,7 @@ function requested(
     updated_at: updated,
     head: `ACME-${number}`,
     base: "main",
-    head_sha: `${number}`.padEnd(40, "c"),
+    head_sha: reviewHeadSha(number),
     cross_repo: false,
     additions: 40,
     deletions: 12,
@@ -654,6 +657,7 @@ const prs: TaskPrs[] = [
           },
           { name: "lint", status: "completed", conclusion: "success", url: null },
         ],
+        checks_state: "complete",
         reviews: [{ author: "ana", state: "CHANGES_REQUESTED", submitted_at: ago(1800), url: "" }],
         past: [],
         verdict: "changes_requested",
@@ -667,6 +671,7 @@ const prs: TaskPrs[] = [
         repo: "web",
         pr: null,
         checks: [],
+        checks_state: "unavailable",
         reviews: [],
         past: [],
         verdict: "none",
@@ -686,6 +691,7 @@ const prs: TaskPrs[] = [
         repo: "web",
         pr: pr(7, "web", true),
         checks: [],
+        checks_state: "unavailable",
         reviews: [],
         past: [],
         verdict: "approved",
@@ -829,6 +835,45 @@ const feedback: RepoFeedback[] = [
     error: null,
   },
 ];
+
+const reviewHeadSha = (number: number) => `${number}`.padEnd(40, "c");
+
+export function reviewDetailFixture(
+  {
+    repo,
+    number,
+    url,
+    head_sha = reviewHeadSha(number),
+  }: Pick<ReviewPrDetails, "repo" | "number" | "url"> & { head_sha?: string },
+  detail: Partial<Omit<ReviewPrDetails, "repo" | "number" | "url">> = {},
+): ReviewPrDetails {
+  return {
+    repo,
+    number,
+    url,
+    head_sha,
+    comments: [],
+    reviews: [],
+    threads: [],
+    comments_state: "complete",
+    reviews_state: "complete",
+    threads_state: "complete",
+    checks: [],
+    checks_state: "complete",
+    ...detail,
+  };
+}
+
+function reviewDetail(
+  repo: string,
+  number: number,
+  detail: NonNullable<Parameters<typeof reviewDetailFixture>[1]>,
+): ReviewPrDetails {
+  return reviewDetailFixture(
+    { repo, number, url: `https://github.com/${repo}/pull/${number}` },
+    detail,
+  );
+}
 
 const say = (lines: string[]) => lines.join("\r\n") + "\r\n";
 
@@ -982,6 +1027,58 @@ function busy(): World {
         more: false,
         error: null,
       },
+    },
+    reviewDetails: {
+      "acme/api#42": reviewDetail("acme/api", 42, {
+        comments: feedback[0].comments,
+        reviews: feedback[0].reviews,
+        threads: feedback[0].threads.map((thread) => ({
+          ...thread,
+          comments: thread.comments.map((note, i) => ({
+            ...note,
+            url: note.url || (i === 0 ? thread.url : `${thread.url}-reply-${i}`),
+          })),
+        })),
+        checks: prs[0].rows[0].checks,
+      }),
+      "acme/web#88": reviewDetail("acme/web", 88, {
+        comments: [
+          {
+            author: "bo",
+            bot: false,
+            state: null,
+            body: "Please keep the search **keyboard shortcuts**.",
+            url: "https://github.com/acme/web/pull/88#issuecomment-1",
+            at: ago(4800),
+          },
+        ],
+        checks: [
+          {
+            name: "search tests",
+            status: "in_progress",
+            conclusion: null,
+            url: "https://github.com/acme/web/actions/runs/88",
+          },
+        ],
+      }),
+      // The fork's failing rollup comes from a legacy commit status, not a check run.
+      "acme/docs#7": reviewDetail("acme/docs", 7, {
+        comments: [
+          {
+            author: "outsider",
+            bot: false,
+            state: null,
+            body: "This change comes from my fork.",
+            url: "https://github.com/acme/docs/pull/7#issuecomment-1",
+            at: ago(18_000),
+          },
+        ],
+      }),
+      "acme/web#91": reviewDetail("acme/web", 91, {
+        checks: [
+          { name: "workspace tests", status: "completed", conclusion: "success", url: null },
+        ],
+      }),
     },
     issues: [
       issue("ACME-123", "Fix login race", "In Progress", "indeterminate", "ACME-100"),
@@ -1277,6 +1374,7 @@ function empty(): World {
       team: null,
       authored: { prs: [], more: false, error: null },
     },
+    reviewDetails: {},
     issues: [],
     elsewhere: [],
     issueTypes: [],
@@ -1323,9 +1421,30 @@ function tickets(): World {
 /** Busy, with the login task's second repo in review too: feedback on two PRs. */
 function reviews(): World {
   const w = busy();
+  if (w.settings.github) w.settings.github = { ...w.settings.github, review_team: "acme/api" };
+  w.reviews.team = {
+    slug: "acme/api",
+    name: "API team",
+    prs: [requested(88, "api", "Add retry metrics", "ana", ago(3600))],
+    more: false,
+    error: null,
+  };
+  w.reviewDetails["acme/api#88"] = reviewDetail("acme/api", 88, {
+    comments: [
+      {
+        author: "ana",
+        bot: false,
+        state: null,
+        body: "The API team is ready to review.",
+        url: "https://github.com/acme/api/pull/88#issuecomment-1",
+        at: ago(3200),
+      },
+    ],
+  });
   const web = w.prs[0].rows.find((r) => r.checkout_id === "c-login-web");
   if (web) {
     web.pr = { ...pr(43, "web", false), title: "Fix login race" };
+    web.checks_state = "complete";
     web.verdict = "commented";
   }
   w.feedback.push({

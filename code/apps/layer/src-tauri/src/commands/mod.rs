@@ -23,9 +23,7 @@ pub struct AppState {
     /// Last git-status per checkout. Cold tasks reuse this so a poll does not
     /// shell out once per every worktree the user has ever opened.
     pub status_cache: parking_lot::Mutex<HashMap<String, CachedStatus>>,
-    /// Tasks whose pull requests were all closed or merged when last read,
-    /// and when: the PR sweep leaves them alone for a while (PR-8).
-    pub prs_settled: parking_lot::Mutex<HashMap<String, Instant>>,
+    pub(crate) github_session: std::sync::Arc<tokio::sync::Mutex<github::NativeGitHub>>,
     /// Each task's pull requests as last read, for the Henchman (HEN-5).
     pub prs_seen: parking_lot::Mutex<HashMap<String, Vec<CheckoutPr>>>,
     /// Reviews and tickets already seen, so a banner is only for what is new.
@@ -154,9 +152,11 @@ mod panes;
 mod panes_restore;
 mod phone;
 mod pr_branches;
+mod pr_comments;
 mod pr_draft;
 mod pr_image_offers;
 mod pr_images;
+mod pr_review_details;
 mod pr_task;
 mod pr_template;
 mod processes;
@@ -223,9 +223,11 @@ pub use outgoing::*;
 pub use panes::*;
 pub use panes_restore::*;
 pub use phone::*;
+pub use pr_comments::*;
 pub use pr_draft::*;
 pub use pr_image_offers::*;
 pub use pr_images::*;
+pub use pr_review_details::*;
 pub use pr_task::*;
 pub use processes::*;
 pub use profiles::*;
@@ -623,7 +625,7 @@ mod tests {
             epic_field_missing: Default::default(),
             pending_notices: Default::default(),
             status_cache: Default::default(),
-            prs_settled: Default::default(),
+            github_session: Default::default(),
             prs_seen: Default::default(),
             news: Default::default(),
             messages: crate::messages::Messages::for_tests(std::env::temp_dir().join("vl-test-messages.json")),

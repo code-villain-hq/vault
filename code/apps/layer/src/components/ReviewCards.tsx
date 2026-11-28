@@ -1,14 +1,35 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useState, type MouseEvent } from "react";
+import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import { api } from "../lib/api";
 import { goTo } from "../lib/goto";
 import { menuKeys, pressKeys } from "../lib/press";
+import type { ReviewPrReaders } from "../lib/review-pr-readers";
 import { ago } from "../lib/time";
 import type { AuthoredPr, ReviewRequest } from "../lib/types";
 import { useStore } from "../store";
+import { ReviewPrDetails } from "./ReviewPrDetails";
 import { BusyLabel, ErrorMessage, useFailure } from "./ui";
 
 const NO_BROWSER = "Couldn't open the browser. Try again.";
+
+function useCardActivation(open: () => void) {
+  const fromReader = useRef(false);
+  return {
+    onPointerDownCapture: (e: PointerEvent) => {
+      if (e.isPrimary && e.button === 0) {
+        fromReader.current = (e.target as Element).closest(".review-pr-details") !== null;
+      }
+    },
+    // A selection drag ending on padding sends the click to the card itself.
+    // The next pointer press resets the guard; keyboard clicks bypass it.
+    onClick: (e: MouseEvent) => {
+      const reading = e.detail > 0 && fromReader.current;
+      fromReader.current = false;
+      if (!reading && !(e.target as Element).closest(".error-message")) open();
+    },
+    onKeyDown: menuKeys(pressKeys(open)),
+  };
+}
 
 /** How a banner names a pull request: `owner/repo#n`, as `news.rs` writes it. */
 export function identity(pr: { repo: string; number: number }): string {
@@ -23,17 +44,20 @@ export function ReviewCard({
   pr,
   focused,
   asked,
+  readers,
   onContextMenu,
 }: {
   pr: ReviewRequest;
   focused: boolean;
   /** Who it was asked of, once the list is not grouped by that (REV-11). */
   asked?: string;
+  readers: ReviewPrReaders;
   onContextMenu: (e: MouseEvent) => void;
 }) {
   // A card has no room for the browser failing to open: the top bar says it.
   const fail = useStore((s) => s.fail);
   const open = () => void openUrl(pr.url).catch(() => fail(NO_BROWSER));
+  const activation = useCardActivation(open);
 
   return (
     // A div, not a button: it holds buttons of its own.
@@ -42,8 +66,7 @@ export function ReviewCard({
       tabIndex={0}
       className={`review-card${focused ? " focused" : ""}`}
       data-review={identity(pr)}
-      onClick={open}
-      onKeyDown={menuKeys(pressKeys(open))}
+      {...activation}
       onContextMenu={onContextMenu}
       title={pr.url}
     >
@@ -91,6 +114,7 @@ export function ReviewCard({
         {pr.checks === "passing" && <span className="ui-status">checks pass</span>}
         <MyReview pr={pr} />
       </div>
+      <ReviewPrDetails pr={pr} readers={readers} />
     </div>
   );
 }
@@ -121,16 +145,18 @@ function MyReview({ pr }: { pr: ReviewRequest }) {
 /**
  * One of your pull requests and where it stands (REV-4), and the way to act
  * on it (REV-7): a click opens its task's Pull requests tab, where feedback
- * goes to an agent; one with no task gets one on its branch. GitHub is the
- * button in the corner. Where it stands is the heading of its group (REV-8).
+ * goes to an agent. One with no task opens GitHub and offers Start task.
+ * Where it stands is the heading of its group (REV-8).
  */
 export function AuthoredCard({
   pr,
   task,
+  readers,
   onContextMenu,
 }: {
   pr: AuthoredPr;
   task: { id: string; name: string } | null;
+  readers: ReviewPrReaders;
   onContextMenu: (e: MouseEvent) => void;
 }) {
   // Opening GitHub fails in the top bar, like the review card; Start task
@@ -143,6 +169,7 @@ export function AuthoredCard({
   const who = (names: string[]) => (names.length ? ` by ${names.join(", ")}` : "");
   const openGitHub = () => void openUrl(pr.url).catch(() => fail(NO_BROWSER));
   const open = () => (task ? goTo(`pr:${task.id}`) : openGitHub());
+  const activation = useCardActivation(open);
 
   async function start() {
     setStarting(true);
@@ -168,11 +195,7 @@ export function AuthoredCard({
       tabIndex={0}
       className="review-card"
       data-review={identity(pr)}
-      // Selecting a failure's text is not a click on the card.
-      onClick={(e) => {
-        if (!(e.target as Element).closest(".error-message")) open();
-      }}
-      onKeyDown={menuKeys(pressKeys(open))}
+      {...activation}
       onContextMenu={onContextMenu}
       title={task ? `Open ${task.name}` : pr.url}
     >
@@ -238,6 +261,7 @@ export function AuthoredCard({
         )}
       </div>
       <ErrorMessage>{failure.error}</ErrorMessage>
+      <ReviewPrDetails pr={pr} readers={readers} />
     </div>
   );
 }

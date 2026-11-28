@@ -24,11 +24,14 @@ function pr(merged: boolean): CheckoutPr {
     checkout_id: "c",
     repo: "acme/api",
     checks: [],
+    checks_state: merged ? "unavailable" : "complete",
     reviews: [],
     past: [],
     verdict: "none",
     base: "main",
     changed: 0,
+    to_reply: 0,
+    error: null,
     pr: {
       number: 1,
       title: "",
@@ -44,7 +47,7 @@ function pr(merged: boolean): CheckoutPr {
       comments: 0,
       review_comments: 0,
     },
-  } as unknown as CheckoutPr;
+  };
 }
 
 describe("a sub-task's state (EPIC-10)", () => {

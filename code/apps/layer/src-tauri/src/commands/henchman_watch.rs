@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::integrations::github::PullRequest;
 
-use super::github::CheckoutPr;
+use super::github::{CheckoutPr, ConnectedGitHub};
 use super::henchman_tools::failed;
 use super::AppState;
 
@@ -40,8 +40,6 @@ pub(crate) struct PrChange {
 static CHANGED: Mutex<Vec<PrChange>> = Mutex::new(Vec::new());
 /// Changes said once per commit, by their keys.
 static SAID: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
-/// When the tasks' pull requests were last swept.
-static SWEPT: Mutex<Option<Instant>> = Mutex::new(None);
 
 /// One change, and its key when it is said once per commit: GitHub reports
 /// whether a pull request can merge as "unknown" while it works that out,
@@ -79,8 +77,11 @@ pub(crate) fn take_changes() -> Vec<PrChange> {
 }
 
 /// The window's sweep read every task: none is due here for a while.
-pub(crate) fn swept() {
-    *SWEPT.lock() = Some(Instant::now());
+pub(crate) async fn swept(state: &AppState, connected: &ConnectedGitHub) {
+    let mut session = state.github_session.lock().await;
+    if session.generation == connected.generation {
+        session.swept = Some(Instant::now());
+    }
 }
 
 /// While a Henchman runs, read every task's pull requests whenever the
@@ -90,30 +91,30 @@ pub fn spawn_henchman_watch(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             tokio::time::sleep(LOOK).await;
-            let due = SWEPT.lock().is_none_or(|at| at.elapsed() >= EVERY);
             let state = app.state::<AppState>();
+            let due = state.github_session.lock().await.swept.is_none_or(|at| at.elapsed() >= EVERY);
             if !due || super::henchman::running(&state).is_none() {
                 continue;
             }
             sweep(&state).await;
-            swept();
         }
     });
 }
 
 /// The window's sweep, without following tickets: only the reads count here.
 async fn sweep(state: &AppState) {
-    let Ok((client, _)) = super::github::github_client(state) else {
+    let Ok(connected) = super::github::connected_github(state).await else {
         return;
     };
     use futures_util::stream::{self, StreamExt};
-    let client = &client;
-    stream::iter(super::github::sweep_ids(state))
+    let connected = &connected;
+    stream::iter(super::github::sweep_ids(state, connected, None).await)
         .for_each_concurrent(super::github::SWEEP_TASKS, |id| async move {
             // One that can't be read is tried again at the next sweep.
-            let _ = super::github::task_prs(state, client, &id).await;
+            let _ = super::github::task_prs(state, connected, &id).await;
         })
         .await;
+    swept(state, connected).await;
 }
 
 /// Whether a change is news: always, unless it is said once and was.
@@ -223,6 +224,7 @@ mod tests {
                 review_comments: 0,
             }),
             checks: Vec::new(),
+            checks_state: Default::default(),
             reviews: Vec::new(),
             past: Vec::new(),
             verdict: "none".into(),

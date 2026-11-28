@@ -11,7 +11,7 @@ use crate::git;
 use crate::integrations::github;
 
 use super::diff::RepoResult;
-use super::github::github_client;
+use super::github::connected_github;
 use super::slack::{record_post, slack_for};
 use super::tickets::tracker;
 use super::{off_runtime, AppState};
@@ -31,7 +31,8 @@ pub async fn github_open_prs(
 ) -> Result<Vec<RepoResult>> {
     let task = state.config.task(&task_id)?;
     super::pr_task::not_a_review(&task, "pushed or opened as a pull request")?;
-    let (client, _) = github_client(&state)?;
+    let connected = connected_github(&state).await?;
+    let client = connected.client;
     let tracker = tracker(&state).ok();
     let body = fixes(tracker.as_ref().map(|t| t.kind()), task.issue_key.as_deref(), body);
 
@@ -239,7 +240,10 @@ pub async fn github_open_prs(
     }
 
     // What was just opened is the sweep's to follow from now (PR-8).
-    state.prs_settled.lock().remove(&task_id);
+    let mut session = state.github_session.lock().await;
+    if session.generation == connected.generation {
+        session.settled.remove(&task_id);
+    }
     Ok(results)
 }
 

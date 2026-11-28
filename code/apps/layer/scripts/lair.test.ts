@@ -32,11 +32,15 @@ function pane(over: Partial<PaneInfo> = {}): PaneInfo {
   };
 }
 
-function pr(over: { merged?: boolean; closed?: boolean } = {}, row: Partial<CheckoutPr> = {}) {
+function pr(
+  over: { merged?: boolean; closed?: boolean } = {},
+  row: Partial<CheckoutPr> = {},
+): CheckoutPr {
   return {
     checkout_id: "c",
     repo: "acme/api",
     checks: [],
+    checks_state: over.merged || over.closed ? "unavailable" : "complete",
     reviews: [],
     past: [],
     verdict: "none",
@@ -46,12 +50,21 @@ function pr(over: { merged?: boolean; closed?: boolean } = {}, row: Partial<Chec
     error: null,
     pr: {
       number: 1,
+      title: "",
       state: over.merged || over.closed ? "closed" : "open",
       merged: !!over.merged,
       draft: false,
+      author: "",
+      head: "",
+      head_sha: "",
+      base: "main",
+      url: "",
+      mergeable_state: null,
+      comments: 0,
+      review_comments: 0,
     },
     ...row,
-  } as unknown as CheckoutPr;
+  };
 }
 
 function task(id: string, changed = 0): TaskView {

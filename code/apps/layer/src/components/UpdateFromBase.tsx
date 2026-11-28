@@ -41,7 +41,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
   const failure = useFailure();
   const fail = failure.fail;
   const githubConnected = useStore((s) => s.settings?.github_connected ?? false);
-  const setTaskPrs = useStore((s) => s.setTaskPrs);
+  const refreshTaskPrs = useStore((s) => s.refreshTaskPrs);
   const at = useAgentTarget(task);
 
   /**
@@ -135,12 +135,7 @@ export function UpdateFromBase({ task, onClose }: { task: TaskView; onClose: () 
       // to move the PR back onto the old one until the next sweep.
       await Promise.all([
         refreshTasks().catch(() => {}),
-        githubConnected
-          ? api
-              .githubTaskPrs(task.id)
-              .then((rows) => setTaskPrs(task.id, rows))
-              .catch(() => {})
-          : null,
+        githubConnected ? refreshTaskPrs(task.id).catch(() => {}) : null,
       ]);
     } catch (e) {
       fail(e);

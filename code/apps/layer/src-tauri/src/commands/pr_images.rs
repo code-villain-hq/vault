@@ -221,7 +221,7 @@ async fn show_in_pr(
 
     let dir = PathBuf::from(&checkout.path);
     let (owner, name) = off_runtime(move || git::origin_slug_cached(&dir)).await??;
-    let (client, _) = github_client(state)?;
+    let (client, _) = github_client(state).await?;
     let branches = super::pr_branches::branches(checkout, &task.branch).await?;
     let pr = super::pr_branches::open_pull(&client, &owner, &name, &branches).await?.ok_or_else(|| {
         Error::Other(format!("{repo} has no open pull request for {}: open it with open_prs first", task.branch))

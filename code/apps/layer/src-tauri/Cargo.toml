@@ -66,8 +66,8 @@ parking_lot = "0.13"
 libc = "0.2"
 tauri-plugin-clipboard-manager = "2"
 # Banners, with UserNotifications: notify-rust posts through
-# NSUserNotificationCenter, which macOS no longer shows. It stays for a dev
-# build, which has no app bundle for UserNotifications.
+# NSUserNotificationCenter, which macOS no longer shows for Layer's bundle id.
+# An unbundled dev build uses that center with notify-rust's app attribution.
 code-villain-notify = { workspace = true }
 # The window keeps drawing when WebKit loses its GPU helper (WIN-7).
 code-villain-webview = { workspace = true }
@@ -85,6 +85,7 @@ objc2-foundation = { version = "0.3", default-features = false, features = [
   "std",
   "NSString",
   "NSDictionary",
+  "NSUserNotification",
   "NSGeometry",
   "NSAttributedString",
   "NSData",

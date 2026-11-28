@@ -2,9 +2,12 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Runtime, State};
+#[cfg(not(target_os = "macos"))]
+use tauri::Emitter;
+use tauri::{AppHandle, Runtime, State};
 
 use crate::config::{GithubConfig, GrafanaConfig, JiraConfig, SlackBotConfig, SlackConfig, TrackerKind, UiPrefs};
 use crate::error::{Error, Result};
@@ -12,6 +15,12 @@ use crate::secrets;
 use crate::shellenv;
 
 use super::{AppNotice, AppState};
+
+#[cfg(target_os = "macos")]
+mod legacy_banner;
+
+type BannerPost = Box<dyn FnOnce() + Send>;
+pub(crate) type SubmitBanner = Arc<dyn Fn(BannerPost) -> tauri::async_runtime::JoinHandle<()> + Send + Sync>;
 
 // ---------------------------------------------------------------- settings
 
@@ -163,48 +172,89 @@ pub fn set_ui_prefs(app: AppHandle, state: State<AppState>, ui: UiPrefs) -> Resu
 /// A banner, and what a click on it should open: `target` is handed back
 /// untouched in `system-notify-click`, as `target::Target` wrote it.
 ///
-/// `code/kit/notify` shows it, and hands the click to `on_open` in `lib.rs`:
-/// notify-rust, like the notification plugin, posts through
-/// NSUserNotificationCenter, which macOS no longer shows, so no banner did.
-/// A dev build has no app bundle for the kit, and gets notify-rust.
-///
-/// The notification plugin's desktop backend shows the banner and drops the
-/// click — `show` never waits for it — so a click could focus the app and
-/// still leave you on whichever view you had left. notify-rust waits for it
-/// here, and emits `system-notify-click` only for the activation, not a
-/// dismissal.
+/// `code/kit/notify` shows it, and hands the click to `on_open` in `lib.rs`.
+/// A dev build has no app bundle for the kit and uses the legacy center.
 pub(crate) fn banner<R: Runtime>(app: &AppHandle<R>, title: String, body: String, target: String) -> Result<()> {
+    banner_inner(app, title, body, target, None)
+}
+
+pub(crate) fn guarded_banner<R: Runtime>(
+    app: &AppHandle<R>,
+    title: String,
+    body: String,
+    target: String,
+    submit: SubmitBanner,
+) -> Result<()> {
+    banner_inner(app, title, body, target, Some(submit))
+}
+
+fn banner_inner<R: Runtime>(
+    app: &AppHandle<R>,
+    title: String,
+    body: String,
+    target: String,
+    submit: Option<SubmitBanner>,
+) -> Result<()> {
     let title = crate::profiles::banner_title(&title);
-    if code_villain_notify::show_opening(&title, &body, &target) {
+    let handled = match &submit {
+        Some(submit) => {
+            let submit = submit.clone();
+            code_villain_notify::show_opening_guarded(&title, &body, &target, move |post| {
+                submit(post);
+            })
+        }
+        None => code_villain_notify::show_opening(&title, &body, &target),
+    };
+    if handled {
         return Ok(());
     }
     // A dev build has no bundle id macOS will attribute a notification to.
     // Borrowing Terminal's is what the plugin does, and without it a `tauri
     // dev` banner is delivered to nobody.
     #[cfg(target_os = "macos")]
-    {
+    let post: BannerPost = {
         let identifier = app.config().identifier.clone();
         let bundle = if tauri::is_dev() { "com.apple.Terminal" } else { identifier.as_str() };
         let _ = notify_rust::set_application(bundle);
-    }
-
-    // `wait_for_action` blocks until the banner is clicked or dismissed, and
-    // this can be called on the thread that owns the window.
-    let app = app.clone();
-    std::thread::Builder::new()
-        .name("system-notify".into())
-        .spawn(move || {
+        let app = app.clone();
+        Box::new(move || legacy_banner::post(app, &title, &body, &target))
+    };
+    #[cfg(not(target_os = "macos"))]
+    let post: BannerPost = {
+        let app = app.clone();
+        let guarded = submit.is_some();
+        Box::new(move || {
             let mut notification = notify_rust::Notification::new();
             notification.summary(&title).body(&body);
             let Ok(handle) = notification.show() else {
                 return;
             };
-            handle.wait_for_action(move |action| {
-                if action == "default" {
-                    let _ = app.emit("system-notify-click", target);
-                }
-            });
+            let wait = move || {
+                handle.wait_for_action(move |action| {
+                    if action == "default" {
+                        let _ = app.emit("system-notify-click", target);
+                    }
+                });
+            };
+            if guarded {
+                let _ = spawn_banner(Box::new(wait));
+            } else {
+                wait();
+            }
         })
+    };
+    if let Some(submit) = submit {
+        submit(post);
+    } else {
+        spawn_banner(post)?;
+    }
+    Ok(())
+}
+
+fn spawn_banner(post: BannerPost) -> Result<()> {
+    std::thread::Builder::new()
+        .name("system-notify".into())
+        .spawn(post)
         .map_err(|e| Error::Other(format!("notification: {e}")))?;
     Ok(())
 }
@@ -230,6 +280,9 @@ pub async fn disconnect(app: AppHandle, which: String) -> Result<()> {
 }
 
 fn disconnect_inner(state: &AppState, which: &str) -> Result<()> {
+    if which == "github" {
+        return super::github::disconnect_github(state);
+    }
     // What was seen on that site says nothing about the next one.
     state.news.forget();
     match which {
@@ -240,10 +293,6 @@ fn disconnect_inner(state: &AppState, which: &str) -> Result<()> {
             *state.ticket_types.lock() = None;
             *state.epic_field_missing.lock() = None;
             state.config.update(|c| c.jira = None)
-        }
-        "github" => {
-            secrets::delete(secrets::GITHUB)?;
-            state.config.update(|c| c.github = None)
         }
         "grafana" => {
             secrets::delete(secrets::GRAFANA)?;

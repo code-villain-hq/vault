@@ -41,11 +41,17 @@ export interface CheckRun {
   url: string | null;
 }
 
-export interface CheckoutPr {
+export type ReadState = "complete" | "incomplete" | "unavailable";
+
+export interface PrChecks {
+  checks: CheckRun[];
+  checks_state: ReadState;
+}
+
+export interface CheckoutPr extends PrChecks {
   checkout_id: string;
   repo: string;
   pr: PullRequest | null;
-  checks: CheckRun[];
   reviews: Review[];
   /** Earlier pull requests from this branch, newest first. */
   past: PullRequest[];
@@ -102,6 +108,30 @@ export interface ReviewThread {
   outdated: boolean;
   url: string;
   comments: FeedbackNote[];
+}
+
+export interface PrComments {
+  comments: FeedbackNote[];
+  reviews: FeedbackNote[];
+  threads: ReviewThread[];
+  comments_state: ReadState;
+  reviews_state: ReadState;
+  threads_state: ReadState;
+}
+
+export interface CheckoutPrComments extends PrComments {
+  checkout_id: string;
+  number: number;
+  /** The permalink of the selected PR, verified against the checkout and GitHub connection. */
+  url: string;
+}
+
+/** The remote PR's detail snapshot, independent of the queue's CI rollup. */
+export interface ReviewPrDetails extends PrComments, PrChecks {
+  repo: string;
+  number: number;
+  url: string;
+  head_sha: string;
 }
 
 export interface FailedCheck {
@@ -228,6 +258,7 @@ export interface AuthoredPr {
   /** Its branch, and the one it merges into. */
   head: string;
   base: string;
+  head_sha: string;
   /** As GitHub rolls up check runs and commit statuses; "none" when nothing reports. */
   checks: "passing" | "failing" | "pending" | "none";
   /** Branch protection's decision, or the latest reviews where it asks for none. */

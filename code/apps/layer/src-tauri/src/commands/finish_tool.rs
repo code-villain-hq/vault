@@ -113,8 +113,8 @@ async fn merged_heads(state: &AppState, task_id: &str) -> Result<HashMap<String,
     if !state.config.with(|c| c.github.is_some()) {
         return Ok(HashMap::new());
     }
-    let (client, _) = super::github::github_client(state)?;
-    let rows = super::github::task_prs(state, &client, task_id).await?;
+    let connected = super::github::connected_github(state).await?;
+    let rows = super::github::task_prs(state, &connected, task_id).await?;
     if let Some(open) = rows.iter().find(|r| r.pr.as_ref().is_some_and(|p| p.state == "open")) {
         let number = open.pr.as_ref().map(|p| p.number).unwrap_or_default();
         return Err(Error::Other(format!(

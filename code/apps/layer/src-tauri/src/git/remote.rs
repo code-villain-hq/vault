@@ -10,6 +10,11 @@ use parking_lot::Mutex;
 use super::run;
 use crate::error::{Error, Result};
 
+/// Unlike `origin_url`, accounts for git's `url.*.insteadOf` rewrites.
+pub(crate) fn effective_origin_url(dir: &Path) -> Result<String> {
+    Ok(run(dir, &["remote", "get-url", "origin"])?.trim().to_string())
+}
+
 /// `owner/repo` parsed from the origin remote.
 ///
 /// Handles the three shapes that turn up in practice, including the SSH form
@@ -18,7 +23,7 @@ use crate::error::{Error, Result};
 ///   https://host/acme/web.git
 ///   ssh://git@host:2222/acme/web.git
 pub fn origin_slug(dir: &Path) -> Result<(String, String)> {
-    let url = run(dir, &["remote", "get-url", "origin"])?.trim().to_string();
+    let url = effective_origin_url(dir)?;
 
     // A copy of a clone that had no origin yet fetches from the clone's
     // folder, and `/Users/me/work/platform/tool` read as `platform/tool`

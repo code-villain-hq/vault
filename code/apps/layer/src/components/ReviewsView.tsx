@@ -1,5 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { copyAndSay } from "../lib/clipboard";
 import { authoredGroups, countOf, reviewCounts, taskOfPr } from "../lib/derive";
 import { useEpics } from "../lib/epics";
@@ -15,6 +15,7 @@ import {
   type Sort,
 } from "../lib/grouping";
 import { readOneOf, write } from "../lib/persist";
+import { createReviewPrReaders } from "../lib/review-pr-readers";
 import type { AuthoredPr, ReviewRequest, TeamReviews } from "../lib/types";
 import { useStore } from "../store";
 import { ChevronIcon } from "./icons";
@@ -125,6 +126,22 @@ export function ReviewsView() {
   const loading = useStore((s) => s.reviewQueueLoading);
   const error = useStore((s) => s.reviewQueueError);
   const refresh = useStore((s) => s.refreshReviewQueue);
+  const githubConnectionRevision = useStore((s) => s.githubConnectionRevision);
+  const connection = JSON.stringify([
+    settings?.github_connected,
+    settings?.github?.api_url,
+    settings?.github?.web_url,
+    githubConnectionRevision,
+  ]);
+  const readers = useMemo(() => createReviewPrReaders(connection), [connection]);
+  useEffect(() => () => readers.prune([]), [readers]);
+  useEffect(() => {
+    readers.prune([
+      ...(queue?.mine ?? []),
+      ...(queue?.team?.error ? [] : (queue?.team?.prs ?? [])),
+      ...(queue?.authored?.error ? [] : (queue?.authored?.prs ?? [])),
+    ]);
+  }, [queue, readers]);
   const toggleSettings = useStore((s) => s.toggleSettings);
   const fail = useStore((s) => s.fail);
   // Both start open. Folding is for getting one queue out of the way, not the
@@ -292,7 +309,14 @@ export function ReviewsView() {
           {SORT_LABEL[sort]} ▾
         </button>
         <div className="spacer" />
-        <button type="button" className="ui-button" onClick={() => void refresh()}>
+        <button
+          type="button"
+          className="ui-button"
+          onClick={() => {
+            readers.refresh(side === "review" ? requested.map(({ pr }) => pr) : ownPrs);
+            void refresh();
+          }}
+        >
           <BusyLabel busy={loading} idle="Refresh" working="Refreshing…" />
         </button>
       </div>
@@ -346,6 +370,7 @@ export function ReviewsView() {
                       key={identity(pr)}
                       pr={pr}
                       task={task}
+                      readers={readers}
                       onContextMenu={(e) => openMenu(e, pr, task?.id)}
                     />
                   );
@@ -370,6 +395,7 @@ export function ReviewsView() {
                       key={identity(pr)}
                       pr={pr}
                       task={task}
+                      readers={readers}
                       onContextMenu={(e) => openMenu(e, pr, task?.id)}
                     />
                   );
@@ -414,6 +440,7 @@ export function ReviewsView() {
                   pr={pr}
                   asked={requested.find((r) => r.pr === pr)?.asked}
                   focused={focusReview === identity(pr)}
+                  readers={readers}
                   onContextMenu={(e) => openMenu(e, pr)}
                 />
               ))}
@@ -443,6 +470,7 @@ export function ReviewsView() {
                   key={`${pr.repo}#${pr.number}`}
                   pr={pr}
                   focused={focusReview === identity(pr)}
+                  readers={readers}
                   onContextMenu={(e) => openMenu(e, pr)}
                 />
               ))}
@@ -467,6 +495,7 @@ export function ReviewsView() {
                     key={`${pr.repo}#${pr.number}`}
                     pr={pr}
                     focused={focusReview === identity(pr)}
+                    readers={readers}
                     onContextMenu={(e) => openMenu(e, pr)}
                   />
                 ))

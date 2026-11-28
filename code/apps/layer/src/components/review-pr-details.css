@@ -1,0 +1,10 @@
+.review-pr-details {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  cursor: auto;
+  user-select: text;
+}
+.review-pr-details > .pr-detail:has(> [aria-expanded="true"]) {
+  flex-basis: 100%;
+}

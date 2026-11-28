@@ -44,6 +44,7 @@ export function Watchers() {
   const tasks = useStore((s) => s.tasks);
   const view = useStore((s) => s.view);
   const githubConnected = useStore((s) => s.settings?.github_connected);
+  const githubConnectionRevision = useStore((s) => s.githubConnectionRevision);
   const refreshAll = useStore((s) => s.refreshAll);
   const refreshRepoHealth = useStore((s) => s.refreshRepoHealth);
   const refreshPanes = useStore((s) => s.refreshPanes);
@@ -251,11 +252,10 @@ export function Watchers() {
   useEffect(() => {
     sweptAt.current.prs = Date.now();
     void refreshPrs();
-  }, [refreshPrs, githubConnected]);
+  }, [refreshPrs, githubConnected, githubConnectionRevision]);
   useEffect(() => {
     sweptAt.current.reviews = Date.now();
-    void refreshReviewQueue({ quiet: true });
-  }, [refreshReviewQueue, githubConnected]);
+  }, [githubConnectionRevision]);
 
   // Your tickets, every three minutes while the window is in front. While it
   // is away the backend looks for itself, for the banners: a hidden
@@ -468,6 +468,7 @@ export function Watchers() {
   // sweep of a launch records what is there without announcing it, or every
   // open PR would report its weeks-old verdict as news. A PR appearing for the
   // first time is silent too — you opened it, from here.
+  useEffect(() => seenPrs.current.clear(), [githubConnectionRevision]);
   useEffect(() => {
     const seen = seenPrs.current;
 

@@ -422,11 +422,11 @@ async fn prs_of(state: &AppState, tasks: &[Task]) -> std::collections::HashMap<S
         tasks.iter().filter(|t| t.review.is_none() && !seen.contains_key(&t.id)).map(|t| t.id.clone()).collect()
     };
     if !missing.is_empty() {
-        if let Ok((client, _)) = super::github::github_client(state) {
+        if let Ok(connected) = super::github::connected_github(state).await {
             use futures_util::stream::{self, StreamExt};
-            let client = &client;
+            let connected = &connected;
             stream::iter(missing)
-                .map(|id| async move { super::github::task_prs(state, client, &id).await })
+                .map(|id| async move { super::github::task_prs(state, connected, &id).await })
                 .buffered(4)
                 .collect::<Vec<_>>()
                 .await;
@@ -510,7 +510,7 @@ async fn overview(app: &AppHandle) -> Result<Value> {
         "tasks": rows.into_iter().map(|(_, _, row)| row).collect::<Vec<_>>(),
         "chats": chats,
         "processes": processes,
-        "github": super::github::github_client(&state).is_ok(),
+        "github": super::github::github_client(&state).await.is_ok(),
         "standing_orders": standing.orders,
         "left_alone": standing.left_alone,
     }))

@@ -148,6 +148,7 @@ function prs(
           review_comments: merged ? 0 : 2,
         },
         checks: [],
+        checks_state: merged ? "unavailable" : "complete",
         reviews: [],
         past: [],
         verdict: verdict as TaskPrs["rows"][number]["verdict"],

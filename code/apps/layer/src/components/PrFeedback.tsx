@@ -2,11 +2,13 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../lib/api";
 import { read, write } from "../lib/persist";
-import type { CodeLine, FeedbackItem, FeedbackNote, RepoFeedback, TaskView } from "../lib/types";
+import { prPermalinkIdentity } from "../lib/pr-permalink";
+import type { FeedbackItem, FeedbackNote, RepoFeedback, TaskView } from "../lib/types";
 import { useStore } from "../store";
 import { AgentTargetFields, useAgentTarget } from "./AgentTarget";
 import { ChevronIcon, ExternalIcon } from "./icons";
 import { Markdown } from "./Markdown";
+import { PrCodeExcerpt } from "./PrCodeExcerpt";
 import { ErrorMessage, Modal, useFailure } from "./ui";
 
 /* oxlint-disable react/no-array-index-key -- diff lines and a thread's comments, in order, with no ids */
@@ -142,27 +144,6 @@ const REVIEW_VERB: Record<string, string> = {
   COMMENTED: "reviewed",
 };
 
-const OP_CLASS = { "+": "add", "-": "del", " ": "" } as const;
-
-/** The lines a thread is on, above its comments, as GitHub shows them. */
-function Code({ lines }: { lines: CodeLine[] }) {
-  return (
-    <div className="fb-code">
-      <div className="diff-lines">
-        {lines.map((l, i) => (
-          <div key={i} className={`diff-line ${OP_CLASS[l.op] ?? ""}`}>
-            <span className="ln">{l.n ?? ""}</span>
-            <span className="tx">
-              {l.op}
-              {l.text}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle: () => void }) {
   const item = entry.item;
   const [open, setOpen] = useState(!entry.resolved);
@@ -178,7 +159,7 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
     head = range ? `${item.path}:${range}` : item.path;
     content = (
       <>
-        {item.code.length > 0 && <Code lines={item.code} />}
+        {item.code.length > 0 && <PrCodeExcerpt lines={item.code} />}
         {item.comments.map((c, n) => (
           <div key={n} className="fb-comment">
             <div className="fb-author">{c.author}</div>
@@ -284,11 +265,11 @@ function EntryRow({ entry, on, onToggle }: { entry: Entry; on: boolean; onToggle
  */
 export function PrFeedback({
   task,
-  first,
+  first: { checkoutId, number, permalink },
   onClose,
 }: {
   task: TaskView;
-  first?: string;
+  first: { checkoutId: string; number: number; permalink: string | null };
   onClose: () => void;
 }) {
   // Reading fails where the list would be, sending above the buttons (NOTE-6).
@@ -300,7 +281,7 @@ export function PrFeedback({
   const [rows, setRows] = useState<RepoFeedback[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [shown, setShown] = useState<string | undefined>(first);
+  const [shown, setShown] = useState(checkoutId);
 
   const sent = useMemo(() => new Set(read<string[]>(sentKey(task.id), [])), [task.id]);
   const built = useMemo(
@@ -316,6 +297,22 @@ export function PrFeedback({
       .githubPrFeedback(task.id)
       .then((r) => {
         if (stop) return;
+        // This read can discover a replacement before the task listing does.
+        const matches = r.filter((row) => row.checkout_id === checkoutId);
+        const [target] = matches;
+        if (
+          matches.length !== 1 ||
+          target?.number !== number ||
+          !permalink ||
+          prPermalinkIdentity(target.url) !== permalink ||
+          target.error
+        ) {
+          const reason = target?.error
+            ? `Couldn't read feedback for pull request #${number}: ${target.error}`
+            : `Couldn't verify feedback for pull request #${number}.`;
+          failReading(`${reason} Refresh Pull requests, then open Feedback → agent again.`);
+          return;
+        }
         setRows(r);
         const next = new Set<string>();
         for (const row of r) for (const e of entries(row, sent).list) if (e.preset) next.add(e.key);
@@ -327,13 +324,12 @@ export function PrFeedback({
     return () => {
       stop = true;
     };
-  }, [task.id, sent, clearReading, failReading]);
+  }, [task.id, checkoutId, number, permalink, sent, clearReading, failReading]);
 
   const chosen = built.flatMap((b) => b.list.filter((e) => picked.has(e.key)));
-  // The PR asked for, or the first when it has none or its PR has gone.
-  const current = built.find((b) => b.row.checkout_id === shown) ?? built[0];
+  const current = built.find((b) => b.row.checkout_id === shown);
   const title =
-    built.length === 1 && current.row.number > 0
+    built.length === 1 && current
       ? `Feedback on ${current.row.repo} #${current.row.number}`
       : "Feedback on the pull requests";
 
@@ -427,9 +423,6 @@ export function PrFeedback({
       toolbar={tabs || undefined}
     >
       <ErrorMessage>{reading.error}</ErrorMessage>
-      {rows && rows.length === 0 && (
-        <div className="muted">No repository in this task has an open pull request.</div>
-      )}
       {current && (
         <PrItems
           key={current.row.checkout_id}

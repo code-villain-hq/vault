@@ -4,7 +4,6 @@ import { githubRefusal, TOKEN_NEEDS_SSO, TOKEN_REJECTED } from "../src/lib/deriv
 import type { CheckoutPr, Settings } from "../src/lib/types";
 import { useStore } from "../src/store";
 
-const backend = api as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
 const row = (error: string | null) => ({ checkout_id: "c", repo: "web", error }) as CheckoutPr;
 
 describe("a token GitHub refused (PR-12)", () => {
@@ -23,30 +22,31 @@ describe("a token GitHub refused (PR-12)", () => {
     ).toBe(null);
   });
 
-  test("a sweep asked for during one runs again after it, with the new token's answer", async () => {
+  test("a second sweep on the same connection waits for the first and reads again", async () => {
+    const before = useStore.getState();
+    const realSweep = api.githubAllPrs;
     useStore.setState({ settings: { github_connected: true } as unknown as Settings, prs: {} });
     let answer = [{ task_id: "t", rows: [row(TOKEN_REJECTED)], ticket: null }];
     let calls = 0;
-    let release = () => {};
-    backend.githubAllPrs = async () => {
-      calls++;
+    const firstReply = Promise.withResolvers<void>();
+    api.githubAllPrs = async () => {
       const now = answer;
-      if (calls === 1)
-        await new Promise<void>((r) => {
-          release = r;
-        });
+      if (++calls === 1) await firstReply.promise;
       return structuredClone(now);
     };
-    const first = useStore.getState().refreshPrs();
-    // The new token is saved while the first sweep, under the old one, is out.
-    answer = [{ task_id: "t", rows: [row(null)], ticket: null }];
-    const second = useStore.getState().refreshPrs();
-    // A real sweep takes longer than a millisecond; one that began in the same
-    // one as the next reads as no older than it, and is rightly not applied.
-    await Bun.sleep(2);
-    release();
-    await Promise.all([first, second]);
-    expect(calls).toBe(2);
-    expect(githubRefusal(useStore.getState().prs)).toBe(null);
+    try {
+      const first = useStore.getState().refreshPrs();
+      answer = [{ task_id: "t", rows: [row(null)], ticket: null }];
+      const second = useStore.getState().refreshPrs();
+      const whileInFlight = calls;
+      firstReply.resolve();
+      await Promise.all([first, second]);
+      expect(whileInFlight).toBe(1);
+      expect(calls).toBe(2);
+      expect(githubRefusal(useStore.getState().prs)).toBe(null);
+    } finally {
+      api.githubAllPrs = realSweep;
+      useStore.setState(before, true);
+    }
   });
 });

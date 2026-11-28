@@ -1,0 +1,51 @@
+.pr-detail {
+  min-width: 0;
+  margin-top: 10px;
+}
+.pr-comments {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+  min-width: 0;
+  cursor: auto;
+}
+.pr-comments section {
+  min-width: 0;
+}
+.pr-comments h4 {
+  margin: 0 0 6px;
+  font-size: var(--type-ui-small-size);
+}
+.pr-comments p.muted {
+  margin: 0;
+}
+.pr-comment-items {
+  max-height: min(45vh, 320px);
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  padding: 8px 10px;
+  user-select: text;
+}
+.pr-note-heading {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  overflow-wrap: anywhere;
+  font-size: var(--type-ui-small-size);
+}
+.pr-thread + .pr-thread {
+  margin-top: 14px;
+}
+.pr-thread-heading {
+  overflow-wrap: anywhere;
+  font-size: var(--type-ui-small-size);
+}
+.pr-thread-heading .ui-chip {
+  margin-left: 6px;
+}
+summary.pr-thread-heading {
+  cursor: pointer;
+}
+.pr-thread-body {
+  margin-top: 6px;
+}

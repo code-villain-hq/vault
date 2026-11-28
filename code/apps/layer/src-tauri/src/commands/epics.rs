@@ -510,11 +510,11 @@ pub(crate) async fn waiting_for(app: &AppHandle, task: &Task) -> Result<Vec<Stri
         Ok((waits, filed_of(state, &of.epic)))
     })
     .await?;
-    let github = super::github::github_client(&state).ok();
+    let github = super::github::connected_github(&state).await.ok();
     let mut open = Vec::new();
     for title in waits {
         let merged = match (filed.iter().find(|t| is(t, &title)), &github) {
-            (Some(t), Some((client, _))) => super::github::task_prs(&state, client, &t.id)
+            (Some(t), Some(connected)) => super::github::task_prs(&state, connected, &t.id)
                 .await
                 .map(|rows| {
                     let live: Vec<_> =
