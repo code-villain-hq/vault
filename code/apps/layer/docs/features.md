@@ -1615,7 +1615,7 @@ Known gaps:
 | Agents: Henchman's agent, model and effort | Claude Code, Sonnet, Medium | HEN-15 |
 | Agents: Henchman's custom instructions | none | HEN-17 |
 | Agents: Task folder location | `~/.villain-worktrees` | where task folders go |
-| Tags: reusable text tags | none | one profile-local catalog shared by Chat and Work (SET-15) |
+| Tags: reusable text tags | none | one profile-local catalog shared by Chat and Work; add, rename, delete (SET-15); `add_tag`, `rename_tag`, `delete_tag` |
 | Keep awake (the cup in the top bar) | off | STATE-7, PHONE-8 |
 | Code: Always write a spec first | off | every agent is told to write the spec before any code, then wait for your go (SPEC-38), and Start work's "Write a spec first" is on and locked; `set_spec_first` |
 | Code: Default toolset | Kiro | the spec toolset a new task gets unless Start work's pick, or a sub-task's epic, says otherwise (SPEC-28, SPEC-29); `set_default_toolset`, which refuses an id no toolset has |
@@ -1737,8 +1737,14 @@ Known gaps:
   and **Add tag** action, including tags not assigned to any item.
   Chat and Work editors offer this same catalog. A new tag assigned in
   an editor becomes reusable only when the edit saves successfully.
-  Removing an assignment MUST NOT remove the catalog entry. Tags have
-  no color, icon or separately editable metadata; item color is independent.
+  Removing an assignment MUST NOT remove the catalog entry. Clicking a
+  tag in Settings → Tags MUST let the user rename or delete it. A rename
+  MUST change the tag on every chat and work task that has it; renaming
+  onto another tag's name (in any case) merges the two under that tag's
+  spelling. Delete asks first, then MUST take the tag off every chat and
+  work task as well as the catalog. Add, rename and delete MUST work from
+  the button and from Enter in the field. Tags have no color, icon or
+  other metadata; item color is independent.
   Validation follows DETAIL-3, including canonical case-insensitive reuse.
   A failed add stays inline and a successful add needs no toast.
 

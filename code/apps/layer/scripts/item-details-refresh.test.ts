@@ -243,3 +243,34 @@ test("a post-save read failure does not turn a durable mutation into a rejected 
   ).resolves.toEqual(details);
   expect(useStore.getState().failure?.text ?? "").toContain("Reconciliation read failed");
 });
+
+test("a deleted tag leaves the catalog, and an older read cannot bring it back (SET-15)", async () => {
+  useStore.setState({ tasks: [task], panes: [pane], tags: ["Review", "Bug"] });
+  const older = deferred<string[]>();
+  api.listTags = () => older.promise;
+  const stale = useStore.getState().refreshTags();
+  api.deleteTag = async () => undefined;
+  api.listTags = async () => ["Bug"];
+  api.listTasks = async () => [task];
+  api.listPanes = async () => [pane];
+  api.waitingPanes = async () => [];
+  await useStore.getState().deleteTag("Review");
+  expect(useStore.getState().tags).toEqual(["Bug"]);
+  older.resolve(["Review", "Bug"]);
+  await stale;
+  expect(useStore.getState().tags).toEqual(["Bug"]);
+});
+
+test("a renamed tag reloads the tasks and chats that carry it (SET-15)", async () => {
+  useStore.setState({ tasks: [task], panes: [pane], tags: ["Review"] });
+  const renamed = { ...details, tags: ["Needs review"] };
+  api.renameTag = async () => "Needs review";
+  api.listTags = async () => ["Needs review"];
+  api.listTasks = async () => [{ ...task, details: renamed }];
+  api.listPanes = async () => [{ ...pane, details: renamed }];
+  api.waitingPanes = async () => [];
+  expect(await useStore.getState().renameTag("review", "Needs review")).toBe("Needs review");
+  expect(useStore.getState().tags).toEqual(["Needs review"]);
+  expect(useStore.getState().tasks[0].details?.tags).toEqual(["Needs review"]);
+  expect(useStore.getState().panes[0].details?.tags).toEqual(["Needs review"]);
+});

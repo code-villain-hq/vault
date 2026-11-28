@@ -65,6 +65,29 @@ export function detailsAnswers(world: World, notify: (event: DetailsEvent) => vo
     }
     return structuredClone(details);
   };
+  // Every chat and task with the tag gets the new spelling, or loses it.
+  const retag = (from: string, to: string | null) => {
+    for (const [kind, map] of [
+      ["task", world.taskDetails],
+      ["chat", world.chatDetails],
+    ] as const) {
+      let changed = false;
+      for (const [key, details] of Object.entries(map)) {
+        const next: string[] = [];
+        for (const tag of details.tags) {
+          const swapped = tag.toLowerCase() === from ? to : tag;
+          if (swapped && !next.some((t) => t.toLowerCase() === swapped.toLowerCase()))
+            next.push(swapped);
+        }
+        if (JSON.stringify(next) === JSON.stringify(details.tags)) continue;
+        changed = true;
+        details.tags = next;
+        if (!details.display_name && !next.length && !details.color) delete map[key];
+      }
+      if (changed) notify({ kind, catalog_changed: true });
+    }
+    notify({ kind: "catalog", catalog_changed: true });
+  };
   return {
     add_tag: (a: Record<string, unknown>): unknown => {
       const tag = text(a.tag, 40);
@@ -76,6 +99,29 @@ export function detailsAnswers(world: World, notify: (event: DetailsEvent) => vo
     },
     set_task_details: (a: Record<string, unknown>): unknown => edit("task", a.taskId, a.patch),
     set_chat_details: (a: Record<string, unknown>): unknown => edit("chat", a.room, a.patch),
+    rename_tag: (a: Record<string, unknown>): unknown => {
+      const from = (text(a.tag, 40) ?? "").toLowerCase();
+      const to = text(a.to, 40);
+      if (!to) throw new Error("Enter a tag.");
+      const index = world.tagCatalog.findIndex((t) => t.toLowerCase() === from);
+      if (index < 0) throw new Error("That tag no longer exists. Refresh Settings and try again.");
+      const other = world.tagCatalog.findIndex((t) => t.toLowerCase() === to.toLowerCase());
+      let saved = to;
+      if (other >= 0 && other !== index) {
+        saved = world.tagCatalog[other];
+        world.tagCatalog.splice(index, 1);
+      } else world.tagCatalog[index] = to;
+      retag(from, saved);
+      return saved;
+    },
+    delete_tag: (a: Record<string, unknown>): unknown => {
+      const from = (text(a.tag, 40) ?? "").toLowerCase();
+      const index = world.tagCatalog.findIndex((t) => t.toLowerCase() === from);
+      if (index < 0) throw new Error("That tag no longer exists. Refresh Settings and try again.");
+      world.tagCatalog.splice(index, 1);
+      retag(from, null);
+      return null;
+    },
     list_tags: (_a: Record<string, unknown>): unknown => [...world.tagCatalog],
     // A copy, as IPC would hand over: the same objects edited in place look
     // unchanged to the store (`lib/same.ts`), and the UI never sees the edit.

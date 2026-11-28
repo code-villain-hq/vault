@@ -268,4 +268,49 @@ mod cases {
         assert_eq!(f.disk()["tasks"][0]["name"], "Source");
         assert_eq!(f.disk()["tasks"][0]["sub_task"]["title"], "Spec title");
     }
+
+    #[test]
+    fn renaming_a_tag_renames_it_on_every_chat_and_task_and_merges_onto_an_existing_spelling() {
+        let f = Fixture::new();
+        edit_details(&f.store, task(), patch(json!({"tags":["Review","Bug"]}))).unwrap();
+        edit_details(&f.store, chat(), patch(json!({"tags":["review"]}))).unwrap();
+        let renamed = rename_tag(&f.store, "REVIEW", " Needs review ").unwrap();
+        assert_eq!(renamed.tag.as_deref(), Some("Needs review"));
+        assert!(renamed.changed && renamed.tasks_changed && renamed.chats_changed);
+        let disk = f.disk();
+        assert_eq!(disk["tag_catalog"], json!(["Needs review", "Bug"]));
+        assert_eq!(disk["task_details"]["t"]["tags"], json!(["Needs review", "Bug"]));
+        assert_eq!(disk["chat_details"]["/old/_chat/abcd1234"]["tags"], json!(["Needs review"]));
+        let merged = rename_tag(&f.store, "Bug", "needs REVIEW").unwrap();
+        assert_eq!(merged.tag.as_deref(), Some("Needs review"));
+        assert!(merged.tasks_changed && !merged.chats_changed);
+        let disk = f.disk();
+        assert_eq!(disk["tag_catalog"], json!(["Needs review"]));
+        assert_eq!(disk["task_details"]["t"]["tags"], json!(["Needs review"]));
+        let cased = rename_tag(&f.store, "needs review", "NEEDS REVIEW").unwrap();
+        assert!(cased.changed);
+        assert_eq!(f.disk()["tag_catalog"], json!(["NEEDS REVIEW"]));
+        let same = rename_tag(&f.store, "needs review", "NEEDS REVIEW").unwrap();
+        assert!(!same.changed);
+        assert!(rename_tag(&f.store, "Missing", "Other").is_err());
+        assert!(rename_tag(&f.store, "NEEDS REVIEW", " ").is_err());
+    }
+
+    #[test]
+    fn deleting_a_tag_takes_it_off_every_item_and_forgets_items_left_with_nothing() {
+        let f = Fixture::new();
+        edit_details(&f.store, task(), patch(json!({"tags":["Review"],"display_name":"Alias"}))).unwrap();
+        edit_details(&f.store, chat(), patch(json!({"tags":["Review"]}))).unwrap();
+        add_tag(&f.store, "Unused").unwrap();
+        let deleted = delete_tag(&f.store, "review").unwrap();
+        assert!(deleted.changed && deleted.tasks_changed && deleted.chats_changed);
+        let disk = f.disk();
+        assert_eq!(disk["tag_catalog"], json!(["Unused"]));
+        assert_eq!(disk["task_details"]["t"]["display_name"], "Alias");
+        assert_eq!(disk["task_details"]["t"]["tags"], json!([]));
+        assert!(disk["chat_details"].get("/old/_chat/abcd1234").is_none());
+        let unused = delete_tag(&f.store, "Unused").unwrap();
+        assert!(unused.changed && !unused.tasks_changed && !unused.chats_changed);
+        assert!(delete_tag(&f.store, "Unused").is_err());
+    }
 }

@@ -88,6 +88,35 @@ pub async fn add_tag(app: AppHandle, tag: String) -> Result<String> {
     .await
 }
 
+#[tauri::command]
+pub async fn rename_tag(app: AppHandle, tag: String, to: String) -> Result<String> {
+    let handle = app.clone();
+    super::blocking(app, move |state| {
+        let edit = item_details::rename_tag(&state.config, &tag, &to)?;
+        notify_catalog(&handle, &edit);
+        Ok(edit.tag.unwrap_or(to))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_tag(app: AppHandle, tag: String) -> Result<()> {
+    let handle = app.clone();
+    super::blocking(app, move |state| {
+        let edit = item_details::delete_tag(&state.config, &tag)?;
+        notify_catalog(&handle, &edit);
+        Ok(())
+    })
+    .await
+}
+
+/// One event per kind of item the edit reached, so the window reloads those.
+fn notify_catalog<R: tauri::Runtime>(app: &AppHandle<R>, edit: &item_details::CatalogEdit) {
+    notify(app, "task", edit.tasks_changed, true);
+    notify(app, "chat", edit.chats_changed, true);
+    notify(app, "catalog", edit.changed && !edit.tasks_changed && !edit.chats_changed, true);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

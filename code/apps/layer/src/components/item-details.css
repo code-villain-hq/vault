@@ -57,3 +57,11 @@ button.item-details-tag {
 .tags-list {
   margin-top: 10px;
 }
+/* Picking a tag in Settings → Tags opens its rename row under the list. The
+   picked chip is marked by its outline, not a fill: data hues stay off tags. */
+.tags-list .item-details-tag[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.tags-edit {
+  margin-top: 10px;
+}

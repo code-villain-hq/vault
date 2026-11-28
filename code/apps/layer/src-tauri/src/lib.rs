@@ -319,6 +319,8 @@ pub fn run() {
             commands::set_chat_details,
             commands::list_tags,
             commands::add_tag,
+            commands::rename_tag,
+            commands::delete_tag,
             commands::delete_task,
             commands::finish_task,
             commands::add_checkout,

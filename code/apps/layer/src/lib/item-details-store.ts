@@ -33,13 +33,25 @@ export interface ItemDetailsState {
   saveTaskDetails: (taskId: string, patch: DetailsPatch) => Promise<ItemDetails>;
   saveChatDetails: (room: string, patch: DetailsPatch) => Promise<ItemDetails>;
   addTag: (tag: string) => Promise<string>;
+  renameTag: (tag: string, to: string) => Promise<string>;
+  deleteTag: (tag: string) => Promise<void>;
 }
+
+// Only the newest catalog read may replace the list, so an older one cannot
+// bring back a deleted tag. A read that a local save overtook only adds to it:
+// it may have been served before that save, or after another writer's.
+let tagReads = 0;
+let tagMerges = 0;
 
 export function itemDetailsActions(
   set: (patch: Partial<State> | ((s: State) => Partial<State>)) => void,
   get: () => State,
 ): ItemDetailsState {
   const catalog = (tags: string[]) => {
+    ++tagMerges;
+    merge(tags);
+  };
+  const merge = (tags: string[]) => {
     set((s) => {
       const next = [...s.tags];
       for (const tag of tags)
@@ -50,9 +62,12 @@ export function itemDetailsActions(
   return {
     tags: [],
     refreshTags: async () => {
-      // The catalog has no deletion. Merge every read so neither an older
-      // read nor a delayed save reply can erase another writer's new tag.
-      catalog(await api.listTags());
+      const read = ++tagReads;
+      const merges = tagMerges;
+      const tags = await api.listTags();
+      if (read !== tagReads) return;
+      if (merges !== tagMerges) merge(tags);
+      else set((s) => (sameJson(s.tags, tags) ? s : { tags }));
     },
     detailsChanged: async (event) => {
       const pending: Promise<void>[] = [];
@@ -87,6 +102,23 @@ export function itemDetailsActions(
       const canonical = await api.addTag(tag);
       catalog([canonical]);
       return canonical;
+    },
+    // A rename or delete reaches every chat and task with the tag. Reload them
+    // here as well as on the event, so the caller sees it done when this ends.
+    renameTag: async (tag, to) => {
+      const canonical = await api.renameTag(tag, to);
+      await Promise.all([
+        get().detailsChanged({ kind: "task", catalog_changed: true }),
+        get().detailsChanged({ kind: "chat", catalog_changed: false }),
+      ]);
+      return canonical;
+    },
+    deleteTag: async (tag) => {
+      await api.deleteTag(tag);
+      await Promise.all([
+        get().detailsChanged({ kind: "task", catalog_changed: true }),
+        get().detailsChanged({ kind: "chat", catalog_changed: false }),
+      ]);
     },
   };
 }
