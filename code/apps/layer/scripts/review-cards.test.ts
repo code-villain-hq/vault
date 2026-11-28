@@ -12,7 +12,8 @@ const readers = createReviewPrReaders("mock");
 function expectClosedDetails(html: string) {
   expect(html).toContain("Comments</button>");
   expect(html).toContain("Check runs</button>");
-  expect(html.match(/aria-expanded="false"/g)).toHaveLength(2);
+  expect(html.match(/role="tab" [^>]*aria-selected="false"/g)).toHaveLength(2);
+  expect(html).not.toContain('role="tabpanel"');
   expect(html).not.toContain("Reading comments");
   expect(html).not.toContain("Reading check runs");
 }
@@ -33,4 +34,19 @@ test("an authored PR without a task offers the same readers and keeps Start task
   );
   expect(html).toContain("Start task");
   expectClosedDetails(html);
+});
+
+test("the details are tabs: opening Check runs closes Comments, and choosing it again closes it", () => {
+  const tabs = createReviewPrReaders("tabs");
+  const pr = queue.mine[0];
+  const open = () => {
+    const entry = tabs.store.getState().get(tabs.keyOf(pr));
+    return entry && { comments: entry.comments, checks: entry.checks };
+  };
+  tabs.toggle(pr, "comments");
+  expect(open()).toEqual({ comments: true, checks: false });
+  tabs.toggle(pr, "checks");
+  expect(open()).toEqual({ comments: false, checks: true });
+  tabs.toggle(pr, "checks");
+  expect(open()).toBeUndefined();
 });

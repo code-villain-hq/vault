@@ -53,11 +53,12 @@ export function createReviewPrReaders(connection: string) {
     );
   }
 
+  /** Tabs: one section open at a time; choosing the open one closes it. */
   function toggle(target: Target, section: Section) {
     const key = keyOf(target);
     const entry = store.getState().get(key);
-    const sections = { comments: entry?.comments ?? false, checks: entry?.checks ?? false };
-    sections[section] = !sections[section];
+    const sections = { comments: false, checks: false };
+    sections[section] = !(entry?.[section] ?? false);
     if (!sections.comments && !sections.checks) put(key);
     else if (entry) put(key, { ...entry, ...sections });
     else start(target, key, sections);

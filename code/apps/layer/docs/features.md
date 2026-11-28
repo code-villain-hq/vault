@@ -1420,6 +1420,8 @@ dot marks it only while something waits on your review.
   fork PRs, and PRs with no Layer task or registered repository. Open a
   section to read that PR in place, without navigating, starting a task,
   checking out a branch, writing to GitHub or sending to an agent.
+  The two are tabs under the card: one open at a time, read below them,
+  and choosing the open tab again closes it, so neither tab moves.
   **Refresh** reloads open details; grouping and sorting do not load them.
   Each section reports loading, empty, failed and incomplete reads
   independently (PR-18). Card clicks, **GitHub**, **Start task**, grouping

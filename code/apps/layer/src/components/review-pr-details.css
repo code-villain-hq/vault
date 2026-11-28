@@ -1,10 +1,13 @@
 .review-pr-details {
-  display: flex;
-  flex-wrap: wrap;
-  column-gap: 8px;
+  margin-top: 6px;
   cursor: auto;
   user-select: text;
 }
-.review-pr-details > .pr-detail:has(> [aria-expanded="true"]) {
-  flex-basis: 100%;
+/* A card is as wide as the window: keep a check's state near its name. */
+.review-pr-panel {
+  max-width: 720px;
+  margin-top: 8px;
+}
+.review-pr-panel .pr-comments {
+  margin-top: 0;
 }
